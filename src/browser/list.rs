@@ -1,4 +1,4 @@
-//! The one shared list layout (ADR-0028 decision 2, REQ-06.016).
+//! The one shared list layout (ADR-0028 decision 2, REQ-006.016).
 //!
 //! A list page builds a [`ListPlan`] from declared data — the record index and
 //! the descriptor (or static Backlog/Decision) slot columns — and renders it

@@ -10,8 +10,8 @@ references:
   - ADR-0028
   - TECH-070
   - TECH-077
-  - REQ-07.002
-  - REQ-07.004
+  - REQ-007.002
+  - REQ-007.004
 status: Done
 assignee:
   - architect
@@ -30,7 +30,7 @@ type: architecture
 Context: MS-033 refinement (TASK-245) is blocked by one ambiguity. ADR-039 decision 25 says a document descriptor's list slots come from its seed entry and are "currently none", and decision 6 forbids the reserved key `group` as a slot key. The implemented `src/browser/routes.rs::PRESENTATION` renders document slots today: `req` and `nfr` `[group]`, `rule` `[applicability]`, `audit` `[audit_type]`, `ui-mockup` `[task, specs]`; the characterization corpus (`tests/fixtures/characterization/corpus/expected/http/list-req/page.html`) expects the `Group` column. TASK-249 must seed those slot sets to keep MS-033 behaviour-neutral, so an accepted decision must settle them first.
 
 Scope:
-1. Amend ADR-039 decisions 6 and 25 to declare the exact seed slot sets for the eleven seed document types of REQ-07.002 (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`), including the engine-owned `group` link for the grouped types, or record a new accepted ADR that owns the seed slot sets. The decision must be internally consistent about the reserved `group` key in decision 6.
+1. Amend ADR-039 decisions 6 and 25 to declare the exact seed slot sets for the eleven seed document types of REQ-007.002 (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`), including the engine-owned `group` link for the grouped types, or record a new accepted ADR that owns the seed slot sets. The decision must be internally consistent about the reserved `group` key in decision 6.
 2. Keep the browser list columns unchanged so MS-033 stays behaviour-neutral: the declared sets reproduce today's `PRESENTATION` output (`req`/`nfr` `[group]`, `rule` `[applicability]`, `audit` `[audit_type]`, `ui-mockup` `[task, specs]`, every other seed type no slots).
 3. Align the accepted decision text with the `PRESENTATION` slot data and the characterization corpus.
 4. Update requirement and specification references only where needed; do not change their normative content.

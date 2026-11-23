@@ -25,7 +25,7 @@ type: implementation
 ---
 
 ## Description
-Context: the pre-refactor engine is far outside the NFR-007.001 and NFR-007.002 targets. The only recorded numbers are inventory 14.2 s and `/doc/REQ-07.001` view 1.8 s at 382 active records (MS-032 description; NFR-007.001 and NFR-007.002 rationale). A reproducible harness is needed both to re-measure that baseline and to compare every later milestone against it.
+Context: the pre-refactor engine is far outside the NFR-007.001 and NFR-007.002 targets. The only recorded numbers are inventory 14.2 s and `/doc/REQ-007.001` view 1.8 s at 382 active records (MS-032 description; NFR-007.001 and NFR-007.002 rationale). A reproducible harness is needed both to re-measure that baseline and to compare every later milestone against it.
 
 Grounding in the current code:
 - The server logs one line per request only in debug mode: `{method} {path} {status} {n}ms` in `src/browser/mod.rs::handle_connection` (`src/browser/mod.rs:317` to `320`, gated on `state.debug`). This is the server-observed latency the NFRs ask for. No timing header exists.
@@ -54,7 +54,7 @@ The first five measured samples of run A decide the band per route and profile, 
 
 7. Output: `docs/benchmarks/MS-032-baseline.md` (method, host, protocol, sample counts, one table per profile with p50 and p95 for server and wall, the 382-record comparison, and the root-cause note) and `docs/benchmarks/raw/<profile>-run-{a,b}.json` (machine-readable result). Every result records: profile, active record count, corpus hash, exact harness command, git commit, rustc version, build profile (release, LTO and strip), host (CPU model, physical and logical cores, RAM, disk type, kernel, distribution) and the date with timezone. The sample-count table records, per route and profile, the band, the warm-up count, the measured count, and the reason for any count below the full protocol. The summary states that MS-036 measures with the full NFR-007 protocol and that the reduced counts are baseline-only.
 
-8. Historical figures: transcribe `inventory 14.2 s` and `/doc/REQ-07.001 view 1.8 s at 382 active records` with their provenance (MS-032; NFR-007.001 and NFR-007.002 rationale), then place the measured `records-382` numbers next to them. The historical corpus is not preserved, so exact equality is not expected and no corpus parameter is tuned to approach the historical value. The `/doc/REQ-07.001` view is represented by `REQ-001` in the generated corpus; say so explicitly.
+8. Historical figures: transcribe `inventory 14.2 s` and `/doc/REQ-007.001 view 1.8 s at 382 active records` with their provenance (MS-032; NFR-007.001 and NFR-007.002 rationale), then place the measured `records-382` numbers next to them. The historical corpus is not preserved, so exact equality is not expected and no corpus parameter is tuned to approach the historical value. The `/doc/REQ-007.001` view is represented by `REQ-001` in the generated corpus; say so explicitly.
 
 9. Reference hardware: compare the measured host against the NFR-007.001 description (4 vCPU, 8 GiB RAM, SSD, Linux, one server process, loopback HTTP, release build with LTO and strip) and flag every deviation in the summary document.
 

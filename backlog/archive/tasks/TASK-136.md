@@ -16,8 +16,8 @@ labels:
 milestone: MS-022
 dependencies: []
 references:
-  - docs/requirements/business/REQ-06.016.md
-  - docs/requirements/business/REQ-06.015.md
+  - docs/requirements/business/REQ-006.016.md
+  - docs/requirements/business/REQ-006.015.md
   - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - src/browser/render.rs
@@ -25,8 +25,7 @@ references:
   - src/browser/templates
   - docs/specifications/browser-shell-shared-list-layout-and-page-width.md
   - docs/specifications/ui/browser-final-cross-type-ui.md
-  - docs/requirements/business/REQ-06.013.md
-  - >-
+  - docs/requirements/business/REQ-006.013.md
     docs/architecture/adr/ADR-0020-registry-derived-browser-views-for-document-types.md
   - tests/record_view_projection.rs
   - src/browser/app.css
@@ -36,7 +35,7 @@ ordinal: 41540
 
 
 ## Description
-**Why.** REQ-06.016 requires one shared list layout for every artifact family, and ADR-0028 is Accepted. Today seven templates each repeat the page chrome, there are two list templates (`list.html`, `document_list.html`) and per-family list builders inside a 4.7k-line `render.rs`; the 1040 px cap and the fixed 210 px sidebar column are hard-coded in `app.css`; and there is no page shell module, so width policy has nowhere to live.
+**Why.** REQ-006.016 requires one shared list layout for every artifact family, and ADR-0028 is Accepted. Today seven templates each repeat the page chrome, there are two list templates (`list.html`, `document_list.html`) and per-family list builders inside a 4.7k-line `render.rs`; the 1040 px cap and the fixed 210 px sidebar column are hard-coded in `app.css`; and there is no page shell module, so width policy has nowhere to live.
 
 **What.** Introduce the shell, the server-side width contract, and the one shared list layout, and prove the layout on one reference family before it spreads. This task is the foundation for TASK-142; it must not leave a second list path behind for the family it migrates.
 
@@ -47,12 +46,12 @@ ordinal: 41540
 - `PageWidth { Capped, Full }` as a route property, `Capped` by default, rendered as `class="app"`; `Full` renders `class="app app--full"`. No client-side width switching. Assigning `Full` to the board, the `.app--full` rule, and the toggle are TASK-144.
 - Migrate one reference family to the shared layout and replay its fixtures.
 - Capture characterization fixtures for **every** family from the pre-change binary into committed test fixtures: row sets, row order, per-row field values, grouped rows for requirements and NFRs, archived exclusion, heading and count note. TASK-142 replays them.
-- Preserve detail, edit, and error pages and their typed field sets; only list views become uniform (REQ-06.016).
+- Preserve detail, edit, and error pages and their typed field sets; only list views become uniform (REQ-006.016).
 
 **Out of scope.** Migrating the remaining families and deleting `document_list.html` (TASK-142); the nav toggle, `localStorage`, `.bleed`, and the `.app--full` CSS (TASK-144); the board action (TASK-147); math and diagram rendering (TASK-145, TASK-146); any new dependency, template engine, or client framework.
 
 **Verified facts (refinement).**
-- `GET /?type=task` renders the kanban board (`render::board_page`; REQ-06.013, MOCK-0002). The task family has **no table list route**; its only list-shaped markup is the empty-project fallback inside `board_page`. See OQ-1.
+- `GET /?type=task` renders the kanban board (`render::board_page`; REQ-006.013, MOCK-0002). The task family has **no table list route**; its only list-shaped markup is the empty-project fallback inside `board_page`. See OQ-1.
 - No list route renders an action cell today. Every list shows a status text, an ID+title link, and Created/Updated values. The shared layout therefore adds a two-link action cell and converts `ul.req-list` rows into a table.
 - Every page template currently contains the full chrome, so wrapping "every page" in the shell also requires turning `document_list.html`, `document_detail.html`, and `document_edit.html` into body fragments. That is chrome removal only; their content and `document_list.html` itself survive until TASK-142.
 
@@ -96,7 +95,7 @@ ordinal: 41540
 Implementation plan — file level. Steps 0–1 and 3 are not UI-gated; steps 5–6 are.
 
 0. Preconditions (blocking; resolve before any code)
-   - OQ-1: confirm the reference family (recommended: milestone). If the answer is "task", stop: the task family has no list route and adding one contradicts REQ-06.013.
+   - OQ-1: confirm the reference family (recommended: milestone). If the answer is "task", stop: the task family has no list route and adding one contradicts REQ-006.013.
    - OQ-2: confirm whether `created_date` stays in the shared list (ADR-0028 amendment + test update, or an added column between family slots and Updated).
    - UI gate: MOCK id allocated, approved, and recorded in the UI description before step 6.
    - Record the answer to OQ-1/OQ-2 in the ticket with `--append-notes`.
@@ -164,7 +163,7 @@ created: 2026-11-15T18:30:00Z
 
 ---
 
-Refinement outcome: not execution-ready. (1) UI gate: the shared list is a visible change (Status moves, Created column removed, ul rows become a table, View/Edit action cell added), so a ui-designer mockup is required — recorded in docs/specifications/ui/browser-shell-and-shared-list-ui.md and reconciled in browser-final-cross-type-ui.md section 5. No waiver claimed. (2) OQ-1: the task family has no list route; /?type=task is the REQ-06.013 kanban board, so the reference family must be chosen (recommended: milestone). (3) OQ-2: the fixed order drops created_date, contradicting ADR-0028 resolved question 3 and tests/record_view_projection.rs, so an ADR amendment or an added column is needed. Feature specification: docs/specifications/browser-shell-shared-list-layout-and-page-width.md.
+Refinement outcome: not execution-ready. (1) UI gate: the shared list is a visible change (Status moves, Created column removed, ul rows become a table, View/Edit action cell added), so a ui-designer mockup is required — recorded in docs/specifications/ui/browser-shell-and-shared-list-ui.md and reconciled in browser-final-cross-type-ui.md section 5. No waiver claimed. (2) OQ-1: the task family has no list route; /?type=task is the REQ-006.013 kanban board, so the reference family must be chosen (recommended: milestone). (3) OQ-2: the fixed order drops created_date, contradicting ADR-0028 resolved question 3 and tests/record_view_projection.rs, so an ADR amendment or an added column is needed. Feature specification: docs/specifications/browser-shell-shared-list-layout-and-page-width.md.
 
 ---
 
@@ -173,7 +172,7 @@ created: 2026-11-15T18:42:00Z
 
 ---
 
-Architecture review resolved the blockers (ADR-0028 amended in place, 2026-11-15, owner confirmation pending). OQ-1: the milestone list (/?type=milestone) is the reference family; the task family has no list route and gets none (REQ-06.013 owns the board). OQ-2: created_date stays as a structural Created column, fixed order ID, Title, Status, family slot(s), Created, Updated, Actions, with labels/references kept in the Title cell for REQ-06.004 parity. OQ-3: release declares no family slot and 'status' is a reserved slot key. Reference-family migration, the shell, PageWidth, and fixture capture are unblocked; AC2/AC3 remain UI-gated pending the MOCK id.
+Architecture review resolved the blockers (ADR-0028 amended in place, 2026-11-15, owner confirmation pending). OQ-1: the milestone list (/?type=milestone) is the reference family; the task family has no list route and gets none (REQ-006.013 owns the board). OQ-2: created_date stays as a structural Created column, fixed order ID, Title, Status, family slot(s), Created, Updated, Actions, with labels/references kept in the Title cell for REQ-006.004 parity. OQ-3: release declares no family slot and 'status' is a reserved slot key. Reference-family migration, the shell, PageWidth, and fixture capture are unblocked; AC2/AC3 remain UI-gated pending the MOCK id.
 
 ---
 

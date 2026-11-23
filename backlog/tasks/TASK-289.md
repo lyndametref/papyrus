@@ -5,7 +5,7 @@ created_date: '2026-11-20T17:44:23Z'
 updated_date: '2026-11-23T14:31:28Z'
 labels: []
 references:
-  - REQ-07.004
+  - REQ-007.004
   - NFR-007.001
   - NFR-007.002
   - NFR-007.003

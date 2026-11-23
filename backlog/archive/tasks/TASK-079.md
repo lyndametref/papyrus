@@ -18,18 +18,14 @@ references:
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-01.005.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-001.005.md
   - docs/specifications/shared-record-envelope-and-front-matter-patcher.md
-  - >-
     docs/specifications/render-one-metadata-projection-in-cli-and-browser-views.md
   - docs/specifications/task-management.md
-  - >-
     docs/specifications/migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write.md
-  - >-
     docs/specifications/expose-front-matter-metadata-options-on-all-record-commands.md
-  - >-
     docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md
   - docs/specifications/milestone-and-release-management.md
   - docs/specifications/search-complete-unified.md

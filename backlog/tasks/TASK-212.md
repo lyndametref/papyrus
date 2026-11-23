@@ -8,10 +8,10 @@ references:
   - AUD-132
   - MS-030
   - TASK-209
-  - REQ-06.020
-  - REQ-06.021
-  - REQ-06.022
-  - REQ-06.013
+  - REQ-006.020
+  - REQ-006.021
+  - REQ-006.022
+  - REQ-006.013
   - TC-066
   - TC-066..TC-097
 status: Done
@@ -19,7 +19,6 @@ assignee:
   - rust-dev
 milestone: MS-030
 dependencies:
-  - TASK-209
 ordinal: 55
 documentation:
   - src/browser/mod.rs

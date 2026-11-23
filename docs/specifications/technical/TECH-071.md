@@ -11,13 +11,13 @@ references:
   - ADR-0036
   - ADR-0037
   - ADR-0039
-  - REQ-01.005
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-001.005
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
 status: verified
 ---
 # TECH-071 Registry-Sourced Record Descriptors

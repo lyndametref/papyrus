@@ -7,8 +7,8 @@ labels:
   - bug
 references:
   - RE-003
-  - REQ-06.002
-  - NFR-01.002
+  - REQ-006.002
+  - NFR-001.002
 status: Done
 assignee:
   - rust-dev

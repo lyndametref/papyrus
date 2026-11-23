@@ -420,9 +420,9 @@ The browser assigns each response exactly one cache class:
 - Help and list order follow the effective `document_types` map order, not the seed `order`.
 - Fields, headings, options, required flags, per-field verbs, and status sets are configuration and seed data. Changing one is a YAML edit; `config set` cannot edit a field.
 
-### Man pages and NFR-03.003
+### Man pages and NFR-003.003
 
-The document command family is generated from project configuration. Config-defined slugs have no man page: ADR-0021 remains Proposed and the scope decision is deferred. NFR-03.003 is not claimed for these slugs, and the gap is recorded as a release risk. This release adds no man-page source, generator, or package content for them.
+The document command family is generated from project configuration. Config-defined slugs have no man page: ADR-0021 remains Proposed and the scope decision is deferred. NFR-003.003 is not claimed for these slugs, and the gap is recorded as a release risk. This release adds no man-page source, generator, or package content for them.
 
 ### Verify the upgrade
 
@@ -439,7 +439,7 @@ The document command family is generated from project configuration. Config-defi
 
 - **Shared single record view layout.** Every managed record type with a single record view uses one layout: a summary card showing only record ID, created date, and updated date (plus owning group for a sub-requirement); labels as a taglist under the title; dependencies and references at the end as collapsible native `<details>` sections, shown only when non-empty and usable without JavaScript. UI mockup views are excluded.
 - **Editable browser configuration view and store relocation.** The browser serves `/config` (alias `/?type=config`), shows effective values, marks explicitly set keys, and edits through the same configuration path as the CLI. Editing a folder key, including `papyrus config set backlog_directory <path>`, relocates the store as one folder move: every file and subfolder is moved and the empty old folder removed. A conflict, unwritable destination, or path outside the project exits `4`, moves nothing, and leaves the configuration unchanged. The browser never moves a folder itself.
-- **Non-functional requirements grouped under their owning group.** The browser derives the owning group from the ID prefix (`NFR-04.002` belongs to `NFR-04`), shows the group title with a number fallback, and renders empty groups explicitly.
+- **Non-functional requirements grouped under their owning group.** The browser derives the owning group from the ID prefix (`NFR-004.002` belongs to `NFR-004`), shows the group title with a number fallback, and renders empty groups explicitly.
 - **Quiet browser console and browser-only `--debug`.** The browser prints only errors by default. `papyrus browser --debug` logs one line per request to standard error with method, path, status, and duration; headers and bodies are never logged. `--debug` is not a global option, and `--json` output stays a single object on standard output.
 - **One ID space.** `storage_id`, `display_id`, and `storage_path` are gone from JSON, routes, links, and pages. Every surface shows only Papyrus IDs, and a Backlog ID is treated as an unknown record.
 

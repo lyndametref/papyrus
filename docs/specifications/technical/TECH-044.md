@@ -12,8 +12,8 @@ references:
   - ADR-0011
   - ADR-0012
   - ADR-0013
-  - NFR-04.004
-  - REQ-01.005
+  - NFR-004.004
+  - REQ-001.005
   - TASK-69
 status: verified
 ---
@@ -22,7 +22,7 @@ status: verified
 ## Description
 ## Purpose
 
-This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — lazy migration of task and milestone files to the Backlog.md on-disk layout, Backlog.md storage IDs, the `m-0` offset, and the byte-identical Backlog.md body contract — was renounced by NFR-04.004 and replaced by the Papyrus-native layout of ADR-0010. The live contract is now defined by:
+This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — lazy migration of task and milestone files to the Backlog.md on-disk layout, Backlog.md storage IDs, the `m-0` offset, and the byte-identical Backlog.md body contract — was renounced by NFR-004.004 and replaced by the Papyrus-native layout of ADR-0010. The live contract is now defined by:
 
 - `docs/specifications/papyrus-native-record-layout-and-single-id-space.md` (native layout and single ID space)
 - `docs/specifications/import-backlog-md-records.md` (one-way Backlog.md import)
@@ -51,7 +51,7 @@ All former in-scope and out-of-scope items are withdrawn; see the superseding sp
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-69 (historical) |
-| Requirements | NFR-04.004 (renunciation); REQ-01.005 (single ID space) |
+| Requirements | NFR-004.004 (renunciation); REQ-001.005 (single ID space) |
 | ADRs | ADR-0010, ADR-0011, ADR-0012, ADR-0013 (superseding); ADR-0007, ADR-0008, ADR-0009 (superseded) |
 | Superseding specifications | `papyrus-native-record-layout-and-single-id-space.md`, `import-backlog-md-records.md` |
 | UI mockups | none |

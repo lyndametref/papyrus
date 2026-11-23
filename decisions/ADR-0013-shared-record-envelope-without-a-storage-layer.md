@@ -18,7 +18,7 @@ accepted
 
 ADR-0012 makes Papyrus-owned YAML front matter the single metadata source and requires patch-based, field-preserving writes and lazy front-matter adoption. ADR-0010 makes the on-disk layout Papyrus-native with one ID space. ADR-0011 adds a one-way import that must produce ordinary Papyrus records. ADR-0006 fixes optimistic concurrency and atomic writes for browser edits.
 
-ADR-0009 (Accepted) established the right structure — one shared record module, one patch API, one writer for CLI and browser, one metadata projection, and a staged delivery — but it is entangled with the storage-identity layer that NFR-04.004 and REQ-01.005 remove: `record::identity` is defined as a two-way display/storage translator, descriptors declare a storage ID pattern and directory, the store translates IDs on the way in and out, Stage 2 exists only to build that translation, and Stage 4 exists only to move records into the Backlog.md layout. Leaving ADR-0009 Accepted would keep a contradicting instruction in force, and its body is frozen, so this ADR supersedes it and restates the envelope with the storage layer removed.
+ADR-0009 (Accepted) established the right structure — one shared record module, one patch API, one writer for CLI and browser, one metadata projection, and a staged delivery — but it is entangled with the storage-identity layer that NFR-004.004 and REQ-001.005 remove: `record::identity` is defined as a two-way display/storage translator, descriptors declare a storage ID pattern and directory, the store translates IDs on the way in and out, Stage 2 exists only to build that translation, and Stage 4 exists only to move records into the Backlog.md layout. Leaving ADR-0009 Accepted would keep a contradicting instruction in force, and its body is frozen, so this ADR supersedes it and restates the envelope with the storage layer removed.
 
 The starting codebase already contains the shared module (`src/record/{frontmatter,document,patch,store,identity,descriptor,migrate,view}.rs`) plus fourteen legacy per-type modules and two browser write paths. The no-drift rule of ADR-0009 decision 7 is only partly enforced: `src/task.rs` and `src/milestone.rs` still resolve three directory locations each and still allocate numbers through the storage-offset identity code, and `src/record/migrate.rs` still contains the legacy-to-Backlog body conversion and relocation.
 
@@ -52,8 +52,8 @@ Forces: one writer so preservation is testable once; CLI/browser parity; single 
    - **Stage 1 — envelope.** `record::frontmatter` + `document` + `patch` + `store` read both legacy (no front matter) and new shapes. Largely present.
    - **Stage 2 — native identity and location.** Replace the translation identity with Papyrus-only identity and allocation; descriptors resolve directories from configuration; tolerant stem resolution (`<PREFIX>-<digits>[-slug]`); read aliases for `tasks/archived/` and `milestones/archived/`; delete storage prefixes, offsets, `to_storage_id`, `to_display_id`, the `backlog/config.yml` reader, and slug-based identity. Remove the milestone `+1` offset and the `m-0` base from allocation and tests.
    - **Stage 3 — document front-matter adoption.** Lazy per-record adoption for document record types on first read and first write, built only on `record::patch`, with dry run and per-file inventory (ADR-0012 decision 9). Requires Stage 1 only.
-   - **Stage 4 — task and milestone adoption.** Front-matter-only adoption for tasks and milestones, including retirement of legacy `## Status`-style sections on write. The legacy-to-Backlog body conversion, the Backlog-layout relocation, and the "byte-identical Backlog body" guarantee are deleted with their tests, because the target shape no longer exists (NFR-04.004). Requires Stages 1 and 2.
-   - **Stage 5 — relocation.** `record::relocate` and its integration into `config set` and the browser configuration view (REQ-01.002, REQ-06.008): whole-folder move, pre-flight conflict detection, rollback, containment.
+   - **Stage 4 — task and milestone adoption.** Front-matter-only adoption for tasks and milestones, including retirement of legacy `## Status`-style sections on write. The legacy-to-Backlog body conversion, the Backlog-layout relocation, and the "byte-identical Backlog body" guarantee are deleted with their tests, because the target shape no longer exists (NFR-004.004). Requires Stages 1 and 2.
+   - **Stage 5 — relocation.** `record::relocate` and its integration into `config set` and the browser configuration view (REQ-001.002, REQ-006.008): whole-folder move, pre-flight conflict detection, rollback, containment.
    - **Stage 6 — import.** `papyrus import backlog` (ADR-0011) on top of Stages 1, 2, 4 and 5.
    - **Stage 7 — removal and enforcement.** Delete the legacy per-type parsers/writers and the browser write path; enforce the decision 7 checks.
    - **Stage 8 — verification.** Adoption idempotency and byte identity; no Backlog-shaped write anywhere; single-ID surfaces in CLI text, `--json`, browser JSON, browser HTML and URLs; import fidelity and excluded scope; relocation atomicity and conflict behaviour; search still indexing whole persisted text (now including front matter) as documented.
@@ -70,7 +70,7 @@ Forces: one writer so preservation is testable once; CLI/browser parity; single 
 - "Preserve everything the operation does not change" is one tested property instead of fourteen untested behaviours, shared by CLI, browser, adoption and import.
 - CLI and browser cannot disagree about metadata or identity because there is one reader, one identity function and one projection.
 - The concrete removal list makes the renunciation enforceable: any surviving storage-ID code path fails review mechanically.
-- The relocation routine is written once and serves both REQ-01.002 and REQ-06.008.
+- The relocation routine is written once and serves both REQ-001.002 and REQ-006.008.
 - Imported records are ordinary records from the moment they are written, because the import cannot bypass the writer.
 
 **Negative:**
@@ -100,7 +100,7 @@ Forces: one writer so preservation is testable once; CLI/browser parity; single 
 5. `record::store` remains the only record writer, and the ADR-0006 version-token contract is unchanged for browser writes.
 6. `record::relocate` is the only folder-move implementation and is invoked by `config set`; the browser may not move folders.
 7. Existing `--json` and browser JSON consumers must be re-tested after the storage-ID fields are removed; specification updates for `papyrus(1)` and `docs/specifications/browser-*.md` are owned by `business-analyst`/`tech-writer`.
-8. Stage order is a planning constraint: Stage 2 before Stages 4 and 6; Stage 1 before everything; verification (Stage 8) is a gate on the release that claims NFR-04.004.
+8. Stage order is a planning constraint: Stage 2 before Stages 4 and 6; Stage 1 before everything; verification (Stage 8) is a gate on the release that claims NFR-004.004.
 
 ## Alternatives Considered
 
@@ -109,10 +109,10 @@ Forces: one writer so preservation is testable once; CLI/browser parity; single 
 | Shared envelope, single writer, Papyrus-only identity, staged removal (this ADR) | Selected | Keeps the structure that made preservation testable and drops only the storage layer that the requirements remove. |
 | Keep ADR-0009 in force and treat the translation as dead code | Rejected | The ADR would still mandate translation, Stage 2 and Stage 4 in the Backlog.md layout; accepted decisions must not contradict requirements. |
 | Add front-matter and identity code to each of the fourteen modules | Rejected | Guarantees drift across CLI, browser, adoption and import. |
-| Keep the browser serializer and give the CLI a separate one | Rejected | Two writers already disagree; REQ-06.004 requires identical values and identical preservation. |
+| Keep the browser serializer and give the CLI a separate one | Rejected | Two writers already disagree; REQ-006.004 requires identical values and identical preservation. |
 | A standalone import script outside the crate | Rejected | A second writer with untested preservation; the wrapper-script form is allowed only as a thin delegate (ADR-0011). |
 | A Markdown/AST library | Rejected | New dependency, and re-rendering would not preserve unknown content byte-identically (ADR-0005). |
-| Store records in a database or index cache | Rejected | Violates NFR-04.001 text-file persistence and would be a parallel store. |
+| Store records in a database or index cache | Rejected | Violates NFR-004.001 text-file persistence and would be a parallel store. |
 | Delete only the two conflicting ADRs' decisions and leave the code | Rejected | Leaves accepted decisions unenforceable and the code contradicting the requirements. |
 
 ## References
@@ -123,6 +123,6 @@ Forces: one writer so preservation is testable once; CLI/browser parity; single 
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md` — metadata contract.
 - `docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md` — atomic writes and version tokens.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — module boundaries and no new dependencies.
-- `docs/requirements/business/REQ-05.011.md`, `REQ-06.004.md`, `REQ-01.005.md`, `REQ-01.002.md`, `REQ-06.008.md`.
-- `docs/requirements/non-functional/NFR-04.004.md`, `NFR-04.001.md`, `NFR-04.002.md`.
+- `docs/requirements/business/REQ-005.011.md`, `REQ-006.004.md`, `REQ-001.005.md`, `REQ-001.002.md`, `REQ-006.008.md`.
+- `docs/requirements/non-functional/NFR-004.004.md`, `NFR-004.001.md`, `NFR-004.002.md`.
 - Implementation: `src/record/*`, `src/task.rs`, `src/milestone.rs`, `src/browser/records.rs`, `src/commands.rs`, `src/init.rs`.

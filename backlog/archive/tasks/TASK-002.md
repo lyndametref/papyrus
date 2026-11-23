@@ -10,16 +10,16 @@ milestone: MS-001
 dependencies:
   - TASK-001
 references:
-  - docs/requirements/business/REQ-01.md
-  - docs/requirements/business/REQ-01.001.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-01.003.md
-  - docs/requirements/business/REQ-01.004.md
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/non-functional/NFR-02.001.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-001.md
+  - docs/requirements/business/REQ-001.001.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-001.003.md
+  - docs/requirements/business/REQ-001.004.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/non-functional/NFR-002.001.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-002-init-command-behavior.md
   - docs/business-rules/BR-003-config-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -55,7 +55,7 @@ Assumptions:
 - Assumption: `git` is available where `--no-git` is not used; otherwise init fails with a runtime error.
 - Assumption: single-crate layout (`src/main.rs` + `src/lib.rs`) is retained.
 - Assumption: `init` creates configured directories from effective defaults and never overwrites existing files.
-- Assumption: configuration is stored as YAML; any YAML runtime dependency must be license-audited for GPL-3.0-or-later compatibility (NFR-06.001/002).
+- Assumption: configuration is stored as YAML; any YAML runtime dependency must be license-audited for GPL-3.0-or-later compatibility (NFR-006.001/002).
 - Assumption: input sanitization uses normalization/escaping, rejecting only values that cannot be normalized into a valid form.
 - Assumption: the project-directory boundary resolves symbolic links to canonical paths.
 
@@ -80,7 +80,7 @@ Dependencies: TASK-1 (Done).
 - [ ] Outside `init`, Papyrus reads and writes only within the canonicalized selected project directory; boundary violations fail without modifying files.
 - [ ] All configuration and other persisted data is written as UTF-8 text; no binary data is written.
 - [ ] User-controlled input is sanitized by normalization/escaping before use; values that cannot be normalized into a valid form fail with exit code 4.
-- [ ] Security is explicitly considered in implementation and review records (NFR-02.001).
+- [ ] Security is explicitly considered in implementation and review records (NFR-002.001).
 
 ## Definition of Done
 - [ ] #1 All acceptance criteria are verified by automated tests or documented manual checks.

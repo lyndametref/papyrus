@@ -10,7 +10,7 @@ references:
   - ADR-0019
   - ADR-0024
   - TECH-077
-  - REQ-07.002
+  - REQ-007.002
   - TC-103
   - TC-104
   - TC-107
@@ -53,7 +53,7 @@ Scope:
 4. Emitter: `to_config_yaml` renders a sequence whose elements are mappings as a block sequence with `- key: value` items, keeps flat string lists inline as `[a, b]`, and reproduces a quoted heading such as `"## User Story"` unchanged. The list-valued classifier stays `config::is_list_valued_key` (ADR-0024 downstream constraint 1): `fields`, `group.fields`, `member.fields`, `slots`, and `api_aliases` are not comma-separated keys, and `statuses` remains the only list-valued key. The existing round-trip self-check in `to_config_yaml` stays.
 5. Configuration commands: with no `document_types` in the file, `config set document_types.<seed-slug>.<leaf>` materializes exactly that one entry, carrying the seed prefix and directory plus the change (TC-114), and never the whole seed set; an entry for a slug with no seed entry cannot be introduced by `config set`, because `prefix` and `directory` are never filled, so it remains a file edit. `config set` applies one change, validates the resulting configuration, and writes only on success; a nested leaf creates only its path. `config get` and `config list` resolve one selector in both the keyed (`fields[story].heading`) and indexed (`fields[0].heading`) forms. `config unset` of `statuses` resets it to the seed collection and unset of a scalar removes the override. `slots` and `api_aliases` stay declarative file data (ADR-0024 amendment).
 6. `init` writes a minimal file: each entry declares `prefix` and `directory`, plus `enabled` only when the walkthrough disables it; no seed-filled scalar or collection is written. The generated file validates. `init --force` still replaces an invalid file.
-7. No document command, record byte, JSON payload, HTTP status, or browser page changes. The only user-visible differences are the D14 configuration-surface ones: minimal `init` output and a full `config list` with selector paths (RE-010 D14, REQ-07.002).
+7. No document command, record byte, JSON payload, HTTP status, or browser page changes. The only user-visible differences are the D14 configuration-surface ones: minimal `init` output and a full `config list` with selector paths (RE-010 D14, REQ-007.002).
 
 Invariants:
 - Old configuration files must parse to the same effective document-type descriptor set after this task. A file that loaded before loads without edits, and the fill and replace rules reproduce the same prefix, directory, enabled flag, statuses, default status, model, verb set, headings, and front-matter keys (MS-033 AC-1, AC-2).
@@ -62,27 +62,27 @@ Invariants:
 Out of scope: the seed values (TASK-249), the document engine and typed modules (MS-034), and the read path (TASK-250). No dependency, ordinal, milestone, or assignee changes.
 
 Assumptions:
-- `config set` on a field property is refused because REQ-07.002 and REQ-01.002 make any change to a field a configuration file edit; only `config get` and `config list` resolve field selectors. Scalar and `statuses` writes keep their documented behaviour.
+- `config set` on a field property is refused because REQ-007.002 and REQ-001.002 make any change to a field a configuration file edit; only `config get` and `config list` resolve field selectors. Scalar and `statuses` writes keep their documented behaviour.
 - Materialization for a seed slug uses the seed prefix and directory that the entry would otherwise inherit; this is the TC-114 case and is not the "never filled" rule, which governs an entry present in the file.
 - `init` keeps writing one entry per enabled or disabled seed type; only the per-entry content becomes minimal.
 - The existing test `tests/cli.rs::init_writes_the_eleven_document_types_with_seeded_flow_statuses` is updated to assert the minimal entry and the absence of seed-filled keys; this is the documented D14 delta, not a regression.
 
 Definition of done: the loader, validator, selector resolver, and emitter cover the nested entry and the field sequence; every diagnostic matches the `document_types.<slug>.<path>` form in one pass; an emitted file reparses to an equal value; `init` writes minimal entries; `cargo test` and `cargo clippy --all-targets -- -D warnings` are clean.
 ## Acceptance Criteria
-- [ ] An unknown entry key, an unknown field-item key, and an unknown enum value (`kind: invalid`, a verb other than `create` and `edit`, `reference_visibility: maybe`) are each rejected with a `document_types.<slug>.<path>` diagnostic and exit code 4, in one aggregated pass in deterministic order (TC-103, TC-104, REQ-07.002, TECH-077 sections 1 and 8).
+- [ ] An unknown entry key, an unknown field-item key, and an unknown enum value (`kind: invalid`, a verb other than `create` and `edit`, `reference_visibility: maybe`) are each rejected with a `document_types.<slug>.<path>` diagnostic and exit code 4, in one aggregated pass in deterministic order (TC-103, TC-104, REQ-007.002, TECH-077 sections 1 and 8).
 - [ ] `fields: []` parses as a valid empty field sequence, and a grouped entry that declares a top-level `fields` is rejected (TC-107, TC-108, ADR-036 decision 26).
 - [ ] A field with neither `heading` nor `frontmatter_key`, a reserved key or `frontmatter_key`, and a duplicate field key within one role are rejected with the keyed or indexed selector and the field key named; the same key in `group.fields` and `member.fields` is accepted (TC-105, TC-106, ADR-036 decisions 21 to 23).
-- [ ] Fill and replace match ADR-036 decision 32: an absent scalar inherits the seed and a present scalar overrides it; an absent collection inherits the seed and a present collection replaces it including `fields: []`; a present `group` block replaces only the group role; a missing `prefix` or `directory` is rejected even for a seed slug; an absent slug stays absent and no seed entry is re-added (TC-109, REQ-07.002).
+- [ ] Fill and replace match ADR-036 decision 32: an absent scalar inherits the seed and a present scalar overrides it; an absent collection inherits the seed and a present collection replaces it including `fields: []`; a present `group` block replaces only the group role; a missing `prefix` or `directory` is rejected even for a seed slug; an absent slug stays absent and no seed entry is re-added (TC-109, REQ-007.002).
 - [ ] The emitter round-trips every fixture configuration: `to_config_yaml` reparses to an equal value, a sequence of mappings renders as a block sequence, a flat string list stays inline, and `"## User Story"` is reproduced with its quotes and two hashes (MS-033 AC-4, ADR-0024).
 - [ ] When the file declares no `document_types`, `config set document_types.req.enabled false` writes exactly one `req` entry carrying its seed prefix and directory plus the disabled value, writes no other seed entry, and leaves the other seed types effective from the seed; an invalid result is refused with the file byte-identical, and `config set document_types.req.statuses active,archived,review` still writes a YAML flow sequence (TC-114, TC-115, TC-190).
 - [ ] `config unset document_types.req.statuses` resets the list to the seed collection, and `config unset` of a scalar removes the override (TC-116, ADR-0024 decision 6).
 - [ ] `config list` prints the full effective configuration with seed-filled values and a selector path for every leaf, including `document_types.req.group.fields[story].heading`; `config get document_types.req.group.fields[0].heading` and the keyed form return the same value, and an unknown key or out-of-range index is rejected with the same diagnostic form (TC-172, TC-191, TC-117).
-- [ ] `papyrus init` writes each entry with only `prefix` and `directory`, plus `enabled: false` when the walkthrough disables it, writes no seed-filled key, and the generated file validates; `init --force` still replaces an invalid file (REQ-07.002, RE-010 D14).
+- [ ] `papyrus init` writes each entry with only `prefix` and `directory`, plus `enabled: false` when the walkthrough disables it, writes no seed-filled key, and the generated file validates; `init --force` still replaces an invalid file (REQ-007.002, RE-010 D14).
 - [ ] No document command, record byte, JSON payload, HTTP status, or browser page changes; the only user-visible differences are the minimal `init` entry and the full `config list`, and the CLI-help goldens are unchanged (MS-033 AC-7).
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments
-- **task-refiner**: Refined for MS-033: description grounded in load_effective_value, merge_yaml, Config::validate, the config get, set, unset and list commands, to_config_yaml and init; 11 testable acceptance criteria added; TECH-077 documented. The field-edit-only rule is taken from REQ-07.002 and REQ-01.002. No dependency, ordinal, milestone, or assignee change.
-- **planner**: Non-blocking refinement notes: (1) TASK-249's seed-slug wording named request as a seed entry; it is corrected to user-defined per ADR-036 decision 30 and REQ-07.002, so no further action. (2) config set field-selector semantics: TASK-248 scope already fixes keyed and indexed selector forms and the single-change validate-then-write rule; this is recorded for traceability, not a defect.
+- **task-refiner**: Refined for MS-033: description grounded in load_effective_value, merge_yaml, Config::validate, the config get, set, unset and list commands, to_config_yaml and init; 11 testable acceptance criteria added; TECH-077 documented. The field-edit-only rule is taken from REQ-007.002 and REQ-001.002. No dependency, ordinal, milestone, or assignee change.
+- **planner**: Non-blocking refinement notes: (1) TASK-249's seed-slug wording named request as a seed entry; it is corrected to user-defined per ADR-036 decision 30 and REQ-007.002, so no further action. (2) config set field-selector semantics: TASK-248 scope already fixes keyed and indexed selector forms and the single-change validate-then-write rule; this is recorded for traceability, not a defect.
 - **rust-dev**: test comment
 - **rust-dev**: Diagnostics: unknown entry keys
 - **rust-dev**: Implemented the nested document-type configuration surface in the config, commands and init modules.

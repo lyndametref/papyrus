@@ -14,14 +14,14 @@ references:
   - BR-005
   - BR-016
   - MOCK-0002
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-01.002
-  - REQ-02.001
-  - REQ-02.002
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.013
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-001.002
+  - REQ-002.001
+  - REQ-002.002
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.013
   - TASK-101
   - TASK-102
   - TASK-103
@@ -32,9 +32,9 @@ status: verified
 ## Description
 ## Purpose
 
-Revise the approved MOCK-0002 backlog review package so that it represents the per-milestone kanban board required by REQ-06.013, instead of the earlier flat backlog list. The revised package must be explicitly approved by the user and recorded as `approved` in the mockup registry before TASK-103 implementation starts. UI mockups may not be implemented as final UI while unapproved.
+Revise the approved MOCK-0002 backlog review package so that it represents the per-milestone kanban board required by REQ-006.013, instead of the earlier flat backlog list. The revised package must be explicitly approved by the user and recorded as `approved` in the mockup registry before TASK-103 implementation starts. UI mockups may not be implemented as final UI while unapproved.
 
-This ticket is UI design work only. It does not change requirements, business rules, specifications, or implementation code; the kanban board contract is already specified by REQ-06.013, TASK-101, `browser-tasks-milestones-and-releases.md` section 3, and `browser-backlog-records-ui.md` section 4. The feature specification for the revision handoff is this document.
+This ticket is UI design work only. It does not change requirements, business rules, specifications, or implementation code; the kanban board contract is already specified by REQ-006.013, TASK-101, `browser-tasks-milestones-and-releases.md` section 3, and `browser-backlog-records-ui.md` section 4. The feature specification for the revision handoff is this document.
 
 ## Scope
 
@@ -69,7 +69,7 @@ This ticket is UI design work only. It does not change requirements, business ru
 
 ## Presentation details resolved by this revision (design decisions)
 
-The following details are not fixed by REQ-06.013 and are resolved by this revision and recorded in the UI description:
+The following details are not fixed by REQ-006.013 and are resolved by this revision and recorded in the UI description:
 
 - Card contents beyond the task ID and title.
 - Column widths.
@@ -80,7 +80,7 @@ The following details are not fixed by REQ-06.013 and are resolved by this revis
 
 ## Assumptions
 
-- Assumption: The kanban board contract is already specified by REQ-06.013 and TASK-101; this ticket only designs the UI for it.
+- Assumption: The kanban board contract is already specified by REQ-006.013 and TASK-101; this ticket only designs the UI for it.
 - Assumption: MOCK-0002 is revised in place (no renumbering) per the global sequential-id rule and the TASK-101 handoff; no new MOCK id is allocated.
 - Assumption: The mockup stays `draft` until the user explicitly approves it; only then may the registry be updated to `approved` and TASK-103 implementation begin.
 - Assumption: Existing MOCK ids are not renumbered; the revision of MOCK-0002 does not supersede or deprecate other mockups.
@@ -96,7 +96,7 @@ The following details are not fixed by REQ-06.013 and are resolved by this revis
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06.013; REQ-06.002; REQ-06.003; REQ-01.002; REQ-02.001; REQ-02.002; NFR-01.002; NFR-05.001 |
+| Requirement | REQ-006.013; REQ-006.002; REQ-006.003; REQ-001.002; REQ-002.001; REQ-002.002; NFR-001.002; NFR-005.001 |
 | Business rule | BR-004; BR-005; BR-016 |
 | ADR | ADR-0005; ADR-0006; ADR-0010; ADR-0012; ADR-0013 |
 | Ticket | TASK-101 (dependency); TASK-102 (this ticket); TASK-103 (downstream implementation) |

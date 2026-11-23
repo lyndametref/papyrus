@@ -16,9 +16,9 @@ accepted
 
 ## Context
 
-The TASK-6 browser is the first Papyrus surface that writes requirement records while the CLI can also edit the same files. The browser has no session, no lock manager, and no database; records are plain UTF-8 Markdown files inside the project directory (NFR-04.001, NFR-04.002). The behavior contract is `docs/specifications/browser-requirements.md` sections 7.10–7.12.
+The TASK-6 browser is the first Papyrus surface that writes requirement records while the CLI can also edit the same files. The browser has no session, no lock manager, and no database; records are plain UTF-8 Markdown files inside the project directory (NFR-004.001, NFR-004.002). The behavior contract is `docs/specifications/browser-requirements.md` sections 7.10–7.12.
 
-Scope note: this ADR governs edits made through the browser. The CLI (`src/requirement.rs`: `create`, `create_group`, `edit`, `deprecate`, `restore`) writes the same record files in the same directories, but its write path is non-atomic (`fs::write` / `fs::rename` with no temporary file or `sync_all`), carries no version token, and `edit` re-renders the document from parsed fields, so it does not preserve unknown `## ` sections or section order. The two surfaces can therefore race, and a CLI edit can silently overwrite a browser edit or drop editor-added sections. Reconciling the CLI with this contract (atomic writes, optimistic concurrency, section preservation) is deferred to a follow-up task and is not part of this ADR. All paths on both surfaces still pass through `Context::ensure_within` (NFR-04.002).
+Scope note: this ADR governs edits made through the browser. The CLI (`src/requirement.rs`: `create`, `create_group`, `edit`, `deprecate`, `restore`) writes the same record files in the same directories, but its write path is non-atomic (`fs::write` / `fs::rename` with no temporary file or `sync_all`), carries no version token, and `edit` re-renders the document from parsed fields, so it does not preserve unknown `## ` sections or section order. The two surfaces can therefore race, and a CLI edit can silently overwrite a browser edit or drop editor-added sections. Reconciling the CLI with this contract (atomic writes, optimistic concurrency, section preservation) is deferred to a follow-up task and is not part of this ADR. All paths on both surfaces still pass through `Context::ensure_within` (NFR-004.002).
 
 The problem is twofold: a save must not silently overwrite a file changed after the edit form was rendered, and a crash or concurrent read must never observe a partially written record. The alternatives considered were advisory file locking, a single-writer queue or daemon, last-write-wins, a lock file, and moving records into a database. Locking and daemons add lifecycle and stale-lock failure modes; last-write-wins loses data; a database violates the text-file and single-crate constraints.
 
@@ -39,7 +39,7 @@ The problem is twofold: a save must not silently overwrite a file changed after 
 - A crash or failed write leaves the original file intact and removes the temporary file on the handled failure paths.
 - Permissions, unknown sections, and section order survive an edit.
 - The version token gives users a clear `409` recovery path instead of silent data loss.
-- All writes remain project-local text files (NFR-04.001) and pass the project-directory boundary check (NFR-04.002).
+- All writes remain project-local text files (NFR-004.001) and pass the project-directory boundary check (NFR-004.002).
 
 **Negative:**
 
@@ -69,15 +69,15 @@ The problem is twofold: a save must not silently overwrite a file changed after 
 | Advisory file locking (`flock`/lock file) | Rejected | Adds stale-lock handling, platform differences, and a second failure mode; unnecessary for the single-user scope. |
 | Single-writer queue or daemon | Rejected | Adds a process, lifecycle, and IPC surface; conflicts with the dependency-free single-binary model. |
 | Last-write-wins | Rejected | Silently loses concurrent edits. |
-| Database-backed records | Rejected | Violates text-file persistence (NFR-04.001) and the single-crate/single-binary constraints. |
+| Database-backed records | Rejected | Violates text-file persistence (NFR-004.001) and the single-crate/single-binary constraints. |
 | Content-hash version token | Deferred | Stronger than metadata, but more work per request; can be adopted later via a new ADR if the token proves insufficient. |
 
 ## References
 
 - `docs/specifications/browser-requirements.md` — TASK-6 sections 5 (JSON API), 7 (editing contract), and 9 (security).
-- `docs/requirements/non-functional/NFR-04.001.md` — text-file persistence.
-- `docs/requirements/non-functional/NFR-04.002.md` — project-directory boundary.
-- `docs/requirements/non-functional/NFR-02.002.md` — input sanitization.
+- `docs/requirements/non-functional/NFR-004.001.md` — text-file persistence.
+- `docs/requirements/non-functional/NFR-004.002.md` — project-directory boundary.
+- `docs/requirements/non-functional/NFR-002.002.md` — input sanitization.
 - `docs/architecture/adr/ADR-0001-implementation-language-rust.md` — Rust and Cargo.
 - `docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md` — single-crate layout.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — server and UI context.

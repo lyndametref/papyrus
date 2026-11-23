@@ -13,12 +13,12 @@ dependencies:
   - TASK-075
   - TASK-076
 references:
-  - docs/requirements/business/REQ-05.012.md
-  - docs/requirements/business/REQ-05.013.md
-  - docs/requirements/business/REQ-05.014.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
+  - docs/requirements/business/REQ-005.012.md
+  - docs/requirements/business/REQ-005.013.md
+  - docs/requirements/business/REQ-005.014.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
   - docs/business-rules/BR-018-use-case-document-type-behavior.md
   - docs/business-rules/BR-019-test-case-document-type-behavior.md
   - docs/business-rules/BR-020-test-report-document-type-behavior.md
@@ -40,7 +40,7 @@ Full behavior, scope, verification matrix, assumptions, and open questions: docs
 Dependencies: TASK-78 (management), TASK-80 (search), TASK-81 (browser), TASK-79 (design review; MOCK-0013 approved).
 
 ## Acceptance Criteria
-- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides use-case/test-case/test-report management, search, and browser access over all three categories; Debian Trixie and other releases are not claimed or verified.
+- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides use-case/test-case/test-report management, search, and browser access over all three categories; Debian Trixie and other releases are not claimed or verified.
 - [x] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists use-case, test-case, test-report, search, and browser, guarding against packaging a stale binary.
 - [x] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [x] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

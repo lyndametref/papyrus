@@ -1,4 +1,4 @@
-//! Integration test for lazy migration (NFR-04.003 round-trip).
+//! Integration test for lazy migration (NFR-004.003 round-trip).
 //!
 //! Native Papyrus records and legacy Papyrus bodies are read, edited, and
 //! listed after lazy on-demand migration. Backlog.md storage-shaped stems are

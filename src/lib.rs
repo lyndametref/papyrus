@@ -67,7 +67,7 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
     /// Resolve a configuration path that is loaded in this phase.
     ///
     /// The path is canonicalized and must stay inside the project before any
-    /// read happens (NFR-04.002), so a command's later context check is never
+    /// read happens (NFR-004.002), so a command's later context check is never
     /// the first guard against an outside target.
     fn contained_config_path(
         project_raw: &std::path::Path,

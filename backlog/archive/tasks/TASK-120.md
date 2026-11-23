@@ -17,8 +17,8 @@ references:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/architecture/adr/ADR-0018-generic-document-content-model.md
-  - REQ-05.008
-  - REQ-05.007
+  - REQ-005.008
+  - REQ-005.007
   - docs/specifications/refactor-record-layer-for-document-archive-and-status.md
   - docs/specifications/ui-mockups-management.md
 documentation:
@@ -26,7 +26,6 @@ documentation:
   - src/record/store.rs
   - tests/ui_mockup_cli.rs
 modified_files:
-  - src/ui_mockup.rs
 priority: high
 ordinal: 41300
 ---
@@ -47,7 +46,7 @@ ordinal: 41300
 
 **In scope.** `src/ui_mockup.rs`: archive, supersede, edit-with-move, and delete paths, including removal of the move-then-write order from all of them. Tests in `tests/ui_mockup_cli.rs` covering the new sequences, both failure points, the no-op case, and a source-level guard against `fs::rename`/`move_record`.
 
-**Out of scope.** HTML metadata fields and the HTML template; status-transition rules; `--status` combined with `--superseded-by`; delete confirmation ordering and its `aborted` output; front matter for mockups (REQ-05.008 forbids it); `record::store::archive_content` itself; the mockup module placement recorded by ADR-0018 decision 3; specification corrections owned by TASK-127; any way to move a mockup out of `archived/`.
+**Out of scope.** HTML metadata fields and the HTML template; status-transition rules; `--status` combined with `--superseded-by`; delete confirmation ordering and its `aborted` output; front matter for mockups (REQ-005.008 forbids it); `record::store::archive_content` itself; the mockup module placement recorded by ADR-0018 decision 3; specification corrections owned by TASK-127; any way to move a mockup out of `archived/`.
 
 **Assumptions.**
 - Assumption: tests run as a non-root user. The unlink-failure test makes the active folder read-only (mode 0o555) so the unlink fails after the destination write succeeds. The test first probes whether a read-only folder actually blocks file creation and skips with a printed notice on a root/privileged run where permission bits do not apply.

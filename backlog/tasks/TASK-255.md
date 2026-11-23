@@ -7,14 +7,14 @@ labels: []
 references:
   - ADR-036
   - ADR-0016
-  - REQ-07.003
-  - REQ-05.011
+  - REQ-007.003
+  - REQ-005.011
   - TECH-070
   - TECH-066
-  - REQ-07.004
+  - REQ-007.004
   - ADR-0017
   - ADR-042
-  - REQ-05.006
+  - REQ-005.006
 status: Done
 assignee:
   - rust-dev
@@ -54,7 +54,7 @@ type: implementation
 GroupedMarkdown create-group, group-link validation, and SingleHtmlMockup supersede (TASK-256); title-contract changes and `--term` removal (TASK-257); config selectors (TASK-258); deleting the nine modules or the transitional schema (TASK-259), and deleting the per-type ops builders or document TypedHandler variants (MS-035 TASK-266/TASK-269); help-golden regeneration (TASK-260); the browser.
 
 ## Grounding
-ADR-036 decisions 7, 8, 15-24, 35-37 and downstream constraints 1-6; ADR-042 ruling 1; TECH-070 sections 1-5 and 7; TECH-066; REQ-07.003; REQ-05.006; REQ-05.011; REQ-07.004.
+ADR-036 decisions 7, 8, 15-24, 35-37 and downstream constraints 1-6; ADR-042 ruling 1; TECH-070 sections 1-5 and 7; TECH-066; REQ-007.003; REQ-005.006; REQ-005.011; REQ-007.004.
 
 ## Definition of done
 One engine drives every document model; the baseline verbs and status behavior are unchanged; field options and required-field validation are field-derived and deterministic; the `audit` seed default is applied on create and not on edit without a `FieldSpec` key, configuration key, or slug literal; the engine emits only PatchOps and uses the single writer; the targeted suites pass; `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` are clean. Any seed fact the engine cannot express is recorded before module deletion, not hard-coded by slug.
@@ -64,7 +64,7 @@ One engine drives every document model; the baseline verbs and status behavior a
 - [ ] #2 The baseline verbs create, list, view, edit, archive, and delete behave identically for every document type; status exists only for SingleMarkdown and GroupedMarkdown; SingleHtmlMockup has no status verb. (MS-034 AC-1)
 - [ ] #3 Create and edit options are derived from the record role field sequence: each field contributes one option on the verbs listed in its `verbs`, in sequence order, with its `option` or kebab-case key. (MS-034 AC-6; ADR-036 d15, d19, d20)
 - [ ] #4 A create that omits required fields fails with one validation outcome listing every missing field key, exit 4, and writes nothing; an edit cannot clear a required field; an optional field can be cleared. (MS-034 AC-1; ADR-036 d18)
-- [ ] #5 The `audit` seed entry carries `field_defaults: { audit_type: security }` and no other seed type has a field default; `create` writes the default when `audit_type` is absent, `edit` leaves an absent `audit_type` unchanged, and no `FieldSpec` key, configuration key, or document slug literal supplies the value. (ADR-042 ruling 1; REQ-05.006; MS-034 AC-4)
+- [ ] #5 The `audit` seed entry carries `field_defaults: { audit_type: security }` and no other seed type has a field default; `create` writes the default when `audit_type` is absent, `edit` leaves an absent `audit_type` unchanged, and no `FieldSpec` key, configuration key, or document slug literal supplies the value. (ADR-042 ruling 1; REQ-005.006; MS-034 AC-4)
 - [ ] #6 Field storage follows the field spec: heading-only writes the section; frontmatter_key-only writes the front-matter key; both writes both; a list field in a section writes `- item` lines; a list field with a frontmatter_key writes a YAML sequence including a single element and an empty list; field sequence order determines section order. (ADR-036 d17, d21, d35)
 - [ ] #7 The engine emits only PatchOp values, applies them through record::patch, and writes once through record::store::write_atomic; it never formats a `---` block, re-renders a body, or calls fs::write; a patch that changes nothing performs no write. (ADR-036 d35-d37; TECH-070 section 4)
 - [ ] #8 Archive and delete keep the existing semantics: archive moves to the type archived subfolder, is idempotent, and never cascades to grouped members; delete follows archive-then-remove; status rejects `archived` and archived records and does not move files. (MS-034 AC-1; TECH-066)

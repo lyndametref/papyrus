@@ -6,11 +6,11 @@ updated_date: '2026-11-22T17:43:19Z'
 labels: []
 references:
   - ADR-039
-  - REQ-06.014
+  - REQ-006.014
   - TECH-068
   - ADR-0033
   - TC-184
-  - REQ-05.007
+  - REQ-005.007
 status: Done
 assignee:
   - rust-dev
@@ -39,7 +39,7 @@ ADR-039 decisions 1 and 23-24 collapse the 9 conflict-page renderers to one and 
 - Do not add a route, template, dependency, asset, client script, or status code. Keep the status-code surface 404 and 409 and the existing headers and `no-store` behavior.
 
 ## Grounding
-ADR-039 decisions 1, 4, 13, 23, and 24; TECH-068 sections 4.3 and 6; REQ-06.014 and REQ-05.007. Symbols: `src/browser/render.rs` (`conflict_page*`, `*_not_found_page`, `document_conflict_page`, `document_not_found_page`), `src/browser/routes.rs` (`NotFoundPage`, `Presentation.not_found`, `not_found_slug`, `BrowserRoutes::not_found_page`, `IdRule.not_found`, `push_id_rule`), `src/browser/mod.rs` (`handle_request` 404 chain and `form_post` conflict chain), and `src/browser/templates/{view,edit,error}.html`.
+ADR-039 decisions 1, 4, 13, 23, and 24; TECH-068 sections 4.3 and 6; REQ-006.014 and REQ-005.007. Symbols: `src/browser/render.rs` (`conflict_page*`, `*_not_found_page`, `document_conflict_page`, `document_not_found_page`), `src/browser/routes.rs` (`NotFoundPage`, `Presentation.not_found`, `not_found_slug`, `BrowserRoutes::not_found_page`, `IdRule.not_found`, `push_id_rule`), `src/browser/mod.rs` (`handle_request` 404 chain and `form_post` conflict chain), and `src/browser/templates/{view,edit,error}.html`.
 
 ## Definition of done
 Exactly one conflict builder and one not-found builder remain for documents; the nine conflict functions and five not-found functions are gone; the per-type 404 selection types are gone; unknown or archived document IDs share one 404 page with no ID echo and no write occurs on a conflict; Backlog and Decision 404 output is unchanged; tests, clippy -D warnings, and fmt are clean.

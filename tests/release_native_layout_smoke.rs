@@ -1583,7 +1583,7 @@ fn t98_07_documented_upgrade_path() {
         assert_eq!(get(&server, "/").status, 200);
 
         // The per-milestone backlog board round-trips a status change to the
-        // native record (REQ-06.013).
+        // native record (REQ-006.013).
         let record_path = project.join("backlog/tasks/TASK-001.md");
         let board = get(&server, "/?type=task").text();
         let version = extract_card_version(&board, "TASK-001");

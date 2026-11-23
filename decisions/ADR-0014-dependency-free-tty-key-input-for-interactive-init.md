@@ -16,16 +16,16 @@ superseded
 
 ## Context
 
-REQ-01.006 requires the `papyrus init` walkthrough to present the artifact set as a single cursor-driven list: exactly one highlighted selectable row, Up/Down and `k`/`j` navigation, Space toggling the highlighted row, Enter confirming, a redraw after every keypress, clamped navigation, core rows (task, milestone, release) never highlighted, and end of input confirming the current state and continuing. The specification (`docs/specifications/interactive-init-walkthrough-for-artifact-activation.md`, TASK-104 revision) fixes the behavior but deliberately leaves one architecture question open: section 2 requires per-keypress input, and the validation section states that a raw/cbreak mode entry failure must "follow the architecture decision for TASK-104".
+REQ-001.006 requires the `papyrus init` walkthrough to present the artifact set as a single cursor-driven list: exactly one highlighted selectable row, Up/Down and `k`/`j` navigation, Space toggling the highlighted row, Enter confirming, a redraw after every keypress, clamped navigation, core rows (task, milestone, release) never highlighted, and end of input confirming the current state and continuing. The specification (`docs/specifications/interactive-init-walkthrough-for-artifact-activation.md`, TASK-104 revision) fixes the behavior but deliberately leaves one architecture question open: section 2 requires per-keypress input, and the validation section states that a raw/cbreak mode entry failure must "follow the architecture decision for TASK-104".
 
-The delivered behavior in `src/init.rs` (`build_config_interactive`) renders a static list and then reads one line of space-separated tokens. That is the conformance defect: a line-oriented read cannot see individual keypresses, cannot move a highlight, and is the typed-token activation REQ-01.006 rejects.
+The delivered behavior in `src/init.rs` (`build_config_interactive`) renders a static list and then reads one line of space-separated tokens. That is the conformance defect: a line-oriented read cannot see individual keypresses, cannot move a highlight, and is the typed-token activation REQ-001.006 rejects.
 
 Forces:
 
 - **Dependency baseline.** ADR-0001 selects Rust and Cargo, ADR-0005 fixes the dependency-free, single-binary, offline posture, and ADR-0004 fixes the repository-root single crate. The crate depends only on `clap`, `serde`, `serde_json`, and `yaml_serde`; no terminal crate and no `libc` crate is present or permitted without a new ADR.
 - **Platform.** ADR-0003 narrows support to Debian Forky on amd64, whose C library is glibc; no Windows/macOS terminal abstraction is required, and the glibc Linux `termios` layout is a single, stable target.
 - **Toolchain.** Rust edition 2024 with `rust-version` 1.99.1: `unsafe extern` blocks are mandatory, and `IsTerminal`, `offset_of!`, and `OwnedFd` are in `std`.
-- **No new user surface.** REQ-01.006 forbids a new CLI flag or environment variable, so key input follows the existing `std::io::IsTerminal` check on stdin.
+- **No new user surface.** REQ-001.006 forbids a new CLI flag or environment variable, so key input follows the existing `std::io::IsTerminal` check on stdin.
 - **Phase hand-off.** Interactive mode runs only when stdin is a terminal; the non-interactive/CI path must not change and must not read stdin. The prefix and folder prompts after the list stay line-based (`BufRead::read_line`) on the same stdin, so input buffered during the list must not be lost.
 - **Terminal hygiene.** The terminal must never be left in a modified mode: not on Enter, not on end of input, not on Ctrl-C, not on an I/O error, not on panic.
 - **Testability without a dev-dependency.** Selection, navigation, and toggling must be testable in-process; the real keyboard path is a thin adapter verified on a real TTY (TASK-104 DoD).
@@ -120,7 +120,7 @@ A parallel draft for this ticket proposed changing the terminal mode out-of-proc
 
 **Positive:**
 
-- REQ-01.006 is implementable with no dependency change: the ADR-0005 baseline exists untouched and the `.deb` payload stays a single binary.
+- REQ-001.006 is implementable with no dependency change: the ADR-0005 baseline exists untouched and the `.deb` payload stays a single binary.
 - Every interactive `init` runs in-process: no subprocess per run, no dependency on an external binary, and precise `errno` from the two calls.
 - The terminal-state contract is structural: `finish()` before the line prompts plus idempotent `Drop` means no return path can leave the terminal modified.
 - The list state machine is IO-free and the interactive flow is testable in-process without a PTY.
@@ -154,11 +154,11 @@ A parallel draft for this ticket proposed changing the terminal mode out-of-proc
 3. **Restoration on every path**: `finish()` after the list and before the first line prompt, idempotent `Drop`, and no `return` between entering the mode and the list loop that bypasses the guard.
 4. **No new CLI flag or environment variable**; interactive detection remains `std::io::stdin().is_terminal()`; ANSI output is gated on `stdout().is_terminal()` and must not appear in captured output.
 5. **`run_init_with_io` keeps its signature**; the non-interactive path performs no stdin reads and writes the same defaults as today. New behavior is reachable only through `run_init_with_io_and_keys`.
-6. **List semantics fixed by REQ-01.006**: initial highlight on the first selectable row (`adr`), navigation over selectable rows only, clamped at both ends, Space toggles only the highlighted row, core rows never highlighted or toggled, rows ordered core → decision types → document types, defaults all active, Enter and EOF both confirm the displayed state.
+6. **List semantics fixed by REQ-001.006**: initial highlight on the first selectable row (`adr`), navigation over selectable rows only, clamped at both ends, Space toggles only the highlighted row, core rows never highlighted or toggled, rows ordered core → decision types → document types, defaults all active, Enter and EOF both confirm the displayed state.
 7. **`term` stays artifact-agnostic**; no artifact name, configuration key, or prompt text may appear in `src/term.rs`.
 8. **Exit code 130**: `AppError::Interrupted` is raised only for the interrupt key in the list phase, maps to `code()` 130, and is not reused for other aborts; existing codes 1, 3, 4 are unchanged.
 9. **Tests**: injected-`KeySource` unit and integration tests are required in the default `cargo test`. The PTY test is `#[ignore]`d and environment-dependent (`script` from util-linux, a usable PTY); real-TTY verification is manual DoD evidence in TASK-104. Do not add a dev-dependency to obtain a PTY.
-10. **Requirement and specification coordination** (owned by `requirements-engineer`/`business-analyst`, not by this ADR): REQ-01.006's error behavior should acknowledge exit code 130 for Ctrl-C, and `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` "Validation and error behavior" may cite ADR-0014 as the resolved mode-failure decision. No behavioral change to the specification is required.
+10. **Requirement and specification coordination** (owned by `requirements-engineer`/`business-analyst`, not by this ADR): REQ-001.006's error behavior should acknowledge exit code 130 for Ctrl-C, and `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` "Validation and error behavior" may cite ADR-0014 as the resolved mode-failure decision. No behavioral change to the specification is required.
 11. **Ticket evidence**: TASK-104 must state which paths were verified (injected source, PTY gate, real TTY) and that Ctrl-C aborts with 130, Ctrl-D confirms and continues.
 
 ## Alternatives Considered
@@ -172,7 +172,7 @@ A parallel draft for this ticket proposed changing the terminal mode out-of-proc
 | Append-only redraw only (no ANSI, ever) | Rejected | Readable in logs, but repeats the whole list per keypress on a real terminal, which is exactly where the highlight must be stable; the TTY-gated ANSI path gives both readability and a usable cursor. |
 | ANSI redraw without a non-TTY fallback | Rejected | Escape sequences would pollute logs whenever stdin is a TTY and stdout is redirected. |
 | Full raw mode / `cfmakeraw` | Rejected | Also clears `OPOST`, so every `\n` staircases; more mode change than the list needs. |
-| Change the terminal mode and also keep typed tokens as a key source | Rejected | REQ-01.006 rejects typed-token activation outright. |
+| Change the terminal mode and also keep typed tokens as a key source | Rejected | REQ-001.006 rejects typed-token activation outright. |
 | Per-artifact `Activate? [Y/n]` prompts | Rejected | Replaced by the maintainer decision of 2026-11-11. |
 | Read keys from a second `/dev/tty` handle | Rejected | Two handles over one terminal complicate ordering and lose the shared-buffer hand-off; stdin is already the terminal in interactive mode. |
 | Map Ctrl-C to `AppError::Runtime` / exit 1 | Rejected | Makes a user abort look like a runtime failure and diverges from the 130 the kernel produces for Ctrl-C during the line prompts. |
@@ -182,8 +182,8 @@ A parallel draft for this ticket proposed changing the terminal mode out-of-proc
 
 ## References
 
-- `docs/requirements/business/REQ-01.006.md` — cursor-driven artifact list, TTY-only execution, no new flag or environment variable.
-- `docs/requirements/business/REQ-01.001.md`, `REQ-01.002.md`, `REQ-01.007.md` — init behavior, configuration access, `id_padding`.
+- `docs/requirements/business/REQ-001.006.md` — cursor-driven artifact list, TTY-only execution, no new flag or environment variable.
+- `docs/requirements/business/REQ-001.001.md`, `REQ-001.002.md`, `REQ-001.007.md` — init behavior, configuration access, `id_padding`.
 - `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` — §2 presentation contract, §3 prompts, "Validation and error behavior".
 - `docs/business-rules/BR-016-configuration-keys-and-precedence.md` — activation via `enabled` flags and core artifacts.
 - `docs/architecture/adr/ADR-0001-implementation-language-rust.md` — Rust and Cargo.

@@ -12,11 +12,11 @@ milestone: MS-016
 dependencies:
   - TASK-020
 references:
-  - docs/requirements/business/REQ-05.012.md
-  - docs/requirements/business/REQ-05.013.md
-  - docs/requirements/business/REQ-05.014.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.010.md
+  - docs/requirements/business/REQ-005.012.md
+  - docs/requirements/business/REQ-005.013.md
+  - docs/requirements/business/REQ-005.014.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.010.md
   - docs/business-rules/BR-018-use-case-document-type-behavior.md
   - docs/business-rules/BR-019-test-case-document-type-behavior.md
   - docs/business-rules/BR-020-test-report-document-type-behavior.md
@@ -28,7 +28,7 @@ ordinal: 35000
 
 
 ## Description
-Deliver dedicated CLI commands `use-case`, `test-case`, and `test-report` for managing use-case, test-case, and test-report records (REQ-05.012/013/014), following the tech-spec per-type pattern (BR-017/018/019/020). Each record has required title and description plus optional applicability; supports create, list, view, edit, deprecate, restore with ID preserved; lifecycle active->deprecated; front matter per REQ-05.010. Resolves the req vs dedicated command conflict in favor of dedicated commands (BR-009/018/019/020). Specification: docs/specifications/use-cases-test-cases-and-test-reports-management.md.
+Deliver dedicated CLI commands `use-case`, `test-case`, and `test-report` for managing use-case, test-case, and test-report records (REQ-005.012/013/014), following the tech-spec per-type pattern (BR-017/018/019/020). Each record has required title and description plus optional applicability; supports create, list, view, edit, deprecate, restore with ID preserved; lifecycle active->deprecated; front matter per REQ-005.010. Resolves the req vs dedicated command conflict in favor of dedicated commands (BR-009/018/019/020). Specification: docs/specifications/use-cases-test-cases-and-test-reports-management.md.
 
 Assumptions:
 - Prefixes/directories/enabled adopted from BR proposals: UC/use-cases, TC/test-cases, TR/test-reports, enabled true.
@@ -43,11 +43,11 @@ Out of scope: search (TASK-80), browser (TASK-81), mockups (TASK-79), packaging 
 - [x] Each type can be created with required title and description and optional applicability; missing required arguments exit 2.
 - [x] Each type can be listed (active only, ID and title, ID ascending), viewed (full persisted text; deprecated viewable), and edited for title, description, and applicability.
 - [x] Each type can be deprecated and restored with its ID preserved; deprecated records are hidden from lists, search, and the web UI; already-deprecated/already-active operations exit 4; unknown ID exits 3.
-- [x] Records carry YAML front matter with id, title, created_date, updated_date, labels, references; description and applicability are body fields (REQ-05.010).
+- [x] Records carry YAML front matter with id, title, created_date, updated_date, labels, references; description and applicability are body fields (REQ-005.010).
 - [x] Record files use the template `# <ID> <title>`, then `## Description`, then optional `## Applicability`, ending with a single trailing newline.
 - [x] IDs are generated as <prefix>-<number> padded to id_padding using UC/TC/TR and directories use-cases/test-cases/test-reports; IDs are never reused.
 - [x] Create and edit expose --label and --reference for front-matter lists; created_date/updated_date are automatic; updated_date refreshes only on a content-changing write.
-- [x] All user input is sanitized (NFR-02.002); a disabled type reports a validation error (exit 4); common CLI controls and exit codes 0/1/2/3/4 behave as TASK-2.
+- [x] All user input is sanitized (NFR-002.002); a disabled type reports a validation error (exit 4); common CLI controls and exit codes 0/1/2/3/4 behave as TASK-2.
 - [x] The req-vs-dedicated-command conflict is resolved and documented: dedicated commands are used and req remains business-requirements only.
 
 ## Definition of Done

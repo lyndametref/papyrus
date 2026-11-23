@@ -16,7 +16,7 @@ accepted
 
 ## Context
 
-REQ-01.006 and `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` section 2 require `papyrus init <project_name>` to present artifact activation as one cursor-driven vertical list: one highlighted selectable row, Up/Down and `k`/`j` navigation with clamping, Space toggling the highlighted row, Enter confirming, a full redraw on every keypress, and end-of-input confirming and continuing. The shipped `src/init.rs` (`build_config_interactive`) still prints a static `[x]` block and reads one line of space-separated artifact names, which is the presentation REQ-01.006 rejects. Supplying single keypresses requires leaving the terminal's canonical line discipline for the duration of the list.
+REQ-001.006 and `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` section 2 require `papyrus init <project_name>` to present artifact activation as one cursor-driven vertical list: one highlighted selectable row, Up/Down and `k`/`j` navigation with clamping, Space toggling the highlighted row, Enter confirming, a full redraw on every keypress, and end-of-input confirming and continuing. The shipped `src/init.rs` (`build_config_interactive`) still prints a static `[x]` block and reads one line of space-separated artifact names, which is the presentation REQ-001.006 rejects. Supplying single keypresses requires leaving the terminal's canonical line discipline for the duration of the list.
 
 Forces at play:
 
@@ -29,7 +29,7 @@ Forces at play:
 
 Terminology: the file name uses "raw mode" in the colloquial sense. The decision selects **cbreak** — non-canonical input with echo and signal generation disabled — not `stty raw`, which also disables output post-processing.
 
-**Relationship to ADR-0014.** A second Proposed ADR covering the same question — `ADR-0014-dependency-free-tty-key-input-for-interactive-init.md` — records an in-process `tcgetattr`/`tcsetattr` FFI route. The two proposals are mutually exclusive for the same code path and both remain Proposed; this ADR records the `stty` alternative and its justification, and is numbered 0015 only because the 0014 number was already taken. The choice between them is a user decision, and no implementation may adopt either route until one of the two is Accepted and the other resolved (refused or superseded). **Resolution (2026-11-13):** the user selected this route for REQ-01.006 / TASK-104; this ADR is Accepted and ADR-0014 is Superseded without having been accepted.
+**Relationship to ADR-0014.** A second Proposed ADR covering the same question — `ADR-0014-dependency-free-tty-key-input-for-interactive-init.md` — records an in-process `tcgetattr`/`tcsetattr` FFI route. The two proposals are mutually exclusive for the same code path and both remain Proposed; this ADR records the `stty` alternative and its justification, and is numbered 0015 only because the 0014 number was already taken. The choice between them is a user decision, and no implementation may adopt either route until one of the two is Accepted and the other resolved (refused or superseded). **Resolution (2026-11-13):** the user selected this route for REQ-001.006 / TASK-104; this ADR is Accepted and ADR-0014 is Superseded without having been accepted.
 
 ## Decision
 
@@ -92,7 +92,7 @@ Terminology: the file name uses "raw mode" in the colloquial sense. The decision
    - renders the list once with every row active and reads a line-based confirmation prompt where only Enter, empty input, or end of input confirms and continues into the unchanged prefix/folder prompts;
    - never reinstates typed artifact tokens and never fails the walkthrough because of the terminal.
 
-   The degraded path therefore cannot deactivate types. A user who needs a different activation edits `papyrus.config.yml` or uses `config set` (REQ-01.002); this is a terminal-environment limitation, not a silent contract change, and REQ-01.006's rejection of typed-token activation still holds.
+   The degraded path therefore cannot deactivate types. A user who needs a different activation edits `papyrus.config.yml` or uses `config set` (REQ-001.002); this is a terminal-environment limitation, not a silent contract change, and REQ-001.006's rejection of typed-token activation still holds.
 
 7. **Ctrl-C is a byte-mapped interrupt with exit code 130, not a signal-based abort.**
    - Because of `-isig`, Ctrl-C arrives as `0x03`. The list maps it to a new `AppError::Interrupted` variant whose `code()` is `130` and whose message is `interrupted`; `main` already exits with `err.code()` after printing the message (JSON-mode error object in `--json`).
@@ -111,7 +111,7 @@ Terminology: the file name uses "raw mode" in the colloquial sense. The decision
 9. **`stty` does not violate ADR-0005: it is not a new dependency of Papyrus.** It is a binary provided by the Debian `coreutils` package, which is `Essential: yes` (Priority: required) and is present on every system that can run a login shell, including `debootstrap --variant=minbase`. Consequences:
    - no crate, build-time, or dev dependency is added; `Cargo.toml` is unchanged;
    - the `.deb` payload is unchanged (no bundled binary, no new `Depends` entry), consistent with ADR-0002 and ADR-0003;
-   - nothing is downloaded, so the offline posture (NFR-01.003) and the "no runtime asset directory" property of ADR-0005 are unaffected;
+   - nothing is downloaded, so the offline posture (NFR-001.003) and the "no runtime asset directory" property of ADR-0005 are unaffected;
    - the dependency is not fatal: decision 6 keeps `init` working when the binary is absent, unreadable, or fails, so `stty` is an optional enhancement rather than a hard requirement;
    - the crate already invokes an external program (`git init`, optional) through `std::process::Command`, so out-of-process system helpers are an established pattern in this codebase.
 
@@ -121,7 +121,7 @@ Terminology: the file name uses "raw mode" in the colloquial sense. The decision
 
 **Positive:**
 
-- REQ-01.006's cursor contract is implementable without a new crate, without `unsafe`, and without changing the packaging or dependency baseline.
+- REQ-001.006's cursor contract is implementable without a new crate, without `unsafe`, and without changing the packaging or dependency baseline.
 - `stty` is a single, auditable external call: the mode is a fixed argument vector, and the terminal state is captured and restored rather than assumed.
 - `-isig` turns Ctrl-C into a byte, which gives one deterministic interrupt path with exit code 130, terminal restoration before exit, and no partially written configuration.
 - The list logic is a pure state machine behind `KeySource`, so every acceptance criterion about cursor, toggling, clamping, and redraw is testable without a TTY, and the scripted tests cannot flake on terminal availability.
@@ -156,7 +156,7 @@ Terminology: the file name uses "raw mode" in the colloquial sense. The decision
 5. `ArtifactList` must not perform I/O other than through its injected `KeySource` and `Write`; it must not call `std::io::stdin`, `std::process`, or the filesystem.
 6. `AppError::Interrupted` maps to exit code 130 and is raised only for the interrupt key in the list phase; it must not be reused for other aborts, and the existing codes 1, 3, 4 are unchanged.
 7. Interrupt (Ctrl-C, decision 7) is the only list-phase exit that leaves `papyrus.config.yml` unwritten and creates no artifact directories. End of input (decision 3) and `stty` failure (decision 6) both confirm the current state and continue through the prefix/folder prompts, and therefore do write the configuration.
-8. The degraded path may not introduce any typed artifact-token activation; REQ-01.006 stays in force in every environment.
+8. The degraded path may not introduce any typed artifact-token activation; REQ-001.006 stays in force in every environment.
 9. Interactive detection remains `std::io::stdin().is_terminal()` per the specification assumption; no `/dev/tty` probing, `TERM` inspection, or new flag is added.
 10. TTY verification (acceptance criterion 14, DoD 6) is manual evidence recorded in the ticket; automated coverage of the real `stty` path is limited to the mode-abstraction seam.
 11. The specification (`docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` §2, §3.1, "Validation and error behavior") already allows a mode-entry failure to follow this ADR; no wording change is required by this decision, and the business analyst owns any later specification text.
@@ -173,14 +173,14 @@ Terminology: the file name uses "raw mode" in the colloquial sense. The decision
 | `tput`, `read -n1`, or a `bash`/`sh` helper for key reading | Rejected | Adds a shell interpreter and a second language to the runtime surface, and `read -n1` still needs a mode change from somewhere. |
 | Read from a second `/dev/tty` handle | Rejected | Two handles over one terminal complicate buffering and ordering, and `stdin` is already the terminal in interactive mode. |
 | Fail `init` when the terminal mode cannot be changed | Rejected | Turns a presentation requirement into a hard runtime dependency and blocks initialization on minimal systems. |
-| Keep line-based typed tokens or per-artifact `y`/`n` prompts | Rejected | Explicitly rejected by REQ-01.006 and the TASK-104 acceptance criteria. |
+| Keep line-based typed tokens or per-artifact `y`/`n` prompts | Rejected | Explicitly rejected by REQ-001.006 and the TASK-104 acceptance criteria. |
 | Install signal handlers to restore the terminal on SIGINT/SIGTERM/SIGTSTP | Rejected | Needs `libc`/`unsafe` or a crate, changing the dependency baseline; residual risk recorded in decision 8 instead. |
 | Full-screen/alternate-buffer TUI | Rejected | Escape-sequence and capability dependence, scrollback loss, and far more surface than one list needs. |
 
 ## References
 
-- `docs/requirements/business/REQ-01.006.md` — interactive cursor-driven init list.
-- `docs/requirements/business/REQ-01.001.md`, `REQ-01.002.md`, `REQ-01.003.md`, `REQ-01.007.md` — init behavior, configuration access, context selection, `id_padding`.
+- `docs/requirements/business/REQ-001.006.md` — interactive cursor-driven init list.
+- `docs/requirements/business/REQ-001.001.md`, `REQ-001.002.md`, `REQ-001.003.md`, `REQ-001.007.md` — init behavior, configuration access, context selection, `id_padding`.
 - `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` — §1.2, §2, §3, §4, "Validation and error behavior".
 - `docs/business-rules/BR-016-configuration-keys-and-precedence.md` — activation via `enabled` flags and core artifacts.
 - `docs/architecture/adr/ADR-0001-implementation-language-rust.md` — Rust.
@@ -189,6 +189,6 @@ Terminology: the file name uses "raw mode" in the colloquial sense. The decision
 - `docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md` — single crate.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — no new dependency, single binary, offline.
 - `docs/architecture/adr/ADR-0014-dependency-free-tty-key-input-for-interactive-init.md` — competing Proposed route for the same question (in-process FFI); only one of the two may be selected.
-- `docs/requirements/non-functional/NFR-01.003.md` — offline operation; `NFR-03.001.md` — Rust; `NFR-04.002.md` — project-directory boundary.
+- `docs/requirements/non-functional/NFR-001.003.md` — offline operation; `NFR-003.001.md` — Rust; `NFR-004.002.md` — project-directory boundary.
 - Implementation: `src/init.rs` (`run_init`, `run_init_with_io`, `build_config_interactive`), `src/error.rs` (`AppError`), `src/main.rs` (exit code propagation), `src/sanitize.rs` (prompt validation).
 - Backlog: TASK-104.

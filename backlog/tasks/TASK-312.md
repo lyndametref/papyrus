@@ -14,15 +14,13 @@ references:
   - TC-183
   - ADR-039
   - TECH-040
-  - REQ-06.014
-  - REQ-06.019
+  - REQ-006.014
+  - REQ-006.019
 status: Done
 assignee:
   - rust-dev
 milestone: MS-035
 dependencies:
-  - TASK-269
-  - TASK-309
 ordinal: 88
 documentation:
   - tests/support/characterization.rs

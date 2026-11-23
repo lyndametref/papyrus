@@ -14,20 +14,18 @@ labels:
 milestone: MS-022
 dependencies: []
 references:
-  - docs/requirements/business/REQ-06.013.md
-  - docs/requirements/business/REQ-02.004.md
-  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-006.013.md
+  - docs/requirements/business/REQ-002.004.md
+  - docs/requirements/business/REQ-005.007.md
   - src/browser/mod.rs
   - src/browser/render.rs
   - docs/specifications/browser-tasks-milestones-and-releases.md
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - docs/specifications/ui/browser-backlog-records-ui.md
-  - docs/requirements/business/REQ-02.003.md
+  - docs/requirements/business/REQ-002.003.md
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
-  - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - src/browser/routes.rs
   - src/task.rs
@@ -38,7 +36,7 @@ ordinal: 41595
 
 
 ## Description
-**Why.** REQ-06.013 was revised on 2026-11-15: the final configured task status column of each milestone board must offer a "Clean up all" action that archives that column's tasks for the current milestone only, with a warning that lists the affected task IDs, a confirmation step, and per-task failure reporting. The board, its drag-and-status control, and its release separators already exist; the bulk action does not.
+**Why.** REQ-006.013 was revised on 2026-11-15: the final configured task status column of each milestone board must offer a "Clean up all" action that archives that column's tasks for the current milestone only, with a warning that lists the affected task IDs, a confirmation step, and per-task failure reporting. The board, its drag-and-status control, and its release separators already exist; the bulk action does not.
 
 **What.** The board action, its server-rendered confirmation flow, its per-task archive behaviour, its failure report, and the visibility rule.
 
@@ -46,7 +44,7 @@ ordinal: 41595
 - The final configured task status is the last entry of `Config::statuses` (`src/config.rs`; the default list ends with `Done`). `render::board_columns` renders exactly `cfg.statuses` in configured order and then an optional trailing `Unconfigured status` column, so "last column" means the last *configured* entry, never the unconfigured column.
 - `board_columns(cfg, tasks, expand: Option<&str>)` (`src/browser/render.rs`) builds each board's columns. `board_milestone_section` passes `Some(milestone_id)`; the `Tasks without a milestone` section passes `None`, which is the natural gate for "milestone board only".
 - The existing status write path is a status-only `POST /doc/{id}` form (`status_change=1`, `version`, `status`, `expand`) handled by `board_status_submit`: success is `303` to `/?type=task[&expand={ms}]`, failure re-renders the board with `BoardAlert`. `POST /?type=task` is `405` today; the `/?type=config` alias already accepts POST, so letting the board route accept POST follows an existing pattern.
-- The task archive entry point is `crate::task::archive(ctx, id)` (`src/task.rs`): it retires legacy sections, refreshes `updated_date`, then moves the file to `<backlog_directory>/archive/tasks/` through `record::store::move_record`. It preserves `status` and the task ID, and it refuses with `Validation("already archived: <id>")` when the destination file already exists. Calling it once per task needs no second write path (ADR-0013) and changes no archive semantics (REQ-02.004, REQ-05.007, ADR-0022).
+- The task archive entry point is `crate::task::archive(ctx, id)` (`src/task.rs`): it retires legacy sections, refreshes `updated_date`, then moves the file to `<backlog_directory>/archive/tasks/` through `record::store::move_record`. It preserves `status` and the task ID, and it refuses with `Validation("already archived: <id>")` when the destination file already exists. Calling it once per task needs no second write path (ADR-0013) and changes no archive semantics (REQ-002.004, REQ-005.007, ADR-0022).
 - There is no CSRF token anywhere in the browser: cross-origin POSTs are rejected by `validate_host`/`validate_origin` in `handle_connection`, and `form_post` requires `application/x-www-form-urlencoded` plus a valid version token. One bulk form cannot carry one version token per task.
 - A milestone board's task set is the enabled task index filtered by `milestone_id`; archived tasks never enter that index.
 

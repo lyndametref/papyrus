@@ -9,15 +9,15 @@ references:
   - RE-007
   - MS-029
   - TECH-078
-  - REQ-07.003
-  - REQ-07.004
-  - REQ-04.001
-  - REQ-04.002
-  - REQ-02.001
-  - REQ-02.002
-  - REQ-03.001
-  - REQ-01.004
-  - NFR-02.002
+  - REQ-007.003
+  - REQ-007.004
+  - REQ-004.001
+  - REQ-004.002
+  - REQ-002.001
+  - REQ-002.002
+  - REQ-003.001
+  - REQ-001.004
+  - NFR-002.002
   - BR-001
   - BR-005
   - BR-006
@@ -70,13 +70,13 @@ Outcome: fix RE-007 so document-type, task, milestone, and decision `create`/`ed
 - No other field accepts stdin multiline input. Titles, IDs, labels, references, documentation, assignee, milestone, depends-on, acceptance criteria, comments, type, ordinal, status, release, superseded-by, group, story, term, view, and applicability remain single-line and keep rejecting embedded newlines with exit code 4.
 
 ## Stdin contract (normative)
-1. Sentinel: an accepting option selects standard input only when its value is exactly one ASCII hyphen `-`, for example `-d -`, `--description -`, `--description=-`, or `--context -`. No other value triggers reading, and no new flags are added, so the baseline command family stays as documented in REQ-07.003 and BR-001.
+1. Sentinel: an accepting option selects standard input only when its value is exactly one ASCII hyphen `-`, for example `-d -`, `--description -`, `--description=-`, or `--context -`. No other value triggers reading, and no new flags are added, so the baseline command family stays as documented in REQ-007.003 and BR-001.
 2. Opt-in only: when an accepting option is absent or holds a literal value, standard input is never read (TC-052). `--editor` remains the only other body-editing path and keeps its current behavior (TC-053).
 3. Read once per invocation: read standard input to end-of-file as bytes and wait for EOF (Ctrl-D on a terminal). Exactly one accepting option may carry the sentinel per invocation; two or more is a validation error (exit code 4) naming the conflicting options, raised before reading standard input or writing anything.
 4. Decoding: the input must be valid UTF-8; invalid bytes are a validation error (exit code 4).
 5. Line endings: CRLF and lone CR normalize to LF.
 6. Boundary: strip leading and trailing line terminators only; internal blank lines, internal newlines, and per-line spaces are preserved verbatim (TC-041). Input that is empty or whitespace-only after boundary stripping is a validation error (exit code 4).
-7. Characters: LF is the only permitted control character; every other C0/DEL/C1 control, including TAB, is rejected with exit code 4, matching the existing single-line criterion (NFR-02.002).
+7. Characters: LF is the only permitted control character; every other C0/DEL/C1 control, including TAB, is rejected with exit code 4, matching the existing single-line criterion (NFR-002.002).
 8. Precedence and ordering: the resolved stdin text is the value of that option and follows the same code path as a literal value. On edit, field updates including the stdin value are applied before `--editor` opens, preserving today's order. On create, standard input is read and validated before an ID is allocated or a file is written.
 9. Failures (empty or whitespace-only input, invalid UTF-8, multiple sentinels) exit 4 and leave the project unchanged: no ID allocated and no record created or modified.
 10. Success output and `--json` shapes are unchanged from the literal-value path.
@@ -89,13 +89,13 @@ Outcome: fix RE-007 so document-type, task, milestone, and decision `create`/`ed
 ## Unchanged behavior
 - Literal single-line arguments, their exact stored value, and the existing sanitization rules.
 - The editor path.
-- Exit codes (REQ-01.004): 0 success, 4 validation.
+- Exit codes (REQ-001.004): 0 success, 4 validation.
 - All non-accepting fields.
 
 ## Assumptions
 - MS-029 plans no architecture, technical-specification, or UI task: this is a CLI input-handling bug with no record-schema, storage, or UI change. TECH-078 is the roadmap entry that references RE-007; TC-040 through TC-054 are the approved verification design.
 - No existing workflow depends on storing the literal value `-` as a description; the sentinel intentionally claims that exact value.
-- TAB stays rejected because NFR-02.002 rejects control characters rather than cleaning them and this request only adds line breaks; no new escape mechanism is introduced.
+- TAB stays rejected because NFR-002.002 rejects control characters rather than cleaning them and this request only adds line breaks; no new escape mechanism is introduced.
 - The clap lone-hyphen value works without `allow_hyphen_values`, verified against the current binary: `-d -` is accepted as an option value.
 - At most one stdin value per invocation is sufficient; `decision` is the only command with multiple accepting options.
 

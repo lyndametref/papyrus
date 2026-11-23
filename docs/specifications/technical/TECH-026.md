@@ -21,21 +21,21 @@ references:
   - MOCK-0002
   - MOCK-0003
   - MOCK-0004
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-05
-  - REQ-05.003
-  - REQ-05.007
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-005
+  - REQ-005.003
+  - REQ-005.007
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-15
   - TASK-19
@@ -57,7 +57,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), and TASK-15 (decision records) so it also serves the glossary store: active glossary terms. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`glossary`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-05.003 and REQ-05.007 for the browser surface under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for glossary terms. Deprecated terms are hidden from lists and unreachable by URL, mirroring archived decisions and deprecated requirements.
+Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), and TASK-15 (decision records) so it also serves the glossary store: active glossary terms. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`glossary`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-005.003 and REQ-005.007 for the browser surface under REQ-006.002, and advances NFR-001.002 (display and edit all Papyrus content) for glossary terms. Deprecated terms are hidden from lists and unreachable by URL, mirroring archived decisions and deprecated requirements.
 
 ## Scope
 
@@ -74,7 +74,7 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 
 ### Out of scope
 
-- Creating, deprecating, restoring, or deleting glossary terms from the browser; changing record IDs. These remain CLI-only (REQ-05.003, BR-011).
+- Creating, deprecating, restoring, or deleting glossary terms from the browser; changing record IDs. These remain CLI-only (REQ-005.003, BR-011).
 - Managing glossary references from other records in the browser.
 - Browsing UI specifications, business rules, audit records, deployment records, or technical specifications — later tickets (TASK-24, TASK-25, TASK-26, TASK-57).
 - Search inside the browser UI, Markdown rendering, rich-text editing, attachments, or file uploads.
@@ -175,7 +175,7 @@ Glossary records that render record references follow the shared reference-link 
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. Templates may be extended with glossary-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Glossary entry and the glossary list/view/edit templates are the only rendering additions.
 
@@ -250,7 +250,7 @@ The following records where glossary terms appear in the browser, the route shap
 | AC-7 | A stale version token returns `409` and does not write. |
 | AC-8 | Writes are atomic, project-local, leave no temporary file, and symlink escapes return `404`. |
 | AC-9 | Browser operations remain offline-capable and use no paths outside the project directory except during init. |
-| AC-10 | The expanded interface renders in Firefox 115+ (NFR-05.001). |
+| AC-10 | The expanded interface renders in Firefox 115+ (NFR-005.001). |
 
 ## Assumptions
 
@@ -260,7 +260,7 @@ The following records where glossary terms appear in the browser, the route shap
 - Assumption: `term` and `definition` are edited as free-text fields; empty definition clears the section.
 - Assumption: A new MOCK id (MOCK-0004) is allocated for the extension rather than modifying the approved MOCK-0001/MOCK-0002/MOCK-0003 in place, per the global sequential-id rule. MOCK-0004 is already approved (TASK-32).
 - Assumption: No new dependencies, crates, or ADRs are introduced.
-- Assumption: AC #10 (real-browser verification in Firefox 115+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate, consistent with TASK-15.
+- Assumption: AC #10 (real-browser verification in Firefox 115+) and NFR-005.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate, consistent with TASK-15.
 - Assumption: The glossary document type is read-only in the browser for deprecation/restoration; creating or deprecating terms remains CLI-only.
 - Assumption: The glossary record's `term` maps to the record `title` field, consistent with `glossary list` (which reports ID and term) and the search spec (which uses the term as title).
 - Assumption: The list row carries no definition preview; the full definition is shown only on the view page, and the row uses the shared Title cell plus the fixed columns.
@@ -275,7 +275,7 @@ The following records where glossary terms appear in the browser, the route shap
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-05, REQ-05.003, REQ-05.007 |
+| Requirement | REQ-006, REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012, REQ-005, REQ-005.003, REQ-005.007 |
 | Business rule | BR-004 (browser command behavior), BR-011 (glossary command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-30, TASK-32, TASK-86 |

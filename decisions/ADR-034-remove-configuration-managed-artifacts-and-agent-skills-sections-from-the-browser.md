@@ -5,11 +5,11 @@ created_date: '2026-11-18T20:14:42Z'
 updated_date: '2026-11-20T20:08:57Z'
 labels: []
 references:
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
-  - REQ-06.003
-  - REQ-06.005
-  - REQ-06.008
+  - REQ-006.003
+  - REQ-006.005
+  - REQ-006.008
   - ADR-0005
   - ADR-0020
   - TECH-050
@@ -30,6 +30,6 @@ accepted
 - **Retirement of the lifecycle page is confirmed.** This record removed the managed-artifacts-and-lifecycles page and the browser configuration and agent-skills pages (decisions 1-3). ADR-0020 decision 9 (a generated lifecycle page listing every configured document type with its status vocabulary) is therefore already retired; the descriptor-driven document refactor must not reintroduce it as a lifecycle page, a per-type status page, or a replacement route. Status vocabulary stays visible through the configuration and CLI surfaces only.
 - **Not changed:** decisions 1-6, the removal of the three browser sections, CLI-only configuration authority, and this record's accepted status.
 ## Context
-REQ-06.018 and RE-005 require removing the Configuration, Managed artifacts and lifecycles, and Agent skills and workflows sections from the browser navigation and routes. The browser currently hosts these as utility pages: TECH-050 managed artifacts and lifecycles, TECH-051 agent skills, and the browser configuration view of TECH-063 and TECH-068. Configuration editing is also available through the CLI and managed-artifact and skill documentation lives outside the browser. Removing the browser-side surfaces keeps the browser focused and keeps configuration CLI-authoritative. Underlying records and configuration files are unchanged.
+REQ-006.018 and RE-005 require removing the Configuration, Managed artifacts and lifecycles, and Agent skills and workflows sections from the browser navigation and routes. The browser currently hosts these as utility pages: TECH-050 managed artifacts and lifecycles, TECH-051 agent skills, and the browser configuration view of TECH-063 and TECH-068. Configuration editing is also available through the CLI and managed-artifact and skill documentation lives outside the browser. Removing the browser-side surfaces keeps the browser focused and keeps configuration CLI-authoritative. Underlying records and configuration files are unchanged.
 ## Consequences
 Positive: simpler, focused browser interface; single configuration authority in the CLI; no browser-side configuration writes. Negative: browser can no longer edit configuration or display managed-artifact and skill documentation; users must use the CLI and external docs. Risks: stale references to removed routes in TECH specs, mockups, and tests must be updated; implementation must preserve other pages.

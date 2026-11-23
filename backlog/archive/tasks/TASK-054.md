@@ -21,19 +21,19 @@ references:
   - docs/specifications/ui/browser-technical-specifications-ui.md
   - docs/specifications/cli-milestone-packaging-and-verification.md
   - docs/packaging.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -41,19 +41,11 @@ references:
   - docs/architecture/adr/ADR-0001-implementation-language-rust.md
   - docs/architecture/adr/ADR-0003-supported-debian-release-target-forky-only.md
   - docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md
-  - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
   - docs/domain-model/business-glossary/technical-specification.md
 documentation:
-  - >-
     docs/specifications/technical-specifications-milestone-packaging-and-verification.md
-  - docs/specifications/technical-specifications-management.md
-  - docs/specifications/search-technical-specifications.md
-  - docs/specifications/browser-technical-specifications.md
-  - docs/specifications/ui/browser-technical-specifications-ui.md
-  - docs/packaging.md
 priority: medium
 type: chore
 ordinal: 29400
@@ -79,7 +71,7 @@ Scope (out):
 - Technical specifications have no supersede or delete command (BR-017 documents create/list/view/edit/deprecate/restore only); the lifecycle smoke covers those commands only and claims no supersede step.
 - No dedicated --type tech-spec search filter: the documented vocabulary is task/milestone/release/decision/doc; technical specifications are searched through --type doc and default search.
 - No structured references between technical specifications and NFRs/tasks (BR-017 defines no reference fields); such IDs remain literal text in the title or description.
-- No verification on Debian releases other than Forky (ADR-0003, NFR-03.002); no real-GUI browser checks (markup/asset-level only); no dependency-license audit re-run; no changes to requirements, business rules, ADRs, packaging scripts, or UI; product code changes only as a minimal bug fix found during verification.
+- No verification on Debian releases other than Forky (ADR-0003, NFR-003.002); no real-GUI browser checks (markup/asset-level only); no dependency-license audit re-run; no changes to requirements, business rules, ADRs, packaging scripts, or UI; product code changes only as a minimal bug fix found during verification.
 - Final cross-type completeness verification is TASK-20 (m-12), not this ticket.
 
 Milestone m-11 scope vs packaging: this ticket packages and verifies the m-11 technical-specifications increment only; it does not re-deliver management, search, browser, or design-review behavior.
@@ -90,14 +82,14 @@ Assumptions:
 - Assumption: scratch directories live under ./.tmp/ and are removed before the task ends.
 - Assumption: the package version stays 0.1.0 (open question OQ-4).
 - Assumption: scripts/build-deb.sh is used unchanged and does not force a rebuild; cargo build --release must run first.
-- Assumption: no new runtime dependency was added; the TASK-1/TASK-4 runtime dependency license audit remains valid (NFR-06.002).
+- Assumption: no new runtime dependency was added; the TASK-1/TASK-4 runtime dependency license audit remains valid (NFR-006.002).
 - Assumption: no UI change ships in this ticket; MOCK-0001 through MOCK-0009 approved baselines remain the layout references and no new mockup is produced.
 - Assumption: the technical-specification browser edit is field-preserving (browser-technical-specifications spec); smoke asserts only the heading title and ## Description change.
 - Assumption: the browser requires both title and description; an on-disk record with an absent/empty description is viewable as (none) but must be completed before saving from the browser.
 - Assumption: --description remains a single-line CLI input and --editor remains the CLI route for multi-line bodies; --editor is not exercised in the isolated install (environment-dependent) and remains covered by tests/technical_specifications_cli.rs.
 
 Open questions (non-blocking, each with a default in the specification):
-- OQ-1 (default: markup/asset-level verification only; no real-GUI browser run) - NFR-05.001 verification method.
+- OQ-1 (default: markup/asset-level verification only; no real-GUI browser run) - NFR-005.001 verification method.
 - OQ-2 (default: fakeroot dpkg --instdir/--admindir on the Forky build host) - container/VM isolation.
 - OQ-3 (default: new tests/technical_specifications_smoke.rs) - milestone test file location.
 - OQ-4 (default: keep version 0.1.0).
@@ -106,7 +98,7 @@ Open questions (non-blocking, each with a default in the specification):
 Specification: docs/specifications/technical-specifications-milestone-packaging-and-verification.md (dedicated; authored during this refinement). Feature specs: docs/specifications/technical-specifications-management.md, docs/specifications/search-technical-specifications.md, docs/specifications/browser-technical-specifications.md, docs/specifications/ui/browser-technical-specifications-ui.md (MOCK-0009 approved).
 
 ## Acceptance Criteria
-- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides technical-specification management, search, and browser (Technical Specifications category); Debian Trixie and other releases are not claimed or verified.
+- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides technical-specification management, search, and browser (Technical Specifications category); Debian Trixie and other releases are not claimed or verified.
 - [x] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists tech-spec (guards against packaging a stale binary).
 - [x] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [x] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

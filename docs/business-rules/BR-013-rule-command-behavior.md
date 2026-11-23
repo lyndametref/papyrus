@@ -15,7 +15,7 @@ status: active
 
 ## Rationale
 
-Based on REQ-05.005 — Manage Business Rules, REQ-07.003 — Dispatch Config-Defined Document Commands, REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because a business rule is the document type with the most per-field behaviour: three required prose fields with different verb sets and a list-valued reference field. The generated command must take `required`, `verbs`, `kind`, and `option` from the seed, so a rule can never be created without the rationale and applicability that ground it, can never have them rewritten afterwards, and can carry zero or more requirement references without a per-type option table.
+Based on REQ-005.005 — Manage Business Rules, REQ-007.003 — Dispatch Config-Defined Document Commands, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, and REQ-005.007 — Manage Document Archive State and Deletion, this rule exists because a business rule is the document type with the most per-field behaviour: three required prose fields with different verb sets and a list-valued reference field. The generated command must take `required`, `verbs`, `kind`, and `option` from the seed, so a rule can never be created without the rationale and applicability that ground it, can never have them rewritten afterwards, and can carry zero or more requirement references without a per-type option table.
 
 ## Applicability
 

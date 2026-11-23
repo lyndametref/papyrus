@@ -12,14 +12,14 @@ references:
   - ADR-0023
   - ADR-0036
   - ADR-0037
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-04.004
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-06.004
-  - REQ-07.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-004.004
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-006.004
+  - REQ-007.002
 status: verified
 ---
 # TECH-043 Migrate Document Record Types to Front Matter Lazily on First Read and First Write

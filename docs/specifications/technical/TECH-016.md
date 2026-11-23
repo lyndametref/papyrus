@@ -10,14 +10,14 @@ references:
   - BR-008
   - BR-015
   - BR-016
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-04
-  - REQ-04.001
-  - REQ-04.002
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-004
+  - REQ-004.001
+  - REQ-004.002
+  - REQ-006
+  - REQ-006.001
   - TASK-10
   - TASK-13
   - TASK-14
@@ -32,7 +32,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend `papyrus search` so that decision records are searched in addition to task, milestone, release, and `doc` (business and non-functional requirement) records. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md` are reused unchanged; this increment adds the decision record store to the set of searchable types. It implements REQ-06.001 under REQ-04/REQ-04.001/REQ-04.002, and advances BR-015 and BR-008.
+Extend `papyrus search` so that decision records are searched in addition to task, milestone, release, and `doc` (business and non-functional requirement) records. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md` are reused unchanged; this increment adds the decision record store to the set of searchable types. It implements REQ-006.001 under REQ-004/REQ-004.001/REQ-004.002, and advances BR-015 and BR-008.
 
 ## Scope
 
@@ -188,8 +188,8 @@ None of these block implementation; each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-04, REQ-04.001, REQ-04.002 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary) |
+| Requirement | REQ-006, REQ-006.001, REQ-004, REQ-004.001, REQ-004.002 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary) |
 | Business rule | BR-015 (search command behavior), BR-008 (decision command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-14 |

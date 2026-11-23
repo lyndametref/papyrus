@@ -12,13 +12,13 @@ references:
   - ADR-0023
   - ADR-0036
   - ADR-0039
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-04.004
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-06.004
-  - REQ-07.004
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-004.004
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-006.004
+  - REQ-007.004
 status: verified
 ---
 # TECH-040 Shared Record Envelope and Front-Matter Patcher

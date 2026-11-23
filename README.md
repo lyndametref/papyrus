@@ -20,7 +20,7 @@ Release 1.0 also makes document types configuration-defined. Static per-type doc
 
 ## Man Page (`papyrus(1)`)
 
-Scope: this section is the in-repo command reference. It documents the built-in commands and the document command family generically; the command name for each document type is an enabled `document_types` slug. Config-defined slugs have no man page: ADR-0021 is Proposed and the scope decision is deferred, and NFR-03.003 is not claimed for them.
+Scope: this section is the in-repo command reference. It documents the built-in commands and the document command family generically; the command name for each document type is an enabled `document_types` slug. Config-defined slugs have no man page: ADR-0021 is Proposed and the scope decision is deferred, and NFR-003.003 is not claimed for them.
 
 <pre>
 PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
@@ -448,7 +448,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
           <b>GroupedMarkdown</b>
           A group record with a plain ID and member records with dotted IDs
-          (for example <b>REQ-01</b> and <b>REQ-01.001</b>), with
+          (for example <b>REQ-001</b> and <b>REQ-001.001</b>), with
           <b>group.fields</b> and <b>member.fields</b> sequences. Seed-only:
           <b>req</b> and <b>nfr</b>.
 
@@ -622,7 +622,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
        These are the seven kinds a scan reports. A repair run may additionally report <b>repair-skipped</b> for a planned repair that cannot be applied; it is not a scan kind.
 
-       Nothing is written unless <b>--fix</b> is given: a plain run renames, relocates, and rewrites nothing. A legacy <b>deprecated/</b> folder is inert - it is never read, never listed, and produces no finding (REQ-05.007).
+       Nothing is written unless <b>--fix</b> is given: a plain run renames, relocates, and rewrites nothing. A legacy <b>deprecated/</b> folder is inert - it is never read, never listed, and produces no finding (REQ-005.007).
 
        A repair run changes identity and nothing else, and it repairs <b>duplicate-id</b> findings only; every other finding stays in the report and unresolved. Within a duplicate group the keeper is the record with the earliest valid <b>created_date</b>, records with a missing or unparsable date rank last, and a remaining tie goes to the smallest project-relative path. Every other record receives the next ID from the allocator and its file is renamed to the new stem. The plan and the single confirmation prompt for the whole run are written to standard error, so <b>--json</b> stays parseable. Affected references are listed and never rewritten. <b>--force</b> skips the prompt and requires <b>--fix</b>. With repairs to apply, no terminal, and no <b>--force</b>, nothing is written and the run exits 2.
 

@@ -13,8 +13,8 @@ references:
   - ADR-0019
   - ADR-0020
   - ADR-0036
-  - REQ-01.003
-  - REQ-07.002
+  - REQ-001.003
+  - REQ-007.002
   - NFR-007.001
   - NFR-007.002
   - TECH-007
@@ -49,7 +49,7 @@ accepted
 
    | Input | Source | Fingerprint | Snapshot parts it invalidates |
    |---|---|---|---|
-   | Configuration file | The path selected at startup (`--config`, `PAPYRUS_CONFIG`, or the project default), resolved per REQ-01.003 and fixed for the process | mtime + length | `Config`, registry, routes |
+   | Configuration file | The path selected at startup (`--config`, `PAPYRUS_CONFIG`, or the project default), resolved per REQ-001.003 and fixed for the process | mtime + length | `Config`, registry, routes |
    | Registry inputs | The configuration file only: `ArtifactRegistry::build(&Config)` reads no other file, and the built-in seed table is compiled into the binary (ADR-0036 decision 28) | The configuration fingerprint | Registry, routes |
    | Route table | Derived in-process by `BrowserRoutes::build(&ArtifactRegistry)`; it has no file of its own | None; it has no independent fingerprint | Routes, and only together with the registry |
 

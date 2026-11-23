@@ -12,11 +12,11 @@ milestone: MS-001
 dependencies:
   - TASK-003
 references:
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
-  - docs/requirements/business/REQ-01.md
-  - docs/requirements/business/REQ-05.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
+  - docs/requirements/business/REQ-001.md
+  - docs/requirements/business/REQ-005.md
   - docs/business-rules/BR-009-req-command-behavior.md
   - docs/business-rules/BR-010-nfreq-command-behavior.md
   - >-
@@ -43,7 +43,7 @@ Scope (out):
 - No new product features, command behavior, or record types (TASK-5+).
 - No req/nfreq implementation changes beyond bug fixes found during verification.
 - No verification on Debian Trixie or any release other than Forky (see OQ-1).
-- No advertising of support beyond Forky (NFR-03.002 amendment pending).
+- No advertising of support beyond Forky (NFR-003.002 amendment pending).
 - No UI, search, or browser work.
 - No edits to requirements files or business rules.
 - No refresh of the runtime dependency-license audit (TASK-1 audit remains valid).
@@ -51,17 +51,17 @@ Scope (out):
 Assumptions:
 - Assumption: Rust 1.99.1 and dpkg-deb are available in the build environment (ADR-0001, ADR-0003).
 - Assumption: an isolated Debian Forky environment (container/chroot/VM) is available; the host is never modified.
-- Assumption: Trixie verification is not performed; the supported-release claim is narrowed to Forky (ADR-0003). Amending NFR-03.002 to match is pending and out of this ticket's write scope (OQ-1).
+- Assumption: Trixie verification is not performed; the supported-release claim is narrowed to Forky (ADR-0003). Amending NFR-003.002 to match is pending and out of this ticket's write scope (OQ-1).
 - Assumption: the Cargo package version is the single source of truth for the .deb version and --version output.
 - Assumption: the TASK-1 runtime dependency-license audit remains valid; no new runtime dependencies were introduced by TASK-2/TASK-3 beyond those already audited.
 - Assumption: automated integration tests use the built binary (CARGO_BIN_EXE_papyrus) and temp directories, consistent with tests/req_cli.rs and tests/cli.rs.
 - Assumption: --editor smoke testing is environment-dependent and is verified by review rather than automated test.
 
 Open questions:
-- OQ-1: NFR-03.002 still states "Debian Trixie, Forky, and later Debian releases". This task and ADR-0003 narrow the verified/advertised target to Forky only. Amending NFR-03.002 requires the requirements-engineer and is out of this ticket's write scope. Until amended, the ticket's supported-release claim conflicts with NFR-03.002 as written.
+- OQ-1: NFR-003.002 still states "Debian Trixie, Forky, and later Debian releases". This task and ADR-0003 narrow the verified/advertised target to Forky only. Amending NFR-003.002 requires the requirements-engineer and is out of this ticket's write scope. Until amended, the ticket's supported-release claim conflicts with NFR-003.002 as written.
 - OQ-2: Whether the new integration test duplicates existing tests/req_cli.rs coverage or adds a consolidated end-to-end lifecycle test; implementation should avoid redundancy and prefer filling gaps (exit-code matrix, ID preservation).
 
-Dependencies: TASK-3 (Done). Also depends on requirements-engineer (NFR-03.002 amendment) and architect (ADR-0003) for the supported-release claim.
+Dependencies: TASK-3 (Done). Also depends on requirements-engineer (NFR-003.002 amendment) and architect (ADR-0003) for the supported-release claim.
 
 ## Acceptance Criteria
 - [ ] cargo build --release with the pinned Rust 1.99.1 toolchain succeeds and produces target/release/papyrus.

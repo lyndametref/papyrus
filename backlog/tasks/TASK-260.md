@@ -5,7 +5,7 @@ created_date: '2026-11-20T17:42:17Z'
 updated_date: '2026-11-22T16:44:40Z'
 labels: []
 references:
-  - REQ-07.003
+  - REQ-007.003
   - ADR-0016
   - TECH-024
   - TECH-070
@@ -61,7 +61,7 @@ Help is now derived from the descriptor and field sequence, so the MS-032 `tests
 The engine and field options (TASK-255), grouped and mockup behavior (TASK-256), title behavior (TASK-257), config selectors (TASK-258), module deletion (TASK-259), and product behavior beyond the documented deltas.
 
 ## Grounding
-MS-034 AC-5 and AC-7; REQ-07.003; ADR-0016 decision 7 as amended; ADR-042 rulings 2 and 4; TECH-070 sections 2 and 6; TECH-024 section 2; TC-185.
+MS-034 AC-5 and AC-7; REQ-007.003; ADR-0016 decision 7 as amended; ADR-042 rulings 2 and 4; TECH-070 sections 2 and 6; TECH-024 section 2; TC-185.
 
 ## Definition of done
 The goldens are regenerated and complete; every diff is attributed; the fixture replay passes with the two glossary usage-error deltas and the four migrated glossary cases, and no other unexplained difference; help is deterministic; the type order is unchanged and recorded as effective configuration map order; the expected-deltas document and the affected tests are updated; the full suite, clippy, and fmt are clean.
@@ -69,7 +69,7 @@ The goldens are regenerated and complete; every diff is attributed; the fixture 
 ## Acceptance Criteria
 - [ ] #1 The CLI help goldens are regenerated from the post-TASK-259 tree and the help golden test passes with the complete snapshot set (no missing or stale files). (MS-034 AC-5)
 - [ ] #2 Every changed golden is attributed in a recorded diff report to one of: the uniform title contract, --term removal, derived field options (including removal of the -d short), create-group and --group, supersede, the audit positional title, model-fixed mockup options, or generated verb about-line prose. No unattributed difference remains; no type-order change is attributed because the order is unchanged. (MS-034 AC-5; ADR-042 rulings 2 and 4)
-- [ ] #3 Help output is deterministic across two runs and across working directory, locale, COLUMNS, and timezone changes; it contains no absolute path, host name, timestamp, process id, or memory address. (MS-034 AC-5; REQ-07.003)
+- [ ] #3 Help output is deterministic across two runs and across working directory, locale, COLUMNS, and timezone changes; it contains no absolute path, host name, timestamp, process id, or memory address. (MS-034 AC-5; REQ-007.003)
 - [ ] #4 The MS-032 CLI fixture replay passes: record files and exit codes match for every case except the documented deltas, and stdout differs only where an attributed delta explains it. (MS-034 AC-7)
 - [ ] #5 The two glossary --term usage-error cases (glossary/create-term-removed and glossary/edit-term-removed) expect exit 2 and no record; the four migrated cases (glossary/create, glossary/create-json, glossary/edit, and glossary/edit-json) keep exit 0 with the new title form and their recorded record bytes. (MS-034 AC-7; TC-185)
 - [ ] #6 The expected-deltas fixture document is updated to state that --term is removed while --definition remains, lists the two usage-error and four migrated glossary cases, and records any measured verb-about-line delta. (MS-034 AC-7)

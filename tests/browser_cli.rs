@@ -4104,7 +4104,7 @@ fn t15a_list_decision_category() {
     assert!(html.contains("ADR-001"), "missing ADR-001");
     assert!(html.contains("ADR-002"), "missing ADR-002");
     assert!(html.contains("BDR-001"), "missing BDR-001");
-    // TASK-142 defect fix: REQ-06.004 parity needs the superseded_by slot.
+    // TASK-142 defect fix: REQ-006.004 parity needs the superseded_by slot.
     assert!(html.contains("<th scope=\"col\" data-column=\"superseded_by\">Superseded by</th>"));
     let start = html.find("data-row-id=\"ADR-001\"").expect("ADR-001 row");
     let end = html[start..].find("</tr>").unwrap() + start;
@@ -6780,7 +6780,7 @@ fn t57e_field_preserving_write() {
     ]);
     assert_eq!(post_form(&server, "/doc/TECH-001", &body).status, 303);
     let after = fs::read_to_string(&path).unwrap();
-    // A browser save adopts front matter (REQ-05.011) and leaves the body
+    // A browser save adopts front matter (REQ-005.011) and leaves the body
     // unchanged apart from the edited fields.
     let (_, body) = papyrus::record::frontmatter::split(&after).unwrap();
     let expected_body = "# TECH-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";
@@ -7591,7 +7591,7 @@ fn t81f_field_preserving_write() {
     ]);
     assert_eq!(post_form(&server, "/doc/UC-001", &body).status, 303);
     let after = fs::read_to_string(&path).unwrap();
-    // A browser save adopts front matter (REQ-05.011) and leaves the body
+    // A browser save adopts front matter (REQ-005.011) and leaves the body
     // unchanged apart from the edited fields.
     let (_, body) = papyrus::record::frontmatter::split(&after).unwrap();
     let expected_body = "# UC-001 Edited title\n\nPreamble kept.\n\n## Description\nNew body\nsecond line\n\n## Editor Notes\nKeep this line\n\n## Unknown\nAnd this\n";

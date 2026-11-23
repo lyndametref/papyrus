@@ -12,11 +12,11 @@ milestone: MS-016
 dependencies:
   - TASK-073
 references:
-  - docs/requirements/business/REQ-05.012.md
-  - docs/requirements/business/REQ-05.013.md
-  - docs/requirements/business/REQ-05.014.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.001.md
+  - docs/requirements/business/REQ-005.012.md
+  - docs/requirements/business/REQ-005.013.md
+  - docs/requirements/business/REQ-005.014.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.001.md
   - docs/business-rules/BR-018-use-case-document-type-behavior.md
   - docs/business-rules/BR-019-test-case-document-type-behavior.md
   - docs/business-rules/BR-020-test-report-document-type-behavior.md
@@ -28,7 +28,7 @@ ordinal: 35100
 
 
 ## Description
-Extend papyrus search to include use cases, test cases, and test reports (document types use-case, test-case, test-report). Records are stored under their configured document_types directories (use-cases/, test-cases/, test-reports/). Only active records whose file stem matches <prefix>-<digits> (UC-xxx, TC-xxx, TR-xxx) are searched; deprecated/ subfolders and non-record files are never scanned. A disabled or absent type contributes no results and no error. Deprecated records are hidden; restored records reappear. Matching, ordering, output shapes, exit codes, boundary enforcement, sanitization, and the read-only guarantee are reused from docs/specifications/search-requirements.md; the type filter value remains doc (no dedicated per-type filter is added). Search operates on the dedicated-type records managed by the use-case/test-case/test-report commands (BR-018/BR-019/BR-020); the req wording in REQ-05.012/013/014 is superseded for implementation. See docs/specifications/search-use-cases-test-cases-and-test-reports.md.
+Extend papyrus search to include use cases, test cases, and test reports (document types use-case, test-case, test-report). Records are stored under their configured document_types directories (use-cases/, test-cases/, test-reports/). Only active records whose file stem matches <prefix>-<digits> (UC-xxx, TC-xxx, TR-xxx) are searched; deprecated/ subfolders and non-record files are never scanned. A disabled or absent type contributes no results and no error. Deprecated records are hidden; restored records reappear. Matching, ordering, output shapes, exit codes, boundary enforcement, sanitization, and the read-only guarantee are reused from docs/specifications/search-requirements.md; the type filter value remains doc (no dedicated per-type filter is added). Search operates on the dedicated-type records managed by the use-case/test-case/test-report commands (BR-018/BR-019/BR-020); the req wording in REQ-005.012/013/014 is superseded for implementation. See docs/specifications/search-use-cases-test-cases-and-test-reports.md.
 
 In scope:
 - Searching active use-case, test-case, and test-report records through the existing papyrus search <query> [--type <type>]... [--limit <n>] shape.

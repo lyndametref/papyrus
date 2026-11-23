@@ -5,12 +5,12 @@ created_date: '2026-11-16T21:03:23Z'
 updated_date: '2026-11-19T10:54:24Z'
 labels: []
 references:
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
-  - REQ-06.003
-  - REQ-06.005
-  - REQ-06.008
-  - NFR-01.002
+  - REQ-006.003
+  - REQ-006.005
+  - REQ-006.008
+  - NFR-001.002
   - ADR-034
   - TECH-080
   - UI-018

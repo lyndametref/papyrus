@@ -10,13 +10,13 @@ milestone: MS-001
 dependencies:
   - TASK-002
 references:
-  - docs/requirements/business/REQ-05.md
-  - docs/requirements/business/REQ-05.001.md
-  - docs/requirements/business/REQ-05.002.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.md
+  - docs/requirements/business/REQ-005.001.md
+  - docs/requirements/business/REQ-005.002.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-009-req-command-behavior.md
   - docs/business-rules/BR-010-nfreq-command-behavior.md
   - docs/specifications/business-and-non-functional-requirements-management.md
@@ -29,15 +29,15 @@ ordinal: 3000
 Implement the `req` and `nfreq` commands so contributors can create, list, view, edit, deprecate, and restore business requirements and non-functional requirements, including their required groups, with stable IDs and text-file persistence inside the project directory.
 
 Scope (in):
-- `papyrus req create <title> [--title <title>] [--story <text>] [-d <description>] --group <id>` and `papyrus req create-group --title <title> [--story <text>] [-d <description>]` (BR-009, REQ-05.001).
+- `papyrus req create <title> [--title <title>] [--story <text>] [-d <description>] --group <id>` and `papyrus req create-group --title <title> [--story <text>] [-d <description>]` (BR-009, REQ-005.001).
 - `papyrus req list`, `view <id>`, `edit <id> [--title <title>] [--story <text>] [-d <description>] [--editor]`, `deprecate <id>`, `restore <id>` (BR-009).
-- `papyrus nfreq create <title> [-d <description>] --group <id>` and `papyrus nfreq create-group --title <title> [-d <description>]` (BR-010, REQ-05.002).
+- `papyrus nfreq create <title> [-d <description>] --group <id>` and `papyrus nfreq create-group --title <title> [-d <description>]` (BR-010, REQ-005.002).
 - `papyrus nfreq list`, `view <id>`, `edit <id> [--title <title>] [-d <description>] [--editor]`, `deprecate <id>`, `restore <id>` (BR-010).
-- Requirement-to-group cardinality 1..1: requirements are created only with a required group, belong to exactly one group, and groups are type-specific (REQ-05.001, REQ-05.002).
-- Stable IDs preserved across deprecation and restoration; group IDs and per-group sequence IDs (REQ-05.001, REQ-05.002, REQ-05.007).
-- Deprecation moves files to the type's `deprecated/` folder and hides them from lists, search, and the web UI; restoration returns them with the same ID (REQ-05.001, REQ-05.002, REQ-05.007).
-- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-02.002, NFR-04.001, NFR-04.002).
-- Common CLI controls and outcomes inherited from TASK-2 (REQ-01.004).
+- Requirement-to-group cardinality 1..1: requirements are created only with a required group, belong to exactly one group, and groups are type-specific (REQ-005.001, REQ-005.002).
+- Stable IDs preserved across deprecation and restoration; group IDs and per-group sequence IDs (REQ-005.001, REQ-005.002, REQ-005.007).
+- Deprecation moves files to the type's `deprecated/` folder and hides them from lists, search, and the web UI; restoration returns them with the same ID (REQ-005.001, REQ-005.002, REQ-005.007).
+- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-002.002, NFR-004.001, NFR-004.002).
+- Common CLI controls and outcomes inherited from TASK-2 (REQ-001.004).
 
 Scope (out):
 - Search and browser access for requirements (TASK-5, TASK-6).

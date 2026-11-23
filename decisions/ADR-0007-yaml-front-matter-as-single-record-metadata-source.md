@@ -16,7 +16,7 @@ superseded
 
 ## Context
 
-REQ-05.010 (front matter on every managed Markdown record), REQ-05.011 (metadata maintained by every command, lazy per-record migration on first read and first write), REQ-06.003 (browser page describing record types and lifecycles), REQ-06.004 (CLI and browser read front matter and write it back), REQ-01.005 (two ID spaces with translation), and NFR-04.003 (task and milestone interoperability with Backlog.md) are recorded. The behavior contract is the requirement files; this ADR fixes how record metadata is represented and where it lives.
+REQ-005.010 (front matter on every managed Markdown record), REQ-005.011 (metadata maintained by every command, lazy per-record migration on first read and first write), REQ-006.003 (browser page describing record types and lifecycles), REQ-006.004 (CLI and browser read front matter and write it back), REQ-001.005 (two ID spaces with translation), and NFR-004.003 (task and milestone interoperability with Backlog.md) are recorded. The behavior contract is the requirement files; this ADR fixes how record metadata is represented and where it lives.
 
 Current implementation shape (verified in `src/` and the corpus):
 
@@ -40,20 +40,20 @@ The forces are: one metadata source per field (no double storage), lossless pres
 
    | Record type | Additional front-matter keys | Source requirement |
    |---|---|---|
-   | Task | `status`, `assignee` (YAML list), `milestone`, `dependencies`, `ordinal`, `documentation`, `type` — the complete Backlog.md key set | REQ-05.010, NFR-04.003 |
-   | Milestone | `release` (additive over Backlog.md's `id` and `title`) | REQ-05.010, NFR-04.003 |
-   | Release | none (general keys only; REQ-03.002 defines no stored release state) | REQ-05.010 |
-   | Decision | `superseded_by` (optional) | REQ-05.010 |
-   | Audit record | `type` | REQ-05.010 |
-   | Business requirement, NFR, glossary, UI spec, tech spec, business rule | none | REQ-05.010 |
-   | UI mockup | not applicable — HTML, excluded (decision 11) | REQ-05.008, REQ-05.010 |
+   | Task | `status`, `assignee` (YAML list), `milestone`, `dependencies`, `ordinal`, `documentation`, `type` — the complete Backlog.md key set | REQ-005.010, NFR-004.003 |
+   | Milestone | `release` (additive over Backlog.md's `id` and `title`) | REQ-005.010, NFR-004.003 |
+   | Release | none (general keys only; REQ-003.002 defines no stored release state) | REQ-005.010 |
+   | Decision | `superseded_by` (optional) | REQ-005.010 |
+   | Audit record | `type` | REQ-005.010 |
+   | Business requirement, NFR, glossary, UI spec, tech spec, business rule | none | REQ-005.010 |
+   | UI mockup | not applicable — HTML, excluded (decision 11) | REQ-005.008, REQ-005.010 |
 
    For tasks and milestones, the `id` value is the Backlog.md storage ID (`TASK-18`, `m-0`), not the Papyrus display ID (`TASK-018`, `MS-001`); the same applies to reference-valued keys `milestone` and `dependencies`. ADR-0008 owns that mapping.
 
 3. **Front matter is authoritative and is the only metadata store.** Values are never mirrored into a `## ` section. The following body sections are retired as metadata carriers: task `## Status`, `## Assignee`, `## Milestone`, `## Labels`, `## Dependencies`; milestone `## Release`; audit `## Audit Type`. New files never write them; a write to an existing file removes them after moving their values into front matter. Body sections that express document content are retained unchanged: `## Description`, `## User Story`, `## Group`, `## Acceptance Criteria`, `## Comments`, `## Implementation Notes`, `## Definition`, `## Rationale`, `## Applicability`, `## Requirements` (business-rule traceability, not general references), `## View`, `## Content`, `## Decision`, `## Context`, `## Consequences`.
 
 4. **The `# <ID> <title>` heading policy differs by record family (product-confirmed).**
-   - Tasks and milestones: no `#` heading. The Backlog.md body has none and NFR-04.003 requires the Backlog.md body shape. ADR-0008 owns the exact body layout.
+   - Tasks and milestones: no `#` heading. The Backlog.md body has none and NFR-004.003 requires the Backlog.md body shape. ADR-0008 owns the exact body layout.
    - All other Markdown record types: the `# <ID> <title>` line is retained as the body title line because accepted ADR bodies are frozen and cannot lose it, because existing readers, search excerpts, and the documentation indexes rely on it, and because a human opening the file benefits from it. It is *not* an independent metadata source: readers take `id` and `title` from front matter; every writer regenerates the heading from the front-matter values so the two cannot diverge. For record types whose `id` is a Papyrus ID, the heading shows the Papyrus ID (ADR-0008 decision 4).
    - Frozen ADR bodies keep their existing heading and sections; the added block is the only change made to an existing decision file.
 
@@ -64,7 +64,7 @@ The forces are: one metadata source per field (no double storage), lossless pres
    - serialization that emits the canonical key order and Backlog-compatible quoting, and a **patch** operation that rewrites only the changed keys while preserving unknown keys, key order, and comments.
    No record module and no browser code may hand-format a `---` block, re-serialize an untouched block, or parse front matter with ad-hoc string splitting.
 
-6. **YAML handling uses the existing `yaml_serde` dependency.** Reading parses the block with `yaml_serde`; writing serializes only scalar/list values under Papyrus control and patches them into the existing block text. A full document re-serialization that would reorder or requote foreign keys is prohibited because it breaks NFR-04.003 round trips.
+6. **YAML handling uses the existing `yaml_serde` dependency.** Reading parses the block with `yaml_serde`; writing serializes only scalar/list values under Papyrus control and patches them into the existing block text. A full document re-serialization that would reorder or requote foreign keys is prohibited because it breaks NFR-004.003 round trips.
 
 7. **Timestamp format.** `created_date` and `updated_date` are quoted ISO-8601 UTC strings at second precision: `'YYYY-MM-DDTHH:MM:SSZ'` (matching observed Backlog.md values). `created_date` is written once at creation and never changed by a later command. `updated_date` is refreshed by every write path (create, edit, archive, restore, deprecate, supersede, browser save). A save that changes nothing does not refresh it because no write happens. A small in-project UTC formatter is used; no new time-formatting dependency is added (ADR-0001 toolchain, ADR-0005 dependency baseline).
 
@@ -78,13 +78,13 @@ The forces are: one metadata source per field (no double storage), lossless pres
    - **Ordering relative to the shared envelope (ADR-0009).** Lazy migration runs only after the shared reader/patcher and the task/milestone ID translation exist, because the migration must not contain a second parser and because task/milestone blocks carry storage IDs. Task and milestone conversion additionally requires Stage 2 identity (ADR-0009 decision 8); document record types need only Stage 1. There is no within-pass ordering because there is no pass.
    - **Reviewable.** A dry run and a per-file inventory (path, action, resulting keys) remain available as a reporting and verification aid over the descriptor-claimed corpus, but they are not a prerequisite bulk step; the corpus converges record by record as records are read or written. The inventory is the evidence that the descriptor set covers the intended corpus and nothing more. No migration command is required for convergence.
 
-10. **`id`, `created_date`, and `updated_date` are exempt from the "every field is a create/update option" rule of REQ-05.011.** `id` is generated and stable (REQ-01.005), the timestamps are automatic; every other front-matter key for a type is exposed as a create option and an update option on that type's commands. `ordinal` is an opaque non-negative integer with a create option, an update option, and a default derived from the current maximum. A key that a command never changes still has to be *preserved*, which is the patch contract in 5.
+10. **`id`, `created_date`, and `updated_date` are exempt from the "every field is a create/update option" rule of REQ-005.011.** `id` is generated and stable (REQ-001.005), the timestamps are automatic; every other front-matter key for a type is exposed as a create option and an update option on that type's commands. `ordinal` is an opaque non-negative integer with a create option, an update option, and a default derived from the current maximum. A key that a command never changes still has to be *preserved*, which is the patch contract in 5.
 
-11. **UI mockups are excluded from front matter (product decision).** REQ-05.008 fixes mockup metadata as HTML comments (`mockup-id`, `status`, `task`, `specs`, `refs`) inside the HTML file, and REQ-05.010 scopes front matter to Markdown. An unwrapped `---` block at the top of an HTML file is invalid markup and would be rendered as text; wrapping it in an HTML comment creates a format no generic YAML reader accepts. Mockup HTML files therefore carry no front matter and keep REQ-05.008 as their single metadata source. This exclusion is final for this ADR, not provisional.
+11. **UI mockups are excluded from front matter (product decision).** REQ-005.008 fixes mockup metadata as HTML comments (`mockup-id`, `status`, `task`, `specs`, `refs`) inside the HTML file, and REQ-005.010 scopes front matter to Markdown. An unwrapped `---` block at the top of an HTML file is invalid markup and would be rendered as text; wrapping it in an HTML comment creates a format no generic YAML reader accepts. Mockup HTML files therefore carry no front matter and keep REQ-005.008 as their single metadata source. This exclusion is final for this ADR, not provisional.
 
 12. **Decision `status` and decision `type` (`adr`/`bdr`) stay in the document core (product decision: no change).** ADR status is a lifecycle value with free-text rationale ("Accepted — approved by explicit user confirmation on 2026-11-04 (TASK-28)") that cannot be moved without editing frozen bodies, and `type` is already derived from the ID prefix. Deprecation state stays expressed by directory placement and mockup status stays in HTML comments. The key registry in 5 remains extensible: moving either later is a registry entry plus a section-retirement rule, not a redesign.
 
-13. **Backfilling front matter is a metadata-only change and is permitted on frozen records.** Adding a block above an existing record body — including an Accepted ADR — does not modify the body it governs. It therefore does not require superseding the ADR and does not violate the ADR immutability rule, which freezes Context, Decision, and Consequences. `id` is backfilled from the existing record ID (heading or filename) so stability under REQ-01.005 holds; for tasks and milestones the backfilled `id` is the storage ID (ADR-0008). Lazy migration of decision 9 is performed under this rule.
+13. **Backfilling front matter is a metadata-only change and is permitted on frozen records.** Adding a block above an existing record body — including an Accepted ADR — does not modify the body it governs. It therefore does not require superseding the ADR and does not violate the ADR immutability rule, which freezes Context, Decision, and Consequences. `id` is backfilled from the existing record ID (heading or filename) so stability under REQ-001.005 holds; for tasks and milestones the backfilled `id` is the storage ID (ADR-0008). Lazy migration of decision 9 is performed under this rule.
 
 14. **Decision `created_date` and `references` are additive to the existing sections (product decision).** For decisions, `## Date` and `## References` remain part of the body and are neither replaced nor moved: front matter for decisions is additive. `created_date` does not replace or duplicate the ADR `## Date` line, and neither section becomes an editable metadata source. New decisions write `created_date` and `## Date` from one clock value so they agree; existing files keep the frozen prose. Readers use front matter first and fall back to the section.
 
@@ -94,7 +94,7 @@ The forces are: one metadata source per field (no double storage), lossless pres
 
 **Positive:**
 
-- One metadata source: CLI list/view, browser list/detail, and search read the same keys, satisfying REQ-06.004 without a synchronization layer.
+- One metadata source: CLI list/view, browser list/detail, and search read the same keys, satisfying REQ-006.004 without a synchronization layer.
 - Field-preserving writes are expressible as a patch, which is the only way to satisfy "preserve untouched front matter" and Backlog.md round-trip in the same writer.
 - No new dependency: `yaml_serde` is already used.
 - `created_date`/`updated_date` become real record data instead of file mtime or nothing, removing the current `SystemTime`-based task sort/list approximations.
@@ -113,7 +113,7 @@ The forces are: one metadata source per field (no double storage), lossless pres
 
 **Risks and mitigations:**
 
-- *Divergent quoting/order breaking Backlog.md*: round-trip tests in both directions are the acceptance gate for NFR-04.003 (ADR-0008 defines the contract).
+- *Divergent quoting/order breaking Backlog.md*: round-trip tests in both directions are the acceptance gate for NFR-004.003 (ADR-0008 defines the contract).
 - *Front matter destroyed by a writer that re-renders the file*: the patch contract plus a test that an untouched file byte-compares equal after a no-op edit; ADR-0009 makes the shared writer the only write path.
 - *Unknown/foreign keys dropped*: the parse result keeps unknown keys and their order; a patch never rebuilds the block.
 - *Timestamp drift or non-UTC values*: single formatter, single clock call per write, frozen `created_date`.
@@ -131,26 +131,26 @@ The forces are: one metadata source per field (no double storage), lossless pres
 
 | Option | Outcome | Reason |
 |---|---|---|
-| YAML front matter as the only metadata store, parsed by one shared module (this ADR) | Selected | Meets REQ-05.010/05.011/06.004, is what Backlog.md already does, and needs no new dependency. |
+| YAML front matter as the only metadata store, parsed by one shared module (this ADR) | Selected | Meets REQ-005.010/05.011/06.004, is what Backlog.md already does, and needs no new dependency. |
 | Keep metadata in `## ` sections and mirror it into front matter | Rejected | Two sources that can diverge; violates "metadata is not duplicated". |
 | Front matter as a read-only cache regenerated from the body on every write | Rejected | A hand-edited or Backlog-edited front matter value would be lost; breaks round-trip. |
-| TOML or JSON metadata block | Rejected | Not Backlog.md-compatible; NFR-04.003 fails. |
+| TOML or JSON metadata block | Rejected | Not Backlog.md-compatible; NFR-004.003 fails. |
 | One metadata block per record type with a per-type parser | Rejected | Repeats the current duplication and guarantees drift between CLI and browser. |
 | Remove all `#` headings and rely on front matter only | Rejected | Impossible for frozen ADR bodies and costly for existing docs/indexers; the heading is retained as a writer-generated body title line (4). |
-| Lazy upgrade on first read and first write (this ADR, revised 2026-11-08) | Selected | Corpus converges record by record as records are read or written; readers keep the legacy fallback only until convergence; idempotent, no dedicated command, and no single large diff. Satisfies REQ-05.011 as revised. |
+| Lazy upgrade on first read and first write (this ADR, revised 2026-11-08) | Selected | Corpus converges record by record as records are read or written; readers keep the legacy fallback only until convergence; idempotent, no dedicated command, and no single large diff. Satisfies REQ-005.011 as revised. |
 | One-time bulk migration of the whole corpus (earlier product decision) | Rejected by product decision 2026-11-08 | Requires a clean git tree and produces a large single diff; a later-upgraded project still needs the same pass. Lazy per-record migration achieves the same end state without a dedicated command and keeps readers robust to both shapes. |
 | Migrate only metadata-bearing files, leave read-only docs alone | Rejected | Creates an unpredictable corpus where "has front matter" does not mean "is a record"; descriptor scope (15) is the explicit boundary instead. |
-| YAML front matter in HTML mockups, wrapped in an HTML comment | Rejected by product decision | Non-standard format that neither generic YAML tools nor browsers handle; REQ-05.008 HTML metadata stays authoritative. |
+| YAML front matter in HTML mockups, wrapped in an HTML comment | Rejected by product decision | Non-standard format that neither generic YAML tools nor browsers handle; REQ-005.008 HTML metadata stays authoritative. |
 
 ## References
 
-- `docs/requirements/business/REQ-05.010.md` — Record Metadata in YAML Front Matter.
-- `docs/requirements/business/REQ-05.011.md` — Maintain Record Metadata Through All Commands.
-- `docs/requirements/business/REQ-06.003.md` — Describe Managed Artifacts and Their Lifecycles in the Browser.
-- `docs/requirements/business/REQ-06.004.md` — Use Front-Matter Metadata in CLI and Browser Views.
-- `docs/requirements/business/REQ-01.005.md` — Assign Stable Record IDs (two ID spaces, translation).
-- `docs/requirements/non-functional/NFR-04.003.md` — Backlog.md task and milestone interoperability.
-- `docs/requirements/business/REQ-05.008.md` — UI mockup metadata in HTML content.
+- `docs/requirements/business/REQ-005.010.md` — Record Metadata in YAML Front Matter.
+- `docs/requirements/business/REQ-005.011.md` — Maintain Record Metadata Through All Commands.
+- `docs/requirements/business/REQ-006.003.md` — Describe Managed Artifacts and Their Lifecycles in the Browser.
+- `docs/requirements/business/REQ-006.004.md` — Use Front-Matter Metadata in CLI and Browser Views.
+- `docs/requirements/business/REQ-001.005.md` — Assign Stable Record IDs (two ID spaces, translation).
+- `docs/requirements/non-functional/NFR-004.003.md` — Backlog.md task and milestone interoperability.
+- `docs/requirements/business/REQ-005.008.md` — UI mockup metadata in HTML content.
 - `docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md` — existing write contract and its deferred CLI alignment.
 - `docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md` — Backlog.md layout, storage IDs, and ID translation.
 - `docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md` — single parse/patch/write implementation and migration staging.

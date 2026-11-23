@@ -15,7 +15,7 @@ labels:
 milestone: MS-022
 dependencies: []
 references:
-  - docs/requirements/business/REQ-01.008.md
+  - docs/requirements/business/REQ-001.008.md
   - >-
     docs/architecture/adr/ADR-0029-read-only-corpus-diagnostics-with-duplicate-id-repair.md
   - src/lib.rs
@@ -29,7 +29,7 @@ ordinal: 41500
 
 
 ## Description
-**Why.** REQ-01.008 adds `papyrus check` and ADR-0029 is Accepted. Three gaps block it today: `lib.rs::run` validates the configuration fail-closed before dispatch, so the command cannot diagnose a broken configuration; `CommandOutput` cannot carry a non-zero exit, so findings would have to be reported as an error; and no read-only corpus enumeration exists, because `record::resolve::list_in_dir` relocates records and therefore writes.
+**Why.** REQ-001.008 adds `papyrus check` and ADR-0029 is Accepted. Three gaps block it today: `lib.rs::run` validates the configuration fail-closed before dispatch, so the command cannot diagnose a broken configuration; `CommandOutput` cannot carry a non-zero exit, so findings would have to be reported as an error; and no read-only corpus enumeration exists, because `record::resolve::list_in_dir` relocates records and therefore writes.
 
 **What.** A `check` built-in command, a `src/check/` module with descriptor-driven read-only scanners, a tolerant self-load, a stable findings model, exit 4, and `--json`. The implementation contract is `docs/specifications/project-diagnostics-check.md` (finding model, detection rules, output shapes, exit codes); ADR-0029 supplies the rationale.
 
@@ -52,7 +52,7 @@ ordinal: 41500
 **Out of scope.** `--fix` and `--force` (TASK-138), reserved slug and help and README (TASK-139, TASK-140), dependency-reference findings, a browser surface, any migration of legacy folders, and any repair or rewriting of references.
 
 **Assumptions.**
-- Assumption: ADR-0029 decision 5 is the detection contract and decision 6 the finding shape and order; where decision 2's "Stage B only when stage A produced no finding" contradicts REQ-01.008 and the independent-checks rule, REQ-01.008 wins (see open questions).
+- Assumption: ADR-0029 decision 5 is the detection contract and decision 6 the finding shape and order; where decision 2's "Stage B only when stage A produced no finding" contradicts REQ-001.008 and the independent-checks rule, REQ-001.008 wins (see open questions).
 - Assumption: `config-invalid` is one finding per diagnostic line, `subject` is `None`, `locations` is the project-relative configuration path, and `detail` keeps the key path verbatim.
 - Assumption: a missing configuration file is a load error and therefore one `config-invalid` finding with exit 4, not a runtime exit 1 as `config list` behaves.
 - Assumption: `deprecated/` exclusion is guaranteed by `resolve_read_directories` plus a defensive path-component filter, so no scanner needs a `deprecated` special case.
@@ -61,7 +61,7 @@ ordinal: 41500
 - Assumption: a task dependency that resolves to no task stays an open question recorded by ADR-0029, not a finding.
 
 **Open questions (do not block implementation; defaults are fixed above and in the specification).**
-1. ADR-0029 decision 2 says Stage B runs "only when stage A produced no finding", while REQ-01.008 and this ticket require the independent checks to run under an invalid configuration. The requirement wins; the ADR sentence should be corrected (owner: architect).
+1. ADR-0029 decision 2 says Stage B runs "only when stage A produced no finding", while REQ-001.008 and this ticket require the independent checks to run under an invalid configuration. The requirement wins; the ADR sentence should be corrected (owner: architect).
 2. ADR-0029 decision 5 calls the offending key path the `config-invalid` location, while decision 6 makes it the `subject`. This ticket uses the configuration file as `locations` and `None` as `subject`, keeping the key path in `detail`, because a joined diagnostic line has no reliable key-path boundary. Confirm or amend.
 3. No reserved-name entry for `check` lands in this ticket. Until `check` is added to the built-in name list, a project that configures a document type named `check` fails while the command tree is built. Accepted as a transient seam between consecutive changes in this milestone.
 

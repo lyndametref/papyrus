@@ -12,17 +12,17 @@ references:
   - BR-018
   - BR-019
   - BR-020
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-05
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-05.012
-  - REQ-05.013
-  - REQ-05.014
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-005
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-005.012
+  - REQ-005.013
+  - REQ-005.014
+  - REQ-006
+  - REQ-006.001
   - TASK-10
   - TASK-14
   - TASK-18
@@ -40,9 +40,9 @@ status: verified
 ## Description
 ## Purpose
 
-Extend `papyrus search` to include use cases, test cases, and test reports. These are document records: they are stored under their configured `document_types` directories (default `use-cases/`, `test-cases/`, and `test-reports/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by later search increments are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.012/REQ-05.013/REQ-05.014/REQ-05.007, and advances BR-015 and BR-018/BR-019/BR-020.
+Extend `papyrus search` to include use cases, test cases, and test reports. These are document records: they are stored under their configured `document_types` directories (default `use-cases/`, `test-cases/`, and `test-reports/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by later search increments are reused unchanged. This increment implements REQ-006.001 under REQ-005/REQ-005.012/REQ-005.013/REQ-005.014/REQ-005.007, and advances BR-015 and BR-018/BR-019/BR-020.
 
-Search operates on the dedicated-type records managed by the `use-case`, `test-case`, and `test-report` commands (BR-018/BR-019/BR-020). The `req` wording in REQ-05.012/013/014 is superseded for implementation by those business rules; no `req`-managed records of these kinds exist.
+Search operates on the dedicated-type records managed by the `use-case`, `test-case`, and `test-report` commands (BR-018/BR-019/BR-020). The `req` wording in REQ-005.012/013/014 is superseded for implementation by those business rules; no `req`-managed records of these kinds exist.
 
 ## Scope
 
@@ -204,8 +204,8 @@ None of these block implementation; each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-05, REQ-05.007, REQ-05.010, REQ-05.012, REQ-05.013, REQ-05.014 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary) |
+| Requirement | REQ-006, REQ-006.001, REQ-005, REQ-005.007, REQ-005.010, REQ-005.012, REQ-005.013, REQ-005.014 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary) |
 | Business rule | BR-015 (search command behavior), BR-016 (configuration keys and precedence), BR-018 (use-case document type behavior), BR-019 (test-case document type behavior), BR-020 (test-report document type behavior) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-80 |

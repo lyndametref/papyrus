@@ -13,12 +13,12 @@ milestone: MS-006
 dependencies:
   - TASK-029
 references:
-  - docs/requirements/business/REQ-05.003.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.003.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
   - docs/specifications/glossary-terms-management.md
@@ -30,7 +30,6 @@ references:
 documentation:
   - docs/specifications/ui/browser-glossary-terms-ui.md
   - docs/specifications/ui/mockups/MOCK-0004-browser-glossary-terms-review.html
-  - docs/specifications/ui/mockups/README.md
 priority: medium
 type: task
 ordinal: 23200
@@ -49,7 +48,7 @@ Scope:
 - Edit form: term (required) and definition (optional); pristine, dirty, validation-error (422), conflict (409), and 320 px states; hidden version input with dashed annotation.
 - Error pages reused from MOCK-0001.
 - Responsive 320 px list and edit form with sidebar toggle and annotation legend.
-- Deprecated glossary terms excluded from lists and navigation (REQ-05.007, BR-011).
+- Deprecated glossary terms excluded from lists and navigation (REQ-005.007, BR-011).
 
 Out of scope:
 - Browser implementation (TASK-23), CLI behaviour (TASK-30), search (TASK-31), packaging (TASK-33).
@@ -74,7 +73,7 @@ Open questions:
 - [ ] A new self-contained HTML review package is created under docs/specifications/ui/mockups/ with the next available MOCK id (expected MOCK-0004), containing a review landing, design deck, and web prototype; styles are inlined and no external file, script, font, image, or network reference is used.
 - [ ] The package reuses the approved shell and adds a Glossary sidebar entry plus a ?type=glossary category; glossary list rows show ID + term, with empty states and long-title wrapping.
 - [ ] The package includes glossary view (ID, term, definition; breadcrumb Glossary › ID; single Edit action) and edit form (term required, definition optional; pristine, dirty, validation-error, conflict, and 320 px states) views.
-- [ ] Deprecated glossary terms are excluded from list/navigation views and are not reachable, consistent with REQ-05.007 and BR-011.
+- [ ] Deprecated glossary terms are excluded from list/navigation views and are not reachable, consistent with REQ-005.007 and BR-011.
 - [ ] Error pages are reused from MOCK-0001 (404 unknown/deprecated, 400, 405, 415, 500) and 320 px list/edit views include sidebar toggle and annotation legend.
 - [ ] A UI description document is created/updated under docs/specifications/ui/ (expected browser-glossary-terms-ui.md) describing screens, states, elements, interactions, active elements, MOCK register, assumptions, and approval status.
 - [ ] The mockup registry docs/specifications/ui/mockups/README.md is updated with the new MOCK row (id, type, name, slug, artifact, platform, views, status, source) and notes.

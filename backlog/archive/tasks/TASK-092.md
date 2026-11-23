@@ -24,20 +24,17 @@ references:
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
-  - >-
     docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-technical-specifications.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-04.004.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-004.004.md
 documentation:
-  - >-
     docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md
 priority: high
 type: feature
@@ -60,7 +57,7 @@ In scope:
 Out of scope: UI mockup HTML rendering/editing (ADR-0012 exception; writes already use the store), the import's Backlog.md body mapping (src/import/), search specification text (already revised), configuration/init writes, global LF normalization of every writer, TASK-98 end-to-end verification and packaging.
 
 Assumptions:
-- Assumption: the browser's non-migrating write branch only serves pre-front-matter files; routing saves through record::store makes browser saves adopt front matter per REQ-05.011. Browser reads of legacy records then adopt too, which follows the requirement and differs from the current code.
+- Assumption: the browser's non-migrating write branch only serves pre-front-matter files; routing saves through record::store makes browser saves adopt front matter per REQ-005.011. Browser reads of legacy records then adopt too, which follows the requirement and differs from the current code.
 - Assumption: the browser may keep a Record-shaped render-only view model, populated from Document + RecordView, with no parsing, ID, path, version, or write logic. Category adapter functions over record::identity are permitted (D1).
 - Assumption: type-specific patch builders may live in one src/record/edit module instead of one module per type.
 - Assumption: src/record/descriptors.rs does not exist; src/record/descriptor.rs is canonical.
@@ -169,7 +166,7 @@ No proof violation remains in the tree.
 
 ### Behavior notes
 
-- Browser saves of pre-front-matter records now adopt front matter (REQ-05.011). `tests/browser_cli.rs` `t57e_field_preserving_write` and `t81f_field_preserving_write` were updated to assert the documented adoption while keeping the body byte-identical apart from the edited fields.
+- Browser saves of pre-front-matter records now adopt front matter (REQ-005.011). `tests/browser_cli.rs` `t57e_field_preserving_write` and `t81f_field_preserving_write` were updated to assert the documented adoption while keeping the body byte-identical apart from the edited fields.
 - `record::migrate::ensure_front_matter_quiet` was added so adoption from a protocol stdout stream (the browser) does not print a progress line; CLI read adoption still prints.
 - No new dependency; `Cargo.toml`/`Cargo.lock` unchanged. No corpus record changed; `git status` shows only source, tests, spec, and this task file.
 

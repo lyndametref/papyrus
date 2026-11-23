@@ -15,7 +15,7 @@ The papyrus init command performs the behavior stated in its Papyrus manpage ent
 
 ## Rationale
 
-Based on REQ-01.001 — Initialize a Papyrus Project, this rule exists because the documented init behavior is the contract for papyrus init; README.md is the sole behavior source.
+Based on REQ-001.001 — Initialize a Papyrus Project, this rule exists because the documented init behavior is the contract for papyrus init; README.md is the sole behavior source.
 
 ## Applicability
 

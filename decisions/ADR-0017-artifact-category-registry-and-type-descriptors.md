@@ -16,9 +16,9 @@ accepted
 
 ## Context
 
-REQ-07.001 fixes exactly three artifact categories — **backlog** (tasks, milestones, releases), **decision** (decision records), **document** (every type declared under `document_types`). Status models differ by category: task statuses are configurable through the top-level `statuses`/`default_status` (REQ-01.002); milestones are fixed `open -> closed`; releases fixed `planned -> released`; decisions use the five Nygard statuses; and every document type has a **main status** `active` or `archived` — the only statuses that affect storage location — plus optional **custom statuses** declared per type in `document_types.<slug>.statuses` with an optional `default_status`. Custom statuses are front-matter values only: no folder per status and no move on a status change. UI mockups keep `pending`/`approved`/`archived` in HTML metadata and declare no custom statuses.
+REQ-007.001 fixes exactly three artifact categories — **backlog** (tasks, milestones, releases), **decision** (decision records), **document** (every type declared under `document_types`). Status models differ by category: task statuses are configurable through the top-level `statuses`/`default_status` (REQ-001.002); milestones are fixed `open -> closed`; releases fixed `planned -> released`; decisions use the five Nygard statuses; and every document type has a **main status** `active` or `archived` — the only statuses that affect storage location — plus optional **custom statuses** declared per type in `document_types.<slug>.statuses` with an optional `default_status`. Custom statuses are front-matter values only: no folder per status and no move on a status change. UI mockups keep `pending`/`approved`/`archived` in HTML metadata and declare no custom statuses.
 
-REQ-07.003 fixes the document **baseline** command family to `create`, `list`, `view`, `edit`, `archive`, `delete` for every document type, and adds `status <id> <value>` for front-matter-backed types (it never archives). The baseline is a lower bound: built-in typed types add verbs and arguments — `req`/`nfr` have `create-group` and a required `--group` on `create` (REQ-05.001, REQ-05.002), and `ui-mockup` has `supersede` (REQ-05.008). REQ-05.007 gives every document type a single archive/delete policy.
+REQ-007.003 fixes the document **baseline** command family to `create`, `list`, `view`, `edit`, `archive`, `delete` for every document type, and adds `status <id> <value>` for front-matter-backed types (it never archives). The baseline is a lower bound: built-in typed types add verbs and arguments — `req`/`nfr` have `create-group` and a required `--group` on `create` (REQ-005.001, REQ-005.002), and `ui-mockup` has `supersede` (REQ-005.008). REQ-005.007 gives every document type a single archive/delete policy.
 
 Current code shape exposes four different partial models of the same idea:
 
@@ -26,11 +26,11 @@ Current code shape exposes four different partial models of the same idea:
 - `src/lib.rs` + one module per type (`src/req.rs`, `src/tech_spec.rs`, …) encode each type's verb set as its own `clap::Subcommand` enum and its own `match` dispatch.
 - `src/browser/records.rs` declares a `Category` enum with fifteen variants and per-variant `key()`, `config_key()`, and `descriptor_name()` mappings, plus `form_for_stem` branching on `Category`.
 - `src/browser/render.rs` branches on `Category` in the sidebar, page titles, list pages, detail pages, and edit forms.
-- `src/config.rs` holds `DocTypeEntry { prefix, directory, enabled }` with no status model, content model, id shape, or verb set. `deploy` is no longer a default entry (REQ-07.002) and survives only as an ordinary user-added type, but the code still seeds it by default.
+- `src/config.rs` holds `DocTypeEntry { prefix, directory, enabled }` with no status model, content model, id shape, or verb set. `deploy` is no longer a default entry (REQ-007.002) and survives only as an ordinary user-added type, but the code still seeds it by default.
 
 ADR-0013 fixes the record envelope, the single write path (`record::store`), the single mutation API (`record::patch`), and makes the descriptor the only extension point for a record type. ADR-0010 fixes configuration-driven directories and Papyrus-only identity. ADR-0012 fixes the front-matter key registry. None of them covers a type that exists only because configuration declares it.
 
-Forces: one structural model for CLI, record layer, search, and browser (otherwise five places drift); type-specific behavior must remain possible for built-in types without special-casing outside that model; config-defined types must require no code; the single write path and front-matter contract must not be weakened; the artifact categories and fixed lifecycles of REQ-07.001 must be expressible as data, not as ad-hoc `match` arms.
+Forces: one structural model for CLI, record layer, search, and browser (otherwise five places drift); type-specific behavior must remain possible for built-in types without special-casing outside that model; config-defined types must require no code; the single write path and front-matter contract must not be weakened; the artifact categories and fixed lifecycles of REQ-007.001 must be expressible as data, not as ad-hoc `match` arms.
 
 ## Decision
 1. **One registry, built at startup, describes every artifact type.** `src/registry.rs` exposes `ArtifactRegistry` with three category collections and one descriptor type. It is assembled from two sources, in this order:
@@ -43,23 +43,23 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 
    | Field | Values | Source of truth |
    |---|---|---|
-   | `category` | `Backlog`, `Decision`, `Document` | REQ-07.001 |
-   | `status_model` | `Fixed(&[State])`, `TaskConfigurable { statuses, default }`, or `DocumentMain { main: [active, archived], custom: &[State], default: State }` | REQ-07.001, REQ-01.002 |
-   | `verbs` | every descriptor in every category: task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/close/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete`, plus `status` where the type stores a front-matter status, plus declared extensions | REQ-02.001–004, REQ-03.001–002, REQ-04.001, REQ-07.003, REQ-05.001/002/008 |
-   | `content_model` | `Generic`, `Typed(&'static TypedSchema)`, `HtmlMockup` | REQ-07.004, REQ-05.008 |
-   | `frontmatter_keys` | general keys plus per-type keys (`status` included only for a type that stores it) | REQ-05.010, ADR-0012 |
-   | `id_shape` | `Plain`, `Dotted`, `Grouped` | REQ-01.005, REQ-05.001/002 |
-   | `archive_policy` | `ArchivedFolder { state_field }` or `None` | REQ-05.007, REQ-04.002 |
+   | `category` | `Backlog`, `Decision`, `Document` | REQ-007.001 |
+   | `status_model` | `Fixed(&[State])`, `TaskConfigurable { statuses, default }`, or `DocumentMain { main: [active, archived], custom: &[State], default: State }` | REQ-007.001, REQ-001.002 |
+   | `verbs` | every descriptor in every category: task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/close/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete`, plus `status` where the type stores a front-matter status, plus declared extensions | REQ-002.001–004, REQ-003.001–002, REQ-004.001, REQ-007.003, REQ-005.001/002/008 |
+   | `content_model` | `Generic`, `Typed(&'static TypedSchema)`, `HtmlMockup` | REQ-007.004, REQ-005.008 |
+   | `frontmatter_keys` | general keys plus per-type keys (`status` included only for a type that stores it) | REQ-005.010, ADR-0012 |
+   | `id_shape` | `Plain`, `Dotted`, `Grouped` | REQ-001.005, REQ-005.001/002 |
+   | `archive_policy` | `ArchivedFolder { state_field }` or `None` | REQ-005.007, REQ-004.002 |
 
-   *Revision (2026-11-15, owner decision): the `verbs` row previously described the field as the document baseline plus `status` plus extensions, which read as a document-only field. `verbs` exists on every descriptor in every category, and the delivered sets are the ones listed above (backlog and decision sets from REQ-02.001–004, REQ-03.001–002, and REQ-04.001). The same correction applies to decision 1's assembly sentence, which no longer refers to `cli::BUILTIN_COMMANDS` handlers because that table carries names only (ADR-0016 decision 2).*
+   *Revision (2026-11-15, owner decision): the `verbs` row previously described the field as the document baseline plus `status` plus extensions, which read as a document-only field. `verbs` exists on every descriptor in every category, and the delivered sets are the ones listed above (backlog and decision sets from REQ-002.001–004, REQ-003.001–002, and REQ-004.001). The same correction applies to decision 1's assembly sentence, which no longer refers to `cli::BUILTIN_COMMANDS` handlers because that table carries names only (ADR-0016 decision 2).*
 
-   *Revision (2026-11-15, owner decision): the milestone entry in the `verbs` row previously read `create/list/view/edit/archive/delete`. The milestone lifecycle is fixed to `open -> closed` (REQ-03.001, REQ-07.001) and is delivered by `papyrus milestone close <id>`, which rewrites `status` and `updated_date` in place through the single write path; milestone archive and milestone restore do not exist. No other category's verb set in that row changes, and ADR-0022 decision 5 and ADR-0023 decision 2 record the same contract.*
+   *Revision (2026-11-15, owner decision): the milestone entry in the `verbs` row previously read `create/list/view/edit/archive/delete`. The milestone lifecycle is fixed to `open -> closed` (REQ-003.001, REQ-007.001) and is delivered by `papyrus milestone close <id>`, which rewrites `status` and `updated_date` in place through the single write path; milestone archive and milestone restore do not exist. No other category's verb set in that row changes, and ADR-0022 decision 5 and ADR-0023 decision 2 record the same contract.*
 
    *Amendment (2026-11-21): the milestone clause of the 2026-11-15 revision is superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; the milestone entry in the `verbs` row is superseded to `create/list/view/edit/close/archive/delete` and no milestone restore exists, and every other statement in this decision stands.*
 
-   Only tasks are `TaskConfigurable`. Milestones, releases, and decisions are `Fixed`. A document descriptor is `DocumentMain`: `active` and `archived` are always present and cannot be removed, renamed, or replaced; every other declared value is a custom status; `custom` is empty when the entry declares no `statuses`; `default` is the entry's `default_status` or `active`. The registry never stores a second copy of the status list — it reads it from the validated configuration (ADR-0019). Configuration cannot change a descriptor's category, fixed lifecycle, verbs, content model, or id shape (REQ-07.001).
+   Only tasks are `TaskConfigurable`. Milestones, releases, and decisions are `Fixed`. A document descriptor is `DocumentMain`: `active` and `archived` are always present and cannot be removed, renamed, or replaced; every other declared value is a custom status; `custom` is empty when the entry declares no `statuses`; `default` is the entry's `default_status` or `active`. The registry never stores a second copy of the status list — it reads it from the validated configuration (ADR-0019). Configuration cannot change a descriptor's category, fixed lifecycle, verbs, content model, or id shape (REQ-007.001).
 
-3. **The baseline verbs are a lower bound; `verbs` is a field of every descriptor, and document extensions are declared on a built-in descriptor.** `verbs` is **not** a document-only field: it is present on every descriptor in every category (decision 2), so a task, milestone, release, or decision descriptor states its own verb set. Within the `Document` category the baseline family `create`, `list`, `view`, `edit`, `archive`, `delete` remains a **lower bound** present on every descriptor; `status` is present only when the descriptor's status model stores a front-matter `status` (so every front-matter-backed document type, but not UI mockups). A built-in document descriptor may add a verb (`create-group`, `supersede`) and may add a required argument (`--group`), with its handler named by the descriptor. A config-defined descriptor has exactly the baseline plus `status`, and no extension point: REQ-07.004 forbids per-type schema and REQ-07.002 forbids per-type code. This is the owner's decision of 2026-11-13 (D1) on REQ-07.003's "same command family" wording: the shared family is the baseline, and the `req`/`nfr`/`ui-mockup` groups are unchanged.
+3. **The baseline verbs are a lower bound; `verbs` is a field of every descriptor, and document extensions are declared on a built-in descriptor.** `verbs` is **not** a document-only field: it is present on every descriptor in every category (decision 2), so a task, milestone, release, or decision descriptor states its own verb set. Within the `Document` category the baseline family `create`, `list`, `view`, `edit`, `archive`, `delete` remains a **lower bound** present on every descriptor; `status` is present only when the descriptor's status model stores a front-matter `status` (so every front-matter-backed document type, but not UI mockups). A built-in document descriptor may add a verb (`create-group`, `supersede`) and may add a required argument (`--group`), with its handler named by the descriptor. A config-defined descriptor has exactly the baseline plus `status`, and no extension point: REQ-007.004 forbids per-type schema and REQ-007.002 forbids per-type code. This is the owner's decision of 2026-11-13 (D1) on REQ-007.003's "same command family" wording: the shared family is the baseline, and the `req`/`nfr`/`ui-mockup` groups are unchanged.
 
    *Revision (2026-11-15, owner decision): this decision previously presented the baseline verbs without stating that `verbs` is carried by every descriptor in every category; the field's scope and the conditional `status` rule are now explicit and the D1 rationale sentence is unchanged.*
 
@@ -92,7 +92,7 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 **Positive:**
 
 - One model replaces four partial ones (`RecordDescriptor` list, per-type CLI enums, `browser::Category`, hard-coded `search::DOC_KEYS`), so a new type cannot appear in the CLI and be missing from the browser or search.
-- The status-model split of REQ-07.001 becomes testable data: one test asserts that only tasks use the top-level configurable statuses, that milestone/release/decision states are fixed, and that a document descriptor always includes `active` and `archived` while its custom statuses come from configuration.
+- The status-model split of REQ-007.001 becomes testable data: one test asserts that only tasks use the top-level configurable statuses, that milestone/release/decision states are fixed, and that a document descriptor always includes `active` and `archived` while its custom statuses come from configuration.
 - Per-type behavior for built-ins stays available without weakening the generic path; a custom document status needs no code, only a validated list entry.
 - The browser and search refactors become mechanical iterations over the registry rather than hand-written per-type additions.
 
@@ -118,34 +118,34 @@ Forces: one structural model for CLI, record layer, search, and browser (otherwi
 | One runtime registry composed from static built-ins plus config entries (this ADR) | Selected | Single model for CLI, record layer, search, and browser; keeps typed behavior for built-ins and zero code for config types. |
 | Extend `RecordDescriptor` with an enum of "generic document" and keep everything else static | Rejected | Leaves the static list authoritative, so config-defined types remain outside the record layer and every surface needs its own exception. |
 | Keep `browser::Category` and add a `Generic(String)` variant | Rejected | Pushes slug strings through render code and keeps per-type match arms; the browser and CLI would still disagree about type sets. |
-| Per-type code generation at build time from a fixed schema list | Rejected | Contradicts REQ-07.002 ("no code change"), needs a build step, and cannot see a project's configuration at build time. |
+| Per-type code generation at build time from a fixed schema list | Rejected | Contradicts REQ-007.002 ("no code change"), needs a build step, and cannot see a project's configuration at build time. |
 | Descriptor per type with a trait object implementing create/edit/archive | Rejected | Pulls record formatting and writing back into the type layer, breaking ADR-0013 decisions 4 and 7. |
 | Model artifacts as a plugin registry loaded at runtime | Rejected | New dynamic-loading surface, packaging and security cost, no requirement. |
 
 ## Open Questions
 
 - Should extensions (`create-group`, `--group`, `supersede`) be expressible for a **config-defined** type later? Current decision: no.
-- Should the registry expose status states to the browser lifecycle page (REQ-06.003) directly, or through a presentation table? Current decision: status model from the registry, curated description text from a static built-in table.
+- Should the registry expose status states to the browser lifecycle page (REQ-006.003) directly, or through a presentation table? Current decision: status model from the registry, curated description text from a static built-in table.
 
 ## Downstream constraints
 
 1. No module other than `src/registry.rs` may enumerate document-type keys or map a slug to behavior.
 2. `record::store` remains the only writer and `record::patch` the only mutation API; descriptors carry no I/O.
-3. Every descriptor's `archive_policy` follows REQ-05.007 and ADR-0022: tasks use `ArchivedFolder`; milestones, decisions, and releases use `ArchivePolicy::None`; document descriptors use `ArchivedFolder` (ADR-0023 decision 2).
+3. Every descriptor's `archive_policy` follows REQ-005.007 and ADR-0022: tasks use `ArchivedFolder`; milestones, decisions, and releases use `ArchivePolicy::None`; document descriptors use `ArchivedFolder` (ADR-0023 decision 2).
 
    *Revision (2026-11-15, owner decision): this constraint previously named only decisions as having no archive policy. Releases are the second family that never moves: their descriptor carries `ArchivePolicy::None` and `release close` rewrites `status` in place (ADR-0023 decision 2).*
 
    *Revision (2026-11-15, owner decision): the milestone descriptor also carries `ArchivePolicy::None`; this constraint previously assigned `ArchivedFolder` to it. The milestone lifecycle is `open -> closed` by `papyrus milestone close <id>`, which writes `status` and `updated_date` in place, and no milestone command archives or restores a milestone. The legacy `<backlog_directory>/archive/milestones/` folder is a read/import location only, not a lifecycle archive destination (ADR-0023 decisions 2 and 4).*
-4. Descriptor fields must be derivable from REQ-07.001/002/003/004 and REQ-05.010; a field that cannot be traced to a requirement is not added.
+4. Descriptor fields must be derivable from REQ-007.001/002/003/004 and REQ-005.010; a field that cannot be traced to a requirement is not added.
 5. The per-type modules may keep validation and patch construction but must lose their `clap` enums, their dispatch `match`, and their directory/ID logic.
 6. A descriptor's custom status list is the validated configuration's list, read-only; no command may add, remove, or rename a status at runtime, and `archived` is never accepted as a custom value.
 
 ## References
 
-- `docs/requirements/business/REQ-07.md`, `REQ-07.001.md`, `REQ-07.002.md`, `REQ-07.003.md`, `REQ-07.004.md`.
-- `docs/requirements/business/REQ-02.001.md`–`REQ-02.004.md`, `REQ-03.001.md`–`REQ-03.002.md`, `REQ-04.001.md` — task, milestone, release, and decision verb sets carried by `verbs`.
-- `docs/requirements/business/REQ-05.001.md`, `REQ-05.002.md`, `REQ-05.007.md`, `REQ-05.008.md`, `REQ-05.010.md`.
-- `docs/requirements/business/REQ-01.002.md`, `REQ-01.005.md`.
+- `docs/requirements/business/REQ-007.md`, `REQ-007.001.md`, `REQ-007.002.md`, `REQ-007.003.md`, `REQ-007.004.md`.
+- `docs/requirements/business/REQ-002.001.md`–`REQ-002.004.md`, `REQ-003.001.md`–`REQ-003.002.md`, `REQ-004.001.md` — task, milestone, release, and decision verb sets carried by `verbs`.
+- `docs/requirements/business/REQ-005.001.md`, `REQ-005.002.md`, `REQ-005.007.md`, `REQ-005.008.md`, `REQ-005.010.md`.
+- `docs/requirements/business/REQ-001.002.md`, `REQ-001.005.md`.
 - `docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md` — configured directories and identity.
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md` — front-matter key registry.
 - `docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md` — envelope, single writer, descriptor as extension point.

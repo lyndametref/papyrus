@@ -7,8 +7,8 @@ labels: []
 references:
   - ADR-0008
   - BR-016
-  - REQ-01.005
-  - REQ-01.007
+  - REQ-001.005
+  - REQ-001.007
   - TASK-2
   - TASK-74
   - TASK-75
@@ -19,7 +19,7 @@ status: verified
 ## Description
 ## Purpose
 
-Constrain the `id_padding` configuration key to the inclusive range 1-6 per REQ-01.007, REQ-01.005, and BR-016, so file IDs (task, milestone, release, and all other record types) use consistent padding with a clear upper limit. Validation rejects out-of-range values instead of clamping them, and ID formatting keeps padding as a minimum width (wider numbers are never truncated or errored).
+Constrain the `id_padding` configuration key to the inclusive range 1-6 per REQ-001.007, REQ-001.005, and BR-016, so file IDs (task, milestone, release, and all other record types) use consistent padding with a clear upper limit. Validation rejects out-of-range values instead of clamping them, and ID formatting keeps padding as a minimum width (wider numbers are never truncated or errored).
 
 ## Scope
 
@@ -60,7 +60,7 @@ Constrain the `id_padding` configuration key to the inclusive range 1-6 per REQ-
 
 ### 3. Scope of affected IDs
 
-The constraint applies to task, milestone, and release IDs (REQ-01.005) and, by extension, to every other record type whose ID uses `id_padding` (decisions, requirements, glossary terms, business rules, UI specifications, UI mockups, audit records, technical specifications).
+The constraint applies to task, milestone, and release IDs (REQ-001.005) and, by extension, to every other record type whose ID uses `id_padding` (decisions, requirements, glossary terms, business rules, UI specifications, UI mockups, audit records, technical specifications).
 
 ## Inputs and outputs
 
@@ -87,14 +87,14 @@ The constraint applies to task, milestone, and release IDs (REQ-01.005) and, by 
 
 ## Open questions
 
-- None. (REQ-01.007 open questions are resolved above: existing key constrained; reject-at-load behavior; message wording follows the established pattern.)
+- None. (REQ-001.007 open questions are resolved above: existing key constrained; reject-at-load behavior; message wording follows the established pattern.)
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-74 |
-| Requirements | REQ-01.007, REQ-01.005 |
+| Requirements | REQ-001.007, REQ-001.005 |
 | Business rule | BR-016 |
 | ADR | ADR-0008 (display width resolution) |
 | Related tickets | TASK-2 (config foundation), TASK-75 (init walkthrough validation) |

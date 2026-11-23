@@ -17,15 +17,15 @@ references:
   - docs/specifications/browser-ui-mockups.md
   - docs/specifications/ui/mockups/MOCK-0006-browser-ui-mockups-review.html
   - docs/specifications/ui/browser-ui-mockups-ui.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.008.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.008.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 priority: medium
@@ -35,7 +35,7 @@ ordinal: 25200
 
 
 ## Description
-Extend the offline, project-local local browser with a UI Mockups category that lists, views, and edits active UI mockups (prefix MOCK, default directory docs/specifications/ui/mockups/). Reuses the approved browser shell, templates, security, offline, and optimistic-concurrency baseline (TASK-6, ADR-0005/ADR-0006) and the approved UI design MOCK-0006 (TASK-41). Deprecated mockups are hidden and unreachable. Implements REQ-05.008 and the web-visibility part of REQ-05.007 under REQ-06.002.
+Extend the offline, project-local local browser with a UI Mockups category that lists, views, and edits active UI mockups (prefix MOCK, default directory docs/specifications/ui/mockups/). Reuses the approved browser shell, templates, security, offline, and optimistic-concurrency baseline (TASK-6, ADR-0005/ADR-0006) and the approved UI design MOCK-0006 (TASK-41). Deprecated mockups are hidden and unreachable. Implements REQ-005.008 and the web-visibility part of REQ-005.007 under REQ-006.002.
 
 SCOPE (in)
 - Category ?type=ui-mockup plus sidebar entry "UI Mockups" after "UI Specifications"; default stays req; any other value 400; entry omitted when document_types.ui-mockup.enabled is false (empty state, not an error).
@@ -71,7 +71,7 @@ ASSUMPTIONS
 - The HTML comment block is the machine-readable metadata source; review packages without it show empty specs/refs and receive the comment block on first save; visible metadata lines are never inserted into such packages.
 - Spec id existence is not required, matching ui-mockup create/edit; duplicates are rejected because the tag fields model a set (stricter than the CLI).
 - task/status/superseded_by are exposed read-only in JSON but not displayed in the browser (MOCK-0006 OQ-3).
-- Real-browser verification in Firefox/Edge/Safari 100+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24.
+- Real-browser verification in Firefox/Edge/Safari 100+ (NFR-005.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24.
 - No new dependencies, crates, or ADRs.
 
 DEPENDENCIES
@@ -87,7 +87,7 @@ REFERENCES
 - Sibling precedent: docs/specifications/browser-ui-specifications.md (TASK-24)
 - UI description: docs/specifications/ui/browser-ui-mockups-ui.md
 - MOCK-0006: docs/specifications/ui/mockups/MOCK-0006-browser-ui-mockups-review.html (registry status approved)
-- Requirements: REQ-05.007, REQ-05.008, REQ-06.002; NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001; BR-004, BR-016
+- Requirements: REQ-005.007, REQ-005.008, REQ-006.002; NFR-001.002, NFR-001.003, NFR-002.002, NFR-004.001, NFR-004.002, NFR-005.001; BR-004, BR-016
 
 ## Acceptance Criteria
 - [x] Category and navigation: GET /?type=ui-mockup renders the UI Mockups list; the default category stays req and any other value returns 400; the sidebar shows "UI Mockups" after "UI Specifications" with aria-current="page" when selected, and the entry is omitted when document_types.ui-mockup.enabled is false.

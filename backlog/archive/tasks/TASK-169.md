@@ -5,7 +5,7 @@ created_date: '2026-11-16T21:03:17Z'
 updated_date: '2026-11-19T10:53:58Z'
 labels: []
 references:
-  - REQ-06.012
+  - REQ-006.012
   - RE-004
 status: Done
 assignee:

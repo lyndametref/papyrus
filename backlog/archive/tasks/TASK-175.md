@@ -5,7 +5,7 @@ created_date: '2026-11-16T21:03:26Z'
 updated_date: '2026-11-19T10:54:24Z'
 labels: []
 references:
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
   - ADR-034
   - TECH-080

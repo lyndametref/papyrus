@@ -16,7 +16,6 @@ assignee:
   - rust-dev
 milestone: MS-032
 dependencies:
-  - TASK-241
   - TASK-242
 ordinal: 55
 documentation:

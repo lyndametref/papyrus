@@ -13,20 +13,20 @@ milestone: MS-016
 dependencies:
   - TASK-073
 references:
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.012.md
-  - docs/requirements/business/REQ-05.013.md
-  - docs/requirements/business/REQ-05.014.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.012.md
+  - docs/requirements/business/REQ-005.013.md
+  - docs/requirements/business/REQ-005.014.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/business-rules/BR-018-use-case-document-type-behavior.md
@@ -36,17 +36,12 @@ references:
   - docs/specifications/ui/mockups/README.md
   - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
-  - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
 documentation:
   - docs/specifications/ui/browser-use-cases-test-cases-and-test-reports-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0013-browser-use-cases-test-cases-and-test-reports-review.html
-  - docs/specifications/ui/mockups/README.md
 priority: medium
 type: task
 ordinal: 35200
@@ -63,10 +58,10 @@ Scope:
 - For each of the three types: list rows with ID + title and the first paragraph of the description as a preview; empty states; long-title wrapping; deprecated records excluded.
 - View: ID, title, description, applicability (when present); breadcrumb `<Type> › ID`; single Edit action; deprecated records unreachable.
 - Edit form: title (required), description (required, multi-line), applicability (optional, multi-line); pristine, dirty, validation-error (422), conflict (409), and 320 px states; hidden version input with dashed annotation.
-- Front-matter metadata projection for all three types: list/detail/edit views show id, title, created_date, updated_date, labels, references (plus type-specific keys if any); created_date and updated_date are read-only in edit; metadata edits target front matter, not body sections (per MOCK-0010, REQ-05.010, REQ-06.004).
+- Front-matter metadata projection for all three types: list/detail/edit views show id, title, created_date, updated_date, labels, references (plus type-specific keys if any); created_date and updated_date are read-only in edit; metadata edits target front matter, not body sections (per MOCK-0010, REQ-005.010, REQ-006.004).
 - Error pages reused from MOCK-0001.
 - Responsive 320 px list and edit form with sidebar toggle and annotation legend.
-- Deprecated records of all three types excluded from lists and navigation (REQ-05.007, BR-018/BR-019/BR-020).
+- Deprecated records of all three types excluded from lists and navigation (REQ-005.007, BR-018/BR-019/BR-020).
 
 Out of scope:
 - Browser implementation (TASK-81), CLI behaviour (TASK-78), search (TASK-80), packaging (TASK-82).
@@ -81,7 +76,7 @@ Assumptions:
 - Assumption: Category selector values are `use-case`, `test-case`, and `test-report` (default remains `req`); any other value is 400, consistent with the baseline.
 - Assumption: The extension package lists all document-type sidebar entries, with only the three new types' views generated and prior entries non-clickable, consistent with MOCK-0003/MOCK-0009.
 - Assumption: Record file format follows use-cases-test-cases-and-test-reports-management.md: `# <ID> <title>` then `## Description`, then `## Applicability` when present.
-- Assumption: Front-matter metadata follows REQ-05.010: general fields only (id, title, created_date, updated_date, labels, references); description and applicability are body fields.
+- Assumption: Front-matter metadata follows REQ-005.010: general fields only (id, title, created_date, updated_date, labels, references); description and applicability are body fields.
 - Assumption: Mockup status starts draft/pending and becomes approved only after explicit user approval; TASK-81 must not implement until approved.
 - Assumption: Applicability is multi-line and rendered with white-space: pre-wrap (recommended); title/description length follow baseline field rules.
 - Assumption: List rows show the first paragraph of the description as a preview (recommended), consistent with audit/technical specifications.
@@ -99,7 +94,7 @@ Open questions:
 - [ ] The package reuses the approved shell and adds sidebar entries and category selectors for Use Cases, Test Cases, and Test Reports; list rows show ID + title (with first-paragraph preview), empty states, long-title wrapping; deprecated records are excluded.
 - [ ] The package includes, for each of the three types, a view (ID, title, description, applicability when present; breadcrumb <Type> › ID; single Edit action) and an edit form (title required, description required multi-line, applicability optional multi-line; pristine, dirty, validation-error, conflict, and 320 px states).
 - [ ] Front-matter metadata projection for all three types is shown in list/detail/edit views (id, title, created_date, updated_date, labels, references); created_date and updated_date are read-only in edit; metadata edits target front matter, not body sections.
-- [ ] Deprecated records of all three types are excluded from lists and navigation and are not reachable, consistent with REQ-05.007 and BR-018/BR-019/BR-020.
+- [ ] Deprecated records of all three types are excluded from lists and navigation and are not reachable, consistent with REQ-005.007 and BR-018/BR-019/BR-020.
 - [ ] Error pages are reused from MOCK-0001 (404 unknown/deprecated, 400, 405, 415, 500) and 320 px list/edit views include sidebar toggle and annotation legend.
 - [ ] A UI description document is created/updated under docs/specifications/ui/ (expected browser-use-cases-test-cases-and-test-reports-ui.md) describing screens, states, elements, interactions, active elements, MOCK register, assumptions, and approval status.
 - [ ] The mockup registry docs/specifications/ui/mockups/README.md is updated with the new MOCK row (id, type, name, slug, artifact, platform, views, status, source) and notes.

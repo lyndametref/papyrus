@@ -16,27 +16,27 @@ accepted
 
 ## Context
 
-REQ-01.008 adds `papyrus check`: a read-only diagnostic over the project corpus and configuration that reports duplicate record IDs, self-referential task dependencies, dependency cycles, dangling `milestone`/`release` references, front-matter/section conflicts, and configuration validity. `--fix` repairs duplicate record IDs **only**; `--force` skips its confirmation (owner decision 2026-11-15, replacing the requirement's `--yes`); any finding exits 4; an invalid configuration is reported first and the checks that need a valid configuration are skipped; the command is CLI-only and honours the global `--json`.
+REQ-001.008 adds `papyrus check`: a read-only diagnostic over the project corpus and configuration that reports duplicate record IDs, self-referential task dependencies, dependency cycles, dangling `milestone`/`release` references, front-matter/section conflicts, and configuration validity. `--fix` repairs duplicate record IDs **only**; `--force` skips its confirmation (owner decision 2026-11-15, replacing the requirement's `--yes`); any finding exits 4; an invalid configuration is reported first and the checks that need a valid configuration are skipped; the command is CLI-only and honours the global `--json`.
 
 The current architecture does not accommodate it in four places:
 
-1. **Startup is fail-closed before dispatch.** `lib.rs::run` loads and fully validates the configuration (ADR-0019) and builds the registry (ADR-0017) for every command except `init` and `config`. A project with an invalid configuration therefore cannot run `check` at all — the exact state `check` exists to diagnose. REQ-01.004 lists the configuration "repair surfaces" as `config get|set|unset|list` and `init --force`; `check` must join that set.
+1. **Startup is fail-closed before dispatch.** `lib.rs::run` loads and fully validates the configuration (ADR-0019) and builds the registry (ADR-0017) for every command except `init` and `config`. A project with an invalid configuration therefore cannot run `check` at all — the exact state `check` exists to diagnose. REQ-001.004 lists the configuration "repair surfaces" as `config get|set|unset|list` and `init --force`; `check` must join that set.
 2. **A non-zero exit cannot carry a normal report.** `main.rs` prints `CommandOutput` and exits 0 on `Ok`, and on `Err(AppError)` prints the error (to stderr, or as `{"error":{...}}` with `--json`) and exits `err.code()`. A findings report is output, not an error, and must stay structured under `--json`.
 3. **There is no read-only corpus enumeration.** `record::resolve::list_in_dir` calls `store::relocate_if_archived`, which *writes* (it moves a mis-placed record), and `browser::records::build_index` is a browser projection tied to a status filter. `record::resolve::duplicate_ids` exists and is unused; it is family-scoped and takes caller-supplied directories.
 4. **There is no ID-rewrite primitive.** `record::store` writes content, moves records, archives, and deletes; nothing rewrites a record's identity in one crash-safe step, and ADR-0013 decision 7 forbids record writing outside `src/record/`.
 
-Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crate (ADR-0005); exit codes 0/1/2/3/4 and the `--json` error object are fixed by REQ-01.004 and ADR-0016 constraint 4; the command tree is registry-derived, so `check` is a built-in name that must be reserved (ADR-0016 decision 2, ADR-0019); interactive confirmation must work without a terminal crate (ADR-0015 precedent); and `--fix` may not become a second migration mechanism.
+Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crate (ADR-0005); exit codes 0/1/2/3/4 and the `--json` error object are fixed by REQ-001.004 and ADR-0016 constraint 4; the command tree is registry-derived, so `check` is a built-in name that must be reserved (ADR-0016 decision 2, ADR-0019); interactive confirmation must work without a terminal crate (ADR-0015 precedent); and `--fix` may not become a second migration mechanism.
 
 ## Decision
 
-1. **`check` is a built-in command with two flags and no subcommands.** `BuiltinCmd::Check { fix: bool, force: bool }`; `check` is added to `cli::BUILTIN_COMMANDS` (reserved name, ADR-0019). The skip-confirmation flag is `--force`, matching every other destructive command in the product (REQ-01.001, REQ-02.004, REQ-05.007); it is not `--yes`. `--force` without `--fix` is a usage error (exit 2). `--fix` and `--force` are not global. `--json` applies as for any output-producing command. No browser route, no JSON API, no library exposure beyond `run`.
+1. **`check` is a built-in command with two flags and no subcommands.** `BuiltinCmd::Check { fix: bool, force: bool }`; `check` is added to `cli::BUILTIN_COMMANDS` (reserved name, ADR-0019). The skip-confirmation flag is `--force`, matching every other destructive command in the product (REQ-001.001, REQ-002.004, REQ-005.007); it is not `--yes`. `--force` without `--fix` is a usage error (exit 2). `--fix` and `--force` are not global. `--json` applies as for any output-producing command. No browser route, no JSON API, no library exposure beyond `run`.
 
 2. **`check` is exempt from fail-closed startup, and loads its own configuration.** `lib.rs::run` gains an `is_check` branch beside `is_config`: the command tree is built with no registry (`registry_opt = None`, so only built-ins exist and `check --help` works), and the handler then performs its own two-stage load:
 
-   - Stage A: a **tolerant self-load** through `commands::load_effective_config_tolerant` — the same loader the `config get|set|unset|list` repair surfaces use (REQ-01.002, REQ-07.002) — so the configuration is parsed without fail-closed validation. Any load error (malformed YAML, duplicate keys, schema mismatch) becomes a single `config-invalid` finding instead of aborting the command. Only when the load succeeds is `Config::validate(Some(project_dir))` run, and its newline-joined diagnostics become one finding per line.
+   - Stage A: a **tolerant self-load** through `commands::load_effective_config_tolerant` — the same loader the `config get|set|unset|list` repair surfaces use (REQ-001.002, REQ-007.002) — so the configuration is parsed without fail-closed validation. Any load error (malformed YAML, duplicate keys, schema mismatch) becomes a single `config-invalid` finding instead of aborting the command. Only when the load succeeds is `Config::validate(Some(project_dir))` run, and its newline-joined diagnostics become one finding per line.
    - Stage B: only when stage A produced no finding, build `ArtifactRegistry` and run the corpus scanners. An invalid registry build is itself a `config-invalid` finding.
 
-   This is the only command allowed to proceed past an invalid configuration, and the exception is deliberate: it is the diagnostic surface for that state. It extends REQ-01.004's repair-surface list and needs no change to ADR-0016's dispatch order.
+   This is the only command allowed to proceed past an invalid configuration, and the exception is deliberate: it is the diagnostic surface for that state. It extends REQ-001.004's repair-surface list and needs no change to ADR-0016's dispatch order.
 
 3. **A findings run is a successful run with a non-zero exit status.** `CommandOutput` gains `pub exit_code: i32` (0 by default) and main prints the output before exiting with it; `AppError` keeps its current mapping, so a runtime I/O failure is still exit 1 and a usage error still exit 2. Under `--json` the findings report is the JSON object (never the `{"error":…}` envelope). `check` exits 4 whenever the scan produced at least one finding — **including after successful repairs** — so a clean second run is the verification step. Exit codes: 0 no findings, 4 findings, 1 I/O failure, 2 usage.
 
@@ -50,15 +50,15 @@ Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crat
 
    | Kind (stable JSON value) | Detection |
    |---|---|
-   | `duplicate-id` | Canonical ID per family (front-matter `id`, else stem) seen more than once across the family's active, archived, and read-only legacy directories. Grouped families compare group records and member records in their own spaces (`REQ-001` vs `REQ-01.008`). |
+   | `duplicate-id` | Canonical ID per family (front-matter `id`, else stem) seen more than once across the family's active, archived, and read-only legacy directories. Grouped families compare group records and member records in their own spaces (`REQ-001` vs `REQ-001.008`). |
    | `self-dependency` | A task whose `dependencies` contain its own ID. |
    | `dependency-cycle` | A cycle in the task dependency graph, reported once per cycle with the member IDs in canonical order. Algorithm: iterative depth-first search with a colour map; no recursion, no crate. |
    | `dangling-milestone` | A task whose `milestone` does not resolve to an existing milestone. |
    | `dangling-release` | A milestone whose `release` does not resolve to an existing release. |
-   | `frontmatter-conflict` | A value carried by both front matter and the body disagrees: `id`/`title` against the `# <ID> <title>` heading, or a retired metadata section against its front-matter field (ADR-0012). Agreement is not a finding; REQ-01.008 reports disagreement. |
+   | `frontmatter-conflict` | A value carried by both front matter and the body disagrees: `id`/`title` against the `# <ID> <title>` heading, or a retired metadata section against its front-matter field (ADR-0012). Agreement is not a finding; REQ-001.008 reports disagreement. |
    | `config-invalid` | Stage A/B diagnostics, one finding per diagnostic line, with the offending key path as the location. |
 
-   A task dependency that resolves to no task is **not** a finding: REQ-01.008 closes the dangling-reference category to `milestone` and `release`. That gap is recorded as an open question rather than implemented silently.
+   A task dependency that resolves to no task is **not** a finding: REQ-001.008 closes the dangling-reference category to `milestone` and `release`. That gap is recorded as an open question rather than implemented silently.
 
 6. **Findings are deterministic and carry a stable shape.**
 
@@ -84,8 +84,8 @@ Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crat
 
    - **Keeper rule** (deterministic, independent of directory iteration order): within a duplicate group the record with the earliest `created_date` keeps the ID; ties break on the lowest project-relative path; remaining ties cannot occur (two records cannot share a path).
    - **Reassignment rule**: every other record in the group gets the next free number of its own family and shape from `record::identity::allocate_next`, computed over every observed number in the family's active, archived, and legacy directories (ADR-0010 decision 5). Prefix and padding come from the descriptor, never from the file.
-   - **Write primitive**: a new `record::store::reassign_id(ctx, path, new_id) -> Result<PathBuf>` builds the patched content with `record::patch` (front-matter `id`, plus the body heading where the type keeps one per REQ-05.010), writes the **new** path atomically, then removes the old path. Order is fixed: new file first (its ID is unique, so a crash leaves a valid record), old file second (a crash leaves a duplicate that the next run re-reports and re-repairs). `updated_date` is refreshed once per write (ADR-0013 decision 9). No other module writes.
-   - **Refusals** (`fixable: false`, reported and left untouched): a record whose front-matter `id` and file stem disagree (`ResolvedRecord::mismatch`) — the duplicate is not unambiguous; a duplicate whose keeper or member lives in a read-only legacy directory (repairing would require a migration that REQ-01.008 forbids); duplicate **group** IDs in a grouped family (reassigning a group ID would renumber its members and their dotted IDs, which is a structural migration) — member-level duplicates in those families are repaired.
+   - **Write primitive**: a new `record::store::reassign_id(ctx, path, new_id) -> Result<PathBuf>` builds the patched content with `record::patch` (front-matter `id`, plus the body heading where the type keeps one per REQ-005.010), writes the **new** path atomically, then removes the old path. Order is fixed: new file first (its ID is unique, so a crash leaves a valid record), old file second (a crash leaves a duplicate that the next run re-reports and re-repairs). `updated_date` is refreshed once per write (ADR-0013 decision 9). No other module writes.
+   - **Refusals** (`fixable: false`, reported and left untouched): a record whose front-matter `id` and file stem disagree (`ResolvedRecord::mismatch`) — the duplicate is not unambiguous; a duplicate whose keeper or member lives in a read-only legacy directory (repairing would require a migration that REQ-001.008 forbids); duplicate **group** IDs in a grouped family (reassigning a group ID would renumber its members and their dotted IDs, which is a structural migration) — member-level duplicates in those families are repaired.
    - **Out of scope, by requirement**: dangling references, cycles, self-dependencies, front-matter conflicts, invalid configuration, and legacy `deprecated/` migration are never repaired.
    - **No inbound reference rewriting**: a repair edits exactly one file — the reassigned record. No record that references a reassigned ID is modified, renumbered, or moved. The confirmation prompt lists, per reassignment, every observed inbound reference (referencing family, record ID, project-relative path, field, and value) that names the reassigned ID, so the user decides before any write; the final report repeats the list. Consequence, accepted: after a repair a reference may resolve to the keeper rather than the intended record, and `--fix` does not attempt to guess the intent.
    - **Idempotent**: a second `--fix` on a repaired corpus performs no write.
@@ -132,10 +132,10 @@ Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crat
 | `check` as a built-in with its own tolerant load, read-only scanners, and a `reassign_id` primitive (this ADR) | Selected | The only shape that satisfies "diagnose an invalid configuration", "read-only by default", "repair through the single write path", and the fixed exit-code contract. |
 | Reuse `AppError::Validation` to produce exit 4 | Rejected | The report would go to stderr and `--json` would emit the error envelope, losing the findings structure; findings are output, not an error. |
 | A dedicated `--check` mode on each family command | Rejected | Duplicates six scanners per family and cannot report project-wide duplicates or cross-family references. |
-| Run `check` inside the browser (a page with a "run diagnostics" button) | Rejected | REQ-01.008 makes it CLI-only in this release, and the browser has no write/diagnostic execution surface. |
+| Run `check` inside the browser (a page with a "run diagnostics" button) | Rejected | REQ-001.008 makes it CLI-only in this release, and the browser has no write/diagnostic execution surface. |
 | Emit a findings file (`.papyrus-check.json`) | Rejected | A new on-disk artifact, a new format, and a new staleness problem; `--json` already covers automation. |
 | Repair by deleting the newer duplicate | Rejected | Destroys a record and its references; ID reassignment preserves content. |
-| Repair references too | Rejected | REQ-01.008 scopes `--fix` to duplicate IDs; reference rewriting is a different, riskier migration. |
+| Repair references too | Rejected | REQ-001.008 scopes `--fix` to duplicate IDs; reference rewriting is a different, riskier migration. |
 | Use `record::resolve::list_in_dir` for enumeration | Rejected | It relocates mis-placed records (writes) and would break the read-only guarantee. |
 
 ## Resolved questions (owner, 2026-11-15)
@@ -146,7 +146,7 @@ Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crat
 4. **Confirmation bypass flag** — decided: `--force`, consistent with every other destructive command; the requirement's `--yes` wording is superseded and its update is routed to the requirements engineer (see References).
 5. **Disabled document types** — decided: scanned; their files exist and can collide (decision 5).
 6. **`updated_date` on repair** — decided: refreshed once per write, one clock per write (ADR-0013 decision 9).
-7. **Unresolved task dependency** — out of scope for this release; REQ-01.008 closes the dangling-reference category to `milestone` and `release`. A `dangling-dependency` finding is a follow-up requirement, not a silent addition.
+7. **Unresolved task dependency** — out of scope for this release; REQ-001.008 closes the dangling-reference category to `milestone` and `release`. A `dangling-dependency` finding is a follow-up requirement, not a silent addition.
 
 ## Downstream constraints
 
@@ -163,12 +163,12 @@ Forces: one parser, one projection, one writer (ADR-0013, ADR-0018); no new crat
 
 ## References
 
-- `docs/requirements/business/REQ-01.008.md` — run project diagnostics. Its current text names `--yes` as the confirmation bypass; this ADR records `--force` per the owner decision of 2026-11-15, so the requirement wording needs a matching update (owner: requirements engineer).
-- `docs/requirements/business/REQ-01.004.md` — global options, exit codes, repair surfaces.
-- `docs/requirements/business/REQ-01.005.md` — stable record IDs and the single ID space.
-- `docs/requirements/business/REQ-05.010.md` — front matter as the authoritative metadata source.
-- `docs/requirements/business/REQ-02.001.md`, `REQ-03.001.md` — task dependencies, milestone `release` reference.
-- `docs/requirements/business/REQ-07.002.md` — configuration validity and repair surfaces.
+- `docs/requirements/business/REQ-001.008.md` — run project diagnostics. Its current text names `--yes` as the confirmation bypass; this ADR records `--force` per the owner decision of 2026-11-15, so the requirement wording needs a matching update (owner: requirements engineer).
+- `docs/requirements/business/REQ-001.004.md` — global options, exit codes, repair surfaces.
+- `docs/requirements/business/REQ-001.005.md` — stable record IDs and the single ID space.
+- `docs/requirements/business/REQ-005.010.md` — front matter as the authoritative metadata source.
+- `docs/requirements/business/REQ-002.001.md`, `REQ-003.001.md` — task dependencies, milestone `release` reference.
+- `docs/requirements/business/REQ-007.002.md` — configuration validity and repair surfaces.
 - `docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md` — version tokens and atomic writes.
 - `docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md` — identity allocation over all locations.
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md` — authoritative fields and retired sections.

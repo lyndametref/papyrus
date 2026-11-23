@@ -20,30 +20,26 @@ references:
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-ui-specifications.md
   - docs/specifications/browser-ui-mockups.md
-  - docs/requirements/business/REQ-05.005.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.005.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-013-rule-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
-  - docs/specifications/browser-business-rules.md
-  - docs/specifications/ui/browser-business-rules-ui.md
-  - docs/specifications/business-rules-management.md
-  - docs/specifications/browser-requirements.md
 type: feature
 ordinal: 26300
 ---
 
 
 ## Description
-Expose business rules in the local browser: extend the offline, project-local read-and-edit web interface with a Business Rules category that lists, views, and edits active business rules (RUL-*, default directory business-rules/). Reuses the approved browser shell, templates, security, offline, and optimistic-concurrency baseline (TASK-6, ADR-0005/ADR-0006) and the approved UI design MOCK-0007 (TASK-45). Deprecated rules are hidden and unreachable. Implements REQ-05.005 and the web-visibility part of REQ-05.007 under REQ-06.002. Full behavior, validation, persistence, API, and tests are specified in docs/specifications/browser-business-rules.md.
+Expose business rules in the local browser: extend the offline, project-local read-and-edit web interface with a Business Rules category that lists, views, and edits active business rules (RUL-*, default directory business-rules/). Reuses the approved browser shell, templates, security, offline, and optimistic-concurrency baseline (TASK-6, ADR-0005/ADR-0006) and the approved UI design MOCK-0007 (TASK-45). Deprecated rules are hidden and unreachable. Implements REQ-005.005 and the web-visibility part of REQ-005.007 under REQ-006.002. Full behavior, validation, persistence, API, and tests are specified in docs/specifications/browser-business-rules.md.
 
 SCOPE (in)
 - Category ?type=business-rule plus sidebar entry "Business Rules" immediately after "Business requirements"; default stays req; any other value 400; entry omitted when document_types.rule.enabled is false (empty state, not an error).
@@ -78,7 +74,7 @@ ASSUMPTIONS
 - Requirement ID format is validated but existence is not required, matching rule create/edit; dangling IDs are allowed.
 - Duplicate requirement references are collapsed on save, matching rule edit.
 - task/status/superseded_by do not apply to business rules (no such metadata).
-- Real-browser verification in Firefox/Edge/Safari 100+ (NFR-05.001) remains a deferred follow-up.
+- Real-browser verification in Firefox/Edge/Safari 100+ (NFR-005.001) remains a deferred follow-up.
 - No new dependencies, crates, or ADRs.
 
 DEPENDENCIES
@@ -93,7 +89,7 @@ REFERENCES
 - Sibling precedents: docs/specifications/browser-ui-specifications.md (TASK-24), docs/specifications/browser-ui-mockups.md (TASK-40)
 - UI description: docs/specifications/ui/browser-business-rules-ui.md
 - MOCK-0007: docs/specifications/ui/mockups/MOCK-0007-business-rules-review.html (registry status approved)
-- Requirements: REQ-05.005, REQ-05.007, REQ-06.002; NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001; BR-004, BR-013, BR-016
+- Requirements: REQ-005.005, REQ-005.007, REQ-006.002; NFR-001.002, NFR-001.003, NFR-002.002, NFR-004.001, NFR-004.002, NFR-005.001; BR-004, BR-013, BR-016
 
 ## Acceptance Criteria
 - [x] Category and navigation: GET /?type=business-rule renders the Business Rules list; the default category stays req and any other value returns 400; the sidebar shows "Business Rules" immediately after "Business requirements" with aria-current="page" when selected, and the entry is omitted when document_types.rule.enabled is false.
@@ -126,6 +122,6 @@ created: 2026-11-07T08:13:00Z
 
 ---
 
-Validated 2026-11-07 (UTC): quality-gatekeeper Pass with findings (14/14 AC, 7/7 DoD); cargo test 87 browser_cli passed (15 t25*); auto-closed under no-validation mode. Non-blocking: manual smoke not run (automated equivalents t25e/t25k), NFR-05.001 deferred, untracked spec doc committed with this change.
+Validated 2026-11-07 (UTC): quality-gatekeeper Pass with findings (14/14 AC, 7/7 DoD); cargo test 87 browser_cli passed (15 t25*); auto-closed under no-validation mode. Non-blocking: manual smoke not run (automated equivalents t25e/t25k), NFR-005.001 deferred, untracked spec doc committed with this change.
 
 ---

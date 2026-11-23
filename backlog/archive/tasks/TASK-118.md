@@ -12,8 +12,8 @@ labels:
 milestone: MS-019
 dependencies: []
 references:
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/business/REQ-01.004.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/business/REQ-001.004.md
 documentation:
   - src/sanitize.rs
   - tests/control_characters_cli.rs
@@ -23,7 +23,7 @@ ordinal: 41250
 
 
 ## Description
-**Why.** F-117-1 (recorded by TASK-117): the shared sanitizers reject NUL, CR, LF, and path separators but accept TAB (0x09), 0x01, and the rest of the C0 range, so a single-line value can carry a control character that corrupts list, view, browser, and front-matter rendering. Typed handlers (ui_spec, audit, rule, glossary, tech_spec, use_case, test_case, test_report, ui_mockup), config list parsing, and browser validation already reject control characters via `char::is_control()`; the shared sanitizer is the outlier, so older types accept input the rest of the product rejects (NFR-02.002).
+**Why.** F-117-1 (recorded by TASK-117): the shared sanitizers reject NUL, CR, LF, and path separators but accept TAB (0x09), 0x01, and the rest of the C0 range, so a single-line value can carry a control character that corrupts list, view, browser, and front-matter rendering. Typed handlers (ui_spec, audit, rule, glossary, tech_spec, use_case, test_case, test_report, ui_mockup), config list parsing, and browser validation already reject control characters via `char::is_control()`; the shared sanitizer is the outlier, so older types accept input the rest of the product rejects (NFR-002.002).
 
 **What.** Apply one shared control-character check in `sanitize_name` and `sanitize_path_string` so every create and edit path that normalizes a single-line value fails with exit 4 and writes nothing. Keep all other accepted input unchanged.
 
@@ -64,12 +64,12 @@ ordinal: 41250
 
 - No legitimate single-line value contains C0, DEL, or C1 characters.
 - Trim-then-reject is correct because trimming is established and documented behaviour (browser help text: "whitespace is trimmed"); an edge control character is removed by trimming, not rejected.
-- Exit code 4 is the validation outcome (REQ-01.004).
+- Exit code 4 is the validation outcome (REQ-001.004).
 - Test fixture: default config plus an injected `note` type (`enabled: true`, `prefix: NOTE`, `directory: notes/`); `req` needs an existing group.
 
 ## Traceability
 
-- NFR-02.002 (sanitize input; reject, do not silently clean), REQ-01.004 (exit codes), F-117-1 in TASK-117 (closed by this ticket).
+- NFR-002.002 (sanitize input; reject, do not silently clean), REQ-001.004 (exit codes), F-117-1 in TASK-117 (closed by this ticket).
 - Existing behaviour: src/sanitize.rs, src/config.rs (list values), src/browser/records.rs:815-860.
 
 ## Open question (non-blocking, default stated)
@@ -129,7 +129,7 @@ Decisions recorded:
 - The check runs on the trimmed value, because trimming is established, documented behaviour; edge whitespace is stripped, interior controls are rejected. Without this the AC would be untestable for values like "Title\t".
 - `sanitize_path_component` / `sanitize_path` still accept C0/DEL in a component (TAB in `--dir`, non-folder config string). Same defect class, kept out of scope here and flagged as a follow-up candidate.
 
-Assumptions: no legitimate single-line value contains C0/DEL/C1; exit 4 is the validation outcome (REQ-01.004); `note` fixture injected as in tests/cli_dispatch.rs; `req` needs an existing group. Dependencies: none; TASK-110 and TASK-117 stay closed.
+Assumptions: no legitimate single-line value contains C0/DEL/C1; exit 4 is the validation outcome (REQ-001.004); `note` fixture injected as in tests/cli_dispatch.rs; `req` needs an existing group. Dependencies: none; TASK-110 and TASK-117 stay closed.
 
 Open question (non-blocking, default stated): confirm C1 inclusion. Execution-ready: yes.
 

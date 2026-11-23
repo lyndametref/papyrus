@@ -13,15 +13,15 @@ milestone: MS-012
 dependencies:
   - TASK-050
 references:
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/business-rules/BR-017-tech-spec-command-behavior.md
@@ -34,7 +34,6 @@ documentation:
   - docs/specifications/ui/browser-technical-specifications-ui.md
   - >-
     docs/specifications/ui/mockups/MOCK-0009-browser-technical-specifications-review.html
-  - docs/specifications/ui/mockups/README.md
 priority: medium
 type: task
 ordinal: 29300
@@ -53,7 +52,7 @@ Scope:
 - Edit form: title (required) and description (required, multi-line); pristine, dirty, validation-error (422), conflict (409), and 320 px states; hidden version input with dashed annotation.
 - Error pages reused from MOCK-0001.
 - Responsive 320 px list and edit form with sidebar toggle and annotation legend.
-- Deprecated technical specifications excluded from lists and navigation (REQ-05.007, BR-017).
+- Deprecated technical specifications excluded from lists and navigation (REQ-005.007, BR-017).
 
 Out of scope:
 - Browser implementation (TASK-57), CLI behaviour (TASK-55), search (TASK-56), packaging (TASK-59).
@@ -66,7 +65,7 @@ Out of scope:
 - [x] A new self-contained HTML review package is created under docs/specifications/ui/mockups/ with the next available MOCK id (expected MOCK-0009), containing a review landing and web prototype; styles are inlined and no external file, script, font, image, or network reference is used.
 - [x] The package reuses the approved shell and adds a Technical Specifications sidebar entry plus a category selector; technical specification list rows show ID + title, with empty states and long-title wrapping; deprecated specifications are excluded.
 - [x] The package includes technical specification view (ID, title, description; breadcrumb Technical Specifications › ID; single Edit action) and edit form (title required, description required multi-line; pristine, dirty, validation-error, conflict, and 320 px states) views.
-- [x] Deprecated technical specifications are excluded from list and navigation views and are not reachable, consistent with REQ-05.007 and BR-017.
+- [x] Deprecated technical specifications are excluded from list and navigation views and are not reachable, consistent with REQ-005.007 and BR-017.
 - [x] Error pages are reused from MOCK-0001 (404 unknown/deprecated, 400, 405, 415, 500) and 320 px list/edit views include sidebar toggle and annotation legend.
 - [x] A UI description document is created/updated under docs/specifications/ui/ (expected browser-technical-specifications-ui.md) describing screens, states, elements, interactions, active elements, MOCK register, assumptions, and approval status.
 - [x] The mockup registry docs/specifications/ui/mockups/README.md is updated with the new MOCK row (id, type, name, slug, artifact, platform, views, status, source) and notes.

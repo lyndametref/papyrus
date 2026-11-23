@@ -5,7 +5,7 @@ created_date: '2026-11-16T21:03:13Z'
 updated_date: '2026-11-19T10:53:57Z'
 labels: []
 references:
-  - REQ-06.012
+  - REQ-006.012
   - RE-004
 status: Done
 assignee:
@@ -21,4 +21,4 @@ type: test-design
 ## Description
 Test cases for uniform single-document browser layout covering id title status dates collapsible sections no type repeat under content. Done when user verified.
 ## Comments
-- **test-manager**: Test cases TC-024 to TC-032 designed and approved by user. Coverage: REQ-06.012, NFR-05.001, NFR-01.002, BR-004. No open questions.
+- **test-manager**: Test cases TC-024 to TC-032 designed and approved by user. Coverage: REQ-006.012, NFR-005.001, NFR-001.002, BR-004. No open questions.

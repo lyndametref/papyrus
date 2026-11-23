@@ -14,12 +14,12 @@ dependencies:
   - TASK-035
 references:
   - README.md
-  - docs/requirements/business/REQ-05.004.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.004.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
 type: feature
@@ -30,7 +30,7 @@ ordinal: 24300
 ## Description
 UI specification management becomes available through the CLI in the same increment (TASK-17). Per the planning directive, the browser view for a new document type ships with its command increment, so UI specifications must be usable in the local browser as soon as the ui-spec command exists.
 
-Scope: investigate how UI specification records are stored and currently rendered, then implement list, view, and edit for UI specifications (title, associated view, description) in the existing local browser UI, reusing the document views built for earlier document types. Deprecated specifications stay hidden from the web UI as documented in REQ-05.007. This task covers the ui-spec document type only; cross-type navigation and the final completeness check belong to TASK-19.
+Scope: investigate how UI specification records are stored and currently rendered, then implement list, view, and edit for UI specifications (title, associated view, description) in the existing local browser UI, reusing the document views built for earlier document types. Deprecated specifications stay hidden from the web UI as documented in REQ-005.007. This task covers the ui-spec document type only; cross-type navigation and the final completeness check belong to TASK-19.
 
 Out of scope: CLI command behavior (TASK-17), unified search (TASK-18), mockup authoring or rendering.
 

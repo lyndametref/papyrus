@@ -14,10 +14,10 @@ dependencies:
   - TASK-105
 documentation:
   - docs/specifications/search-config-defined-document-types.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-06.004.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-006.004.md
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
   - >-
@@ -35,9 +35,9 @@ Scope: iterate `ArtifactRegistry::enabled(ArtifactCategory::Document)`; resolve 
 Out of scope: new `--type` values or a per-document-type filter, a `papyrus <slug> search` command, ranking/scoring, new options or output formats, browser search (TASK-114), registry-model or record-storage changes.
 
 Assumptions:
-- "Per-type search" means the documented type-restricted search (`--type doc` and the four non-document values), not a per-slug filter; REQ-06.001 and BR-015 fix the five documented values.
+- "Per-type search" means the documented type-restricted search (`--type doc` and the four non-document values), not a per-slug filter; REQ-006.001 and BR-015 fix the five documented values.
 - Matching stays whole persisted text; "same metadata projection" refers to ID and title derivation only.
-- Search auto-relocates an archived-status record found in the active directory (REQ-05.007); an archived UI mockup is excluded by its HTML status without relocation.
+- Search auto-relocates an archived-status record found in the active directory (REQ-005.007); an archived UI mockup is excluded by its HTML status without relocation.
 
 Behavior contract: `docs/specifications/search-config-defined-document-types.md`.
 
@@ -46,14 +46,14 @@ Behavior contract: `docs/specifications/search-config-defined-document-types.md`
 - [x] Directory, file extension, ID parse shape, and title source come from the descriptor (doc_directory plus relative directory, content_model, id_shape, prefix, shared front-matter/heading projection); a config-defined record is searchable by title, description, labels, and references with the unchanged whole-text case-insensitive matching, ID ordering, and output format of built-in document types.
 - [x] Default search and --type doc include records of every enabled config-defined document type; --type task|milestone|release|decision never return them; no new --type value, per-slug filter, or papyrus <slug> search command is added.
 - [x] Adding, renaming, re-pointing, or disabling a document type in configuration changes results on the next invocation without a code change or rebuild; a disabled type yields no results and exits 0.
-- [x] Only the active directory is indexed: archived/ and any other subdirectory are never scanned, a record whose stored main status is archived is not returned and is auto-relocated per REQ-05.007, relocation failure exits 4 with the source named, and a custom-status record stays searchable.
+- [x] Only the active directory is indexed: archived/ and any other subdirectory are never scanned, a record whose stored main status is archived is not returned and is auto-relocated per REQ-005.007, relocation failure exits 4 with the source named, and a custom-status record stays searchable.
 - [x] Tests cover a user-added generic type end to end (unified and --type doc hits by title, description, labels, references; JSON shape and path), disabled exclusion, archived and legacy-subdirectory exclusion, archived-status auto-relocation, custom-status visibility, configuration changes, and an unchanged built-in req/nfr/rule/ui-mockup regression fixture.
 
 ## Definition of Done
 - [x] #1 cargo build succeeds.
 - [x] #2 cargo test and cargo clippy are clean; the new T-113 test cases pass and the existing search suite is unchanged and green.
 - [x] #3 No DOC_KEYS, no module-local document-slug list, and no per-slug match arm remain in src/search.rs (grep/review check).
-- [x] #4 search performs no write on the active directory except the REQ-05.007 auto-relocation; it creates, moves, or deletes nothing else.
+- [x] #4 search performs no write on the active directory except the REQ-005.007 auto-relocation; it creates, moves, or deletes nothing else.
 - [x] #5 docs/specifications/search-config-defined-document-types.md is linked and matches the delivered behavior.
 - [x] #6 Any deferred item or open question is recorded in the task notes with an owning task.
 
@@ -72,11 +72,11 @@ created: 2026-11-14T14:51:00Z
 
 ---
 
-Refinement 2026-11-14: corrected "per-type search" to the documented type-restricted search (--type doc plus the four non-document values). REQ-06.001 and BR-015 fix the five-value vocabulary; no per-slug filter or `papyrus <slug> search` is added. Added active-directory-only auto-relocation per REQ-05.007/ADR-0022 decision 12 and a spec at docs/specifications/search-config-defined-document-types.md.
+Refinement 2026-11-14: corrected "per-type search" to the documented type-restricted search (--type doc plus the four non-document values). REQ-006.001 and BR-015 fix the five-value vocabulary; no per-slug filter or `papyrus <slug> search` is added. Added active-directory-only auto-relocation per REQ-005.007/ADR-0022 decision 12 and a spec at docs/specifications/search-config-defined-document-types.md.
 
 ---
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Search now derives every document type from the startup ArtifactRegistry; the static DOC_KEYS list and collect_type are deleted. One descriptor-driven collector handles default and config-defined types (directory, content model, ID shape, prefix), keeps backlog/decision collectors, sorting, --limit and text/JSON output unchanged. Only active directories are indexed; archived records and archived/deprecated folders are invisible; archived-in-active records auto-relocate per REQ-05.007 with exit 4 on failure; disabled types produce no results. Evidence: cargo test 753 passed / 0 failed / 22 ignored (new tests/search_config_types_cli.rs 13/13, search_cli 52 passed); clippy -D warnings and fmt clean.
+Search now derives every document type from the startup ArtifactRegistry; the static DOC_KEYS list and collect_type are deleted. One descriptor-driven collector handles default and config-defined types (directory, content model, ID shape, prefix), keeps backlog/decision collectors, sorting, --limit and text/JSON output unchanged. Only active directories are indexed; archived records and archived/deprecated folders are invisible; archived-in-active records auto-relocate per REQ-005.007 with exit 4 on failure; disabled types produce no results. Evidence: cargo test 753 passed / 0 failed / 22 ignored (new tests/search_config_types_cli.rs 13/13, search_cli 52 passed); clippy -D warnings and fmt clean.

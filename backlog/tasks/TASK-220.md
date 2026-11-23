@@ -8,10 +8,9 @@ references:
   - ADR-0005
   - ADR-0026
   - ADR-0027
-  - NFR-07.003
-  - TECH-072
   - NFR-007.003
-  - REQ-06.014
+  - TECH-072
+  - REQ-006.014
 status: Done
 assignee:
   - architect

@@ -14,10 +14,10 @@ dependencies:
   - TASK-105
 documentation:
   - docs/architecture/adr/ADR-0016-runtime-config-derived-command-dispatch.md
-  - docs/requirements/business/REQ-07.003.md
+  - docs/requirements/business/REQ-007.003.md
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
-  - docs/requirements/business/REQ-04.002.md
+  - docs/requirements/business/REQ-004.002.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
 priority: high
 ordinal: 41030
@@ -25,9 +25,9 @@ ordinal: 41030
 
 
 ## Description
-`src/lib.rs` compiles twenty subcommands, including eleven document-type variants and the `nfreq` alias, and each type owns a clap enum and match arm. REQ-07.003 requires the command tree to come from the effective configuration at startup: a new `document_types` entry must expose `papyrus <slug>` and a help line with no rebuild, an unknown or disabled slug must exit 2, and built-in names must never be shadowed. ADR-0016 also requires the parser to use the project exit codes and JSON errors instead of clap's exiting parser. This task performs the single cutover of the command surface, so the static commands and `nfreq` cannot coexist with the dynamic ones.
+`src/lib.rs` compiles twenty subcommands, including eleven document-type variants and the `nfreq` alias, and each type owns a clap enum and match arm. REQ-007.003 requires the command tree to come from the effective configuration at startup: a new `document_types` entry must expose `papyrus <slug>` and a help line with no rebuild, an unknown or disabled slug must exit 2, and built-in names must never be shadowed. ADR-0016 also requires the parser to use the project exit codes and JSON errors instead of clap's exiting parser. This task performs the single cutover of the command surface, so the static commands and `nfreq` cannot coexist with the dynamic ones.
 
-The cutover also removes the one static verb that contradicts a validated requirement: `papyrus decision archive` (REQ-04.002) and its `DecisionCmd::Archive` variant, dispatch arm, and now-unreachable handler. Decisions have no archive command or archive state and no archive policy (ADR-0017, ADR-0023 decision 3), so leaving the command would keep the registry and the CLI in disagreement. The document and decision command surface, dispatch, handler removal, and CLI tests belong to this task; the BR-008 and README wording corrections belong to TASK-115 and TASK-116.
+The cutover also removes the one static verb that contradicts a validated requirement: `papyrus decision archive` (REQ-004.002) and its `DecisionCmd::Archive` variant, dispatch arm, and now-unreachable handler. Decisions have no archive command or archive state and no archive policy (ADR-0017, ADR-0023 decision 3), so leaving the command would keep the registry and the CLI in disagreement. The document and decision command surface, dispatch, handler removal, and CLI tests belong to this task; the BR-008 and README wording corrections belong to TASK-115 and TASK-116.
 
 ## Acceptance Criteria
 - [x] src/cli/ builds the command tree with clap's builder API from cli::BUILTIN_COMMANDS and the artifact registry; no #[derive(Subcommand)] command enum remains and no module outside src/cli/ constructs or inspects a clap::Command.

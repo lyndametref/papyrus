@@ -16,7 +16,7 @@ accepted
 
 ## Context
 
-REQ-05.007 (rewritten in this change set) replaces the document lifecycle `active -> deprecated` with a **main status** `active` or `archived`, stores the state in the front-matter `status` field, moves an archived file into an `archived/` subfolder of the type's configured directory, removes every restore command for documents, and states that a `deprecated/` folder left by an earlier version is not read as archived and is not migrated. REQ-07.001 adds **custom statuses**: each document type may declare additional statuses in `document_types.<slug>.statuses`, optionally with a `default_status`; a custom status is a front-matter value only — no folder per status, no file move, no effect on listing, archiving, or deletion — and `papyrus <slug> status <id> <value>` sets `active` or a declared custom status but never archives. REQ-07.001 also fixes the milestone (`open -> closed`) and release (`planned -> released`) lifecycles, and REQ-05.010 now requires `status` in milestone, release, and front-matter document records. REQ-04.002 keeps decisions out of it: decisions have no archive command or archive state and use the five Nygard statuses.
+REQ-005.007 (rewritten in this change set) replaces the document lifecycle `active -> deprecated` with a **main status** `active` or `archived`, stores the state in the front-matter `status` field, moves an archived file into an `archived/` subfolder of the type's configured directory, removes every restore command for documents, and states that a `deprecated/` folder left by an earlier version is not read as archived and is not migrated. REQ-007.001 adds **custom statuses**: each document type may declare additional statuses in `document_types.<slug>.statuses`, optionally with a `default_status`; a custom status is a front-matter value only — no folder per status, no file move, no effect on listing, archiving, or deletion — and `papyrus <slug> status <id> <value>` sets `active` or a declared custom status but never archives. REQ-007.001 also fixes the milestone (`open -> closed`) and release (`planned -> released`) lifecycles, and REQ-005.010 now requires `status` in milestone, release, and front-matter document records. REQ-004.002 keeps decisions out of it: decisions have no archive command or archive state and use the five Nygard statuses.
 
 Current code and ADRs contradict the new state:
 
@@ -25,9 +25,9 @@ Current code and ADRs contradict the new state:
 - ADR-0010 decision 2 lists `<doc_directory>/<type directory>/deprecated/` as the idle location, and decision 7 states "archive, restore, deprecate, restore are moves, not rewrites" with restore as a first-class operation. Decision 5's allocation rule already scans the deprecated location.
 - ADR-0012's field map gives milestones only `release`, releases no additional keys, and document types no keys; `status` is absent for all three.
 - ADR-0012 decision 6 declares the front-matter key registry the only metadata extension point (a registry entry plus a section-retirement rule), which is the mechanism available for adding `status`.
-- `nfr`/task/milestone records keep their own `status` semantics: tasks configurable (REQ-01.002), milestones `open|closed`, releases `planned|released`; only documents lose restore.
+- `nfr`/task/milestone records keep their own `status` semantics: tasks configurable (REQ-001.002), milestones `open|closed`, releases `planned|released`; only documents lose restore.
 
-Forces: one identity and one file name across state changes (REQ-01.005); no data loss on failure; the on-disk location must remain derivable from configuration (ADR-0010 decision 2); writes must stay on the single path (`record::store`, ADR-0013 decision 4); archive must not delete; legacy `deprecated/` content must not be silently presented as archived; and the state value must be visible in the same `RecordView` projection used by CLI, JSON, and browser (ADR-0013 decision 5).
+Forces: one identity and one file name across state changes (REQ-001.005); no data loss on failure; the on-disk location must remain derivable from configuration (ADR-0010 decision 2); writes must stay on the single path (`record::store`, ADR-0013 decision 4); archive must not delete; legacy `deprecated/` content must not be silently presented as archived; and the state value must be visible in the same `RecordView` projection used by CLI, JSON, and browser (ADR-0013 decision 5).
 
 ## Decision
 1. **`status` is a registry key for three record families, with two different state models.** ADR-0012 decision 6 is used: the key registry gains `status` for
@@ -37,7 +37,7 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
    For a document type the registry entry is `main = [active, archived]`, `custom = <declared statuses other than the two main ones, in configured order>`, `default = <default_status or active>`. `active` and `archived` are always present and cannot be removed, renamed, or replaced; a custom value may not reuse either. A built-in document type with no configured `statuses` therefore has exactly the two main states, and a config-defined type without `statuses` behaves the same way.
 
-   Key order is unchanged: general keys first, then `status`, then the type's other keys. UI mockups keep their status in HTML metadata, gain no front-matter key, and declare no custom statuses (REQ-05.008). Decisions keep `status` in the document core (ADR-0012 decision 12).
+   Key order is unchanged: general keys first, then `status`, then the type's other keys. UI mockups keep their status in HTML metadata, gain no front-matter key, and declare no custom statuses (REQ-005.008). Decisions keep `status` in the document core (ADR-0012 decision 12).
 
 2. **Archive is one operation on one record: patch `status`, then relocate.** `record::store::archive(id, descriptor)`:
    1. builds the patched text with `record::patch` (`SetFrontMatter("status", "archived")`, plus the UI-mockup HTML metadata write and `superseded_by` back-reference where the descriptor requires it);
@@ -46,7 +46,7 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
    If step 2 fails the source is untouched and the command fails. If step 3 fails, both copies exist; the command reports a runtime error naming both paths, and the existing duplicate detection makes the record unreadable-for-write until a human removes one. No path in this sequence truncates or rewrites the source in place, so an interruption never loses content.
 
-3. **`archive` is idempotent in effect, accepts an active record whatever its status value, and discards the custom value.** Archiving an already-archived record is a no-op success (no write, no `updated_date` change). Archiving a record that carries a custom status is the ordinary case: the patch sets `status` to `archived`, the custom value is not copied anywhere, and no separate field records it (REQ-05.007, REQ-07.001). A record stored in the active folder while its `status` reads `archived` is not an archive-time error: it is auto-relocated to `archived/` on read per decision 12; `archive` on such a record is a no-op success once relocation has occurred.
+3. **`archive` is idempotent in effect, accepts an active record whatever its status value, and discards the custom value.** Archiving an already-archived record is a no-op success (no write, no `updated_date` change). Archiving a record that carries a custom status is the ordinary case: the patch sets `status` to `archived`, the custom value is not copied anywhere, and no separate field records it (REQ-005.007, REQ-007.001). A record stored in the active folder while its `status` reads `archived` is not an archive-time error: it is auto-relocated to `archived/` on read per decision 12; `archive` on such a record is a no-op success once relocation has occurred.
 
    *Revision (2026-11-14, owner decision): the archived-in-active-folder case was previously a validation error refusing writes and reporting; it is now auto-relocated on read (decision 12). The original wording is superseded by this revision; the ADR remains Accepted.*
 
@@ -54,25 +54,25 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
    - accepts `active` or a custom status declared for that type, and rejects any other value, including `archived`, with a validation error (exit 4) that names `archive` as the only way to archive;
    - rejects an archived record with a validation error (exit 4) naming the record as archived, changing nothing and moving nothing;
    - patches `status` and refreshes `updated_date` in one write through `record::store::write_atomic`; it performs no move, creates no folder, and leaves the file in the active directory;
-   - is not offered on a type without a front-matter status (UI mockups), which keep their lifecycle in HTML metadata (REQ-05.008).
+   - is not offered on a type without a front-matter status (UI mockups), which keep their lifecycle in HTML metadata (REQ-005.008).
 
    Custom statuses therefore never enter the archive logic: an active record with a custom status is indistinguishable from an `active` record for storage, listing, archiving, and deletion.
 
-5. **There is no restore for documents.** `record::store` loses its document restore operation, every document descriptor loses the `restore` verb, and no CLI, browser, or API path can move an archived document back. Only tasks keep archive/restore, because REQ-01.005 requires task IDs to survive that cycle.
+5. **There is no restore for documents.** `record::store` loses its document restore operation, every document descriptor loses the `restore` verb, and no CLI, browser, or API path can move an archived document back. Only tasks keep archive/restore, because REQ-001.005 requires task IDs to survive that cycle.
 
-   *Revision (2026-11-15, owner decision): milestones no longer keep archive/restore. The milestone lifecycle is fixed to `open -> closed` by `papyrus milestone close <id>`; the archive and restore verbs and the milestone archive location are removed. Only tasks keep archive/restore, because REQ-01.005 requires task IDs to survive that cycle. `close` writes `status` and `updated_date` in place and does not move the record.*
+   *Revision (2026-11-15, owner decision): milestones no longer keep archive/restore. The milestone lifecycle is fixed to `open -> closed` by `papyrus milestone close <id>`; the archive and restore verbs and the milestone archive location are removed. Only tasks keep archive/restore, because REQ-001.005 requires task IDs to survive that cycle. `close` writes `status` and `updated_date` in place and does not move the record.*
 
    *Amendment (2026-11-21): the milestone clause of the 2026-11-15 revision is superseded by ADR-032 decisions 2, 4 and 5 — the milestone lifecycle is `open -> closed -> archived`, a milestone has an archive location (the backlog archive milestones folder, also the legacy read/import location) and `papyrus milestone archive <id>` is the only path to `archived`; no milestone restore exists, and every other statement in this decision stands.*
 
-6. **`archived/` is the only recognized inactive location.** Directory resolution gains `resolve_archived_directory`; `resolve_deprecated_directory` and every read alias for `deprecated/` are deleted. A `deprecated/` folder is therefore invisible to listing, view, search, and the browser, exactly as REQ-05.007 states, and is never migrated, moved, or rewritten. Its files remain on disk until a human moves them. Orphaned `deprecated/` folders stay inert: no inventory, listing, or migration command is provided (decision 12).
+6. **`archived/` is the only recognized inactive location.** Directory resolution gains `resolve_archived_directory`; `resolve_deprecated_directory` and every read alias for `deprecated/` are deleted. A `deprecated/` folder is therefore invisible to listing, view, search, and the browser, exactly as REQ-005.007 states, and is never migrated, moved, or rewritten. Its files remain on disk until a human moves them. Orphaned `deprecated/` folders stay inert: no inventory, listing, or migration command is provided (decision 12).
 
-7. **Delete is archive-then-unlink.** `delete` on an active document performs decision 2's archive, then removes the archived file; on an already-archived document it removes the file directly. Confirmation and `--force` are CLI concerns (REQ-05.007), not store concerns. Allocation stays `max(number present) + 1` over active and archived locations and never recomputes, so a gap is left where a file was removed. Reuse of the highest deleted number when the highest-numbered record is deleted is accepted behavior and is documented; no persisted high-water mark is introduced (decision 12; ADR-0010 decision 5 unchanged).
+7. **Delete is archive-then-unlink.** `delete` on an active document performs decision 2's archive, then removes the archived file; on an already-archived document it removes the file directly. Confirmation and `--force` are CLI concerns (REQ-005.007), not store concerns. Allocation stays `max(number present) + 1` over active and archived locations and never recomputes, so a gap is left where a file was removed. Reuse of the highest deleted number when the highest-numbered record is deleted is accepted behavior and is documented; no persisted high-water mark is introduced (decision 12; ADR-0010 decision 5 unchanged).
 
 8. **Supersession is a lifecycle transition expressed the same way.** `ui-mockup supersede <old> <new>` sets the old mockup's HTML status to `archived`, records the back-reference, and moves it to `archived/`, using decision 2's sequence. It does not introduce a second archive mechanism.
 
 9. **Reading a non-conforming `status` is tolerant and non-destructive.** A front-matter `status` outside the descriptor's declared vocabulary — a value removed from `statuses` after records used it, or a hand-edited string — is preserved verbatim, the record is flagged in list/view diagnostics, and a write that would normalize it is refused until the value or the configuration is fixed. A record in that state is still an ordinary active record for storage and for `archive`; only `status` writes are refused. Papyrus never silently rewrites a state value on read and never adds an undeclared value to the vocabulary.
 
-10. **Visibility follows location, and the status value is a filter, not a visibility switch.** List, search, and browser index only the active directory; the `archived/` directory is never indexed and is not resolvable by ID for viewing (REQ-05.007, REQ-06.014). A custom status does not hide a record: it remains listed and is selectable through the browser's status filter, whose options are `active` plus the declared custom statuses. `--json` reports `status` for every reachable record, so an API consumer sees the value it is reading.
+10. **Visibility follows location, and the status value is a filter, not a visibility switch.** List, search, and browser index only the active directory; the `archived/` directory is never indexed and is not resolvable by ID for viewing (REQ-005.007, REQ-006.014). A custom status does not hide a record: it remains listed and is selectable through the browser's status filter, whose options are `active` plus the declared custom statuses. `--json` reports `status` for every reachable record, so an API consumer sees the value it is reading.
 
 11. **Clause-level supersession, explicitly scoped.** On acceptance this ADR supersedes:
     - ADR-0010 decision 2's `<type directory>/deprecated/` idle location and decision 7's deprecate/restore move rule, for document types only;
@@ -89,14 +89,14 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 **Positive:**
 
 - One lifecycle operation (`archive`) replaces deprecate and restore for ten document types, removing an entire class of state-transition bugs and roughly half of each document module's command surface.
-- The state is in front matter and the location follows only from the main status, so a record's lifecycle is visible in the same projection used everywhere (REQ-06.004).
+- The state is in front matter and the location follows only from the main status, so a record's lifecycle is visible in the same projection used everywhere (REQ-006.004).
 - Custom statuses are configuration data with no storage consequence, so a type can gain a vocabulary without a folder, a migration, or a new lifecycle.
 - The archive sequence never destroys content: the destination is written before the source is removed.
 - The `deprecated/` decision is explicit and testable: the directory is not read, so an upgrade cannot half-migrate a corpus.
 
 **Negative:**
 
-- Existing projects with documents in `deprecated/` lose access to them through Papyrus until a human moves the files and edits their metadata; the release notes must say so (REQ-05.007 already accepts this).
+- Existing projects with documents in `deprecated/` lose access to them through Papyrus until a human moves the files and edits their metadata; the release notes must say so (REQ-005.007 already accepts this).
 - Removing restore is a user-visible capability loss; it is a deliberate product decision, not an implementation gap.
 - Archive now performs a content change, so a record's bytes and `updated_date` change on archive; any test or user expectation of "move only" must change.
 - Two operations (write + unlink) are not atomic together; the residual duplicate state is handled by reporting, not by a transaction.
@@ -119,15 +119,15 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
 | Option | Outcome | Reason |
 |---|---|---|
-| `status` in front matter (main + custom) plus `archived/`, archive = write-destination-then-unlink, no restore (this ADR) | Selected | Matches REQ-05.007/REQ-05.010/REQ-07.001, keeps one file and one ID, and never loses content on failure. |
-| Keep `deprecated/` as the folder name and change only the command verbs | Rejected | Contradicts REQ-05.007's `archived/` location and its explicit "deprecated/ is not read as archived". |
+| `status` in front matter (main + custom) plus `archived/`, archive = write-destination-then-unlink, no restore (this ADR) | Selected | Matches REQ-005.007/REQ-005.010/REQ-007.001, keeps one file and one ID, and never loses content on failure. |
+| Keep `deprecated/` as the folder name and change only the command verbs | Rejected | Contradicts REQ-005.007's `archived/` location and its explicit "deprecated/ is not read as archived". |
 | Rename the file into `archived/` first and patch `status` afterwards | Rejected | A failure between the two leaves an `status: active` record in the archive folder, which decision 3 would then have to special-case. |
-| Store the state only in front matter and leave files in place | Rejected | REQ-05.007 requires the move; listing would need a per-file state filter and archive would become O(scan). |
-| Give every custom status its own folder | Rejected | REQ-07.001 states custom statuses are front-matter values only, with no folder per status and no move. |
-| Keep the pre-archive custom value in a second field | Rejected by REQ-07.001 | The requirement states the previous value is not retained anywhere, and a second field would need its own lifecycle. |
-| Model custom statuses as a second configurable lifecycle for documents | Rejected | REQ-07.001 keeps the main statuses fixed and makes only the custom vocabulary configurable; a configurable lifecycle would make archive/delete behavior depend on configuration. |
-| Keep restore for documents as a hidden command | Rejected | REQ-05.007 states no Papyrus command returns an archived document to `active`. |
-| Migrate `deprecated/` automatically on first read | Rejected | REQ-05.007 explicitly forbids migration; a bulk move would also rewrite a corpus without review. |
+| Store the state only in front matter and leave files in place | Rejected | REQ-005.007 requires the move; listing would need a per-file state filter and archive would become O(scan). |
+| Give every custom status its own folder | Rejected | REQ-007.001 states custom statuses are front-matter values only, with no folder per status and no move. |
+| Keep the pre-archive custom value in a second field | Rejected by REQ-007.001 | The requirement states the previous value is not retained anywhere, and a second field would need its own lifecycle. |
+| Model custom statuses as a second configurable lifecycle for documents | Rejected | REQ-007.001 keeps the main statuses fixed and makes only the custom vocabulary configurable; a configurable lifecycle would make archive/delete behavior depend on configuration. |
+| Keep restore for documents as a hidden command | Rejected | REQ-005.007 states no Papyrus command returns an archived document to `active`. |
+| Migrate `deprecated/` automatically on first read | Rejected | REQ-005.007 explicitly forbids migration; a bulk move would also rewrite a corpus without review. |
 
 ## Open Questions
 
@@ -148,13 +148,13 @@ Forces: one identity and one file name across state changes (REQ-01.005); no dat
 
 ## References
 
-- `docs/requirements/business/REQ-05.007.md` — archive state, location, delete, no restore, `deprecated/` not read.
-- `docs/requirements/business/REQ-05.010.md`, `REQ-05.011.md` — `status` in front matter and metadata maintenance.
-- `docs/requirements/business/REQ-05.008.md` — UI mockup HTML metadata and supersession.
-- `docs/requirements/business/REQ-04.002.md` — decisions have no archive state.
-- `docs/requirements/business/REQ-07.001.md` — main status, custom statuses, `status` command, fixed lifecycles per category.
-- `docs/requirements/business/REQ-07.002.md` — `statuses`/`default_status` configuration and validation.
-- `docs/requirements/business/REQ-01.005.md` — ID stability across archive.
+- `docs/requirements/business/REQ-005.007.md` — archive state, location, delete, no restore, `deprecated/` not read.
+- `docs/requirements/business/REQ-005.010.md`, `REQ-005.011.md` — `status` in front matter and metadata maintenance.
+- `docs/requirements/business/REQ-005.008.md` — UI mockup HTML metadata and supersession.
+- `docs/requirements/business/REQ-004.002.md` — decisions have no archive state.
+- `docs/requirements/business/REQ-007.001.md` — main status, custom statuses, `status` command, fixed lifecycles per category.
+- `docs/requirements/business/REQ-007.002.md` — `statuses`/`default_status` configuration and validation.
+- `docs/requirements/business/REQ-001.005.md` — ID stability across archive.
 - `docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md` — atomic write sequence.
 - `docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md` — layout, allocation, identity; deprecated clauses superseded here.
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md` — key registry and field map; `status` rows superseded here.

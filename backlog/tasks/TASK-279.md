@@ -32,7 +32,6 @@ assignee:
   - quality-gatekeeper
 milestone: MS-036
 dependencies:
-  - TASK-278
   - TASK-313
   - TASK-314
 ordinal: 90

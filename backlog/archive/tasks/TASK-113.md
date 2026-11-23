@@ -15,8 +15,8 @@ milestone: MS-019
 dependencies: []
 references:
   - docs/business-rules/BR-007-release-command-behavior.md
-  - docs/requirements/business/REQ-03.002.md
-  - docs/requirements/business/REQ-07.001.md
+  - docs/requirements/business/REQ-003.002.md
+  - docs/requirements/business/REQ-007.001.md
 documentation:
   - docs/specifications/milestone-and-release-management.md
   - src/release.rs
@@ -27,7 +27,7 @@ ordinal: 41200
 
 
 ## Description
-**Why.** BR-007 and REQ-03.002 document `papyrus release close <id>` as the only `planned -> released` transition, but `src/release.rs` has no `Close` variant and `ReleaseCmd` exposes only create/list/view/edit, so the command exits 2 and a release can never reach `released`. TASK-117 recorded this as G-5, release-blocking for the m-17 gate. The browser lifecycle text compounds the gap by advertising a non-existent `papyrus release status <id> released` command. The owner chose to implement the documented command rather than amend BR-007.
+**Why.** BR-007 and REQ-003.002 document `papyrus release close <id>` as the only `planned -> released` transition, but `src/release.rs` has no `Close` variant and `ReleaseCmd` exposes only create/list/view/edit, so the command exits 2 and a release can never reach `released`. TASK-117 recorded this as G-5, release-blocking for the m-17 gate. The browser lifecycle text compounds the gap by advertising a non-existent `papyrus release status <id> released` command. The owner chose to implement the documented command rather than amend BR-007.
 
 **What.** Add the `close` verb end to end: `Verb::Close` in `src/registry.rs` with `RELEASE_VERBS` updated, a `ReleaseCmd::Close { id }` variant in `src/release.rs`, and a `close()` implementation that resolves the release, reads its front-matter status, refuses anything but `planned`, sets `released`, and writes through `record::store::write_atomic` (the single write path, ADR-0013). Also write `status: planned` in `create()` so a native release starts in its documented state. Correct the browser help/lifecycle text in `src/browser/render.rs` to name `papyrus release close <id>` and the `planned -> released` lifecycle.
 
@@ -44,7 +44,7 @@ ordinal: 41200
 **Out of scope.**
 
 - Reopening a release (`released -> planned`), bulk close, `--status` on `release edit`, and any release archive/delete behavior.
-- Amending BR-007, REQ-03.002, REQ-07.001, or an ADR; these already describe the implemented behavior.
+- Amending BR-007, REQ-003.002, REQ-007.001, or an ADR; these already describe the implemented behavior.
 - The m-18 refactor and cache tasks; `release` stays a builtin command path in this task.
 
 **Assumptions.**
@@ -64,7 +64,7 @@ ordinal: 41200
 - [x] `--json` on close emits exactly one JSON object carrying the release ID and new status; text mode prints the ID or a one-line confirmation consistent with `release create`
 - [x] No occurrence of `papyrus release status <id> released` remains; `src/browser/render.rs` names `papyrus release close <id>` and the browser lifecycle text matches BR-007
 - [x] CLI integration tests cover close success, already-released rejection, unknown ID, JSON output, and front-matter/body preservation; a browser test asserts the corrected lifecycle text
-- [x] BR-007, REQ-03.002, and REQ-07.001 are satisfied without editing requirement, business-rule, or ADR files
+- [x] BR-007, REQ-003.002, and REQ-007.001 are satisfied without editing requirement, business-rule, or ADR files
 - [x] `papyrus release create` writes `status: planned` in the front matter, and `close` treats a missing or empty status as `planned`; any other value is refused
 - [x] `docs/specifications/release-lifecycle.md` and `docs/specifications/milestone-and-release-management.md` describe `close` as implemented and mark the previous open questions resolved, with no edits to requirement, business-rule, or ADR files
 

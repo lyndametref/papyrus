@@ -10,12 +10,12 @@ milestone: MS-004
 dependencies:
   - TASK-012
 references:
-  - docs/requirements/business/REQ-04.md
-  - docs/requirements/business/REQ-04.001.md
-  - docs/requirements/business/REQ-04.002.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-004.md
+  - docs/requirements/business/REQ-004.001.md
+  - docs/requirements/business/REQ-004.002.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-008-decision-command-behavior.md
 documentation:
   - docs/specifications/decision-records-management.md
@@ -24,7 +24,7 @@ ordinal: 13000
 
 
 ## Description
-Deliver the `decision` commands so a project contributor can create, list, view, edit, supersede, and archive decision records, with stable IDs, documented Nygard fields (Title, Status, Decision, Context, Consequences), fixed status vocabulary and transitions, and text-file persistence inside the project directory. Implements REQ-04, REQ-04.001, REQ-04.002 and the BR-008 command contract. Provides decision records later searched (TASK-14) and exposed in the browser (TASK-15). Full behavior and acceptance criteria are in docs/specifications/decision-records-management.md.
+Deliver the `decision` commands so a project contributor can create, list, view, edit, supersede, and archive decision records, with stable IDs, documented Nygard fields (Title, Status, Decision, Context, Consequences), fixed status vocabulary and transitions, and text-file persistence inside the project directory. Implements REQ-004, REQ-004.001, REQ-004.002 and the BR-008 command contract. Provides decision records later searched (TASK-14) and exposed in the browser (TASK-15). Full behavior and acceptance criteria are in docs/specifications/decision-records-management.md.
 
 ## Acceptance Criteria
 - [ ] papyrus decision create <title> [-t <type>] [-d <decision>] [--context <text>] [--consequences <text>] creates a decision with Nygard fields and prints its generated ID.

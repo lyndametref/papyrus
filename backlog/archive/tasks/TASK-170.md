@@ -5,11 +5,11 @@ created_date: '2026-11-16T21:03:19Z'
 updated_date: '2026-11-19T10:54:23Z'
 labels: []
 references:
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
-  - REQ-06.003
-  - REQ-06.005
-  - REQ-06.008
+  - REQ-006.003
+  - REQ-006.005
+  - REQ-006.008
 status: Done
 assignee:
   - architect

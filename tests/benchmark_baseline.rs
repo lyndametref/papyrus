@@ -2045,12 +2045,12 @@ fn summary_markdown(results: &[(Profile, Vec<RunResult>)]) -> String {
     out.push_str("## Comparison with the historical 382-record figures\n\n");
     out.push_str(&format!(
         "Historical figures, provenance `{HISTORICAL_PROVENANCE}`: inventory `/` 14.2 s and \
-         `/doc/REQ-07.001` view 1.8 s at 382 active records. The historical corpus is not preserved, \
+         `/doc/REQ-007.001` view 1.8 s at 382 active records. The historical corpus is not preserved, \
          so exact equality is neither expected nor targeted; no corpus parameter was tuned to \
          approach these values.\n\n"
     ));
     out.push_str(
-        "The historical `/doc/REQ-07.001` view is represented by `REQ-001` in the generated corpus \
+        "The historical `/doc/REQ-007.001` view is represented by `REQ-001` in the generated corpus \
          (the requirement family group; the member route `REQ-001.001` is the closest individual \
          member route and is also recorded below).\n\n",
     );

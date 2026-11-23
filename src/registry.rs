@@ -19,7 +19,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 
-/// The three artifact categories fixed by REQ-07.001.
+/// The three artifact categories fixed by REQ-007.001.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArtifactCategory {
     Backlog,
@@ -27,7 +27,7 @@ pub enum ArtifactCategory {
     Document,
 }
 
-/// The identity shape a type's records use (REQ-01.005, REQ-05.001/002).
+/// The identity shape a type's records use (REQ-001.005, REQ-005.001/002).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IdShape {
     /// `<PREFIX>-<sequence>`: the only shape the family claims.
@@ -39,7 +39,7 @@ pub enum IdShape {
     Grouped,
 }
 
-/// How a type's records reach their inactive location (REQ-05.007, REQ-04.002).
+/// How a type's records reach their inactive location (REQ-005.007, REQ-004.002).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArchivePolicy {
     /// The record type is never archived (decisions, releases).
@@ -54,17 +54,17 @@ pub const MAIN_DOCUMENT_STATUSES: [&str; 2] = ["active", "archived"];
 const MAIN_STATUS_ACTIVE: &str = MAIN_DOCUMENT_STATUSES[0];
 const MAIN_STATUS_ARCHIVED: &str = MAIN_DOCUMENT_STATUSES[1];
 
-/// The status model of a type (REQ-07.001, REQ-01.002, REQ-04.001).
+/// The status model of a type (REQ-007.001, REQ-001.002, REQ-004.001).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StatusModel {
-    /// Tasks only; mirrors top-level `statuses`/`default_status` (REQ-01.002).
+    /// Tasks only; mirrors top-level `statuses`/`default_status` (REQ-001.002).
     TaskConfigurable {
         statuses: Vec<String>,
         default: String,
     },
-    /// Milestones, releases, decisions (REQ-07.001, REQ-04.001).
+    /// Milestones, releases, decisions (REQ-007.001, REQ-004.001).
     Fixed { states: &'static [&'static str] },
-    /// Every front-matter-backed document type (REQ-07.001, REQ-07.002).
+    /// Every front-matter-backed document type (REQ-007.001, REQ-007.002).
     ///
     /// `main` is always [`MAIN_DOCUMENT_STATUSES`]; `custom` is owned, ordered
     /// data taken from the validated configuration; `default` is
@@ -73,11 +73,11 @@ pub enum StatusModel {
         custom: Vec<String>,
         default: String,
     },
-    /// UI mockups only: state lives in HTML metadata (REQ-05.008).
+    /// UI mockups only: state lives in HTML metadata (REQ-005.008).
     HtmlMetadata { states: &'static [&'static str] },
 }
 
-/// The verbs a descriptor exposes (REQ-07.003).
+/// The verbs a descriptor exposes (REQ-007.003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
     Create,
@@ -195,7 +195,7 @@ pub const CANONICAL_DOCUMENT_VERB_ORDER: &[Verb] = &[
     Verb::Status,
 ];
 
-/// The body model of a document type (ADR-036 decision 5, REQ-07.004).
+/// The body model of a document type (ADR-036 decision 5, REQ-007.004).
 ///
 /// The model is seed data and never a configuration key: a seed slug takes its
 /// model from the seed table, and every user-defined slug is `SingleMarkdown`
@@ -261,7 +261,7 @@ impl TypeDescriptor {
     }
 
     /// Whether this descriptor is the config-defined document path that the
-    /// seed-derived model replaces (REQ-07.004, MS-033 AC-7).
+    /// seed-derived model replaces (REQ-007.004, MS-033 AC-7).
     ///
     /// Compatibility bridge for a type declared only in configuration; the
     /// seed-derived model and visibility are read for built-in slugs.
@@ -602,7 +602,7 @@ pub const GENERAL_FRONTMATTER_KEYS: &[&str] = &[
     "references",
 ];
 
-/// The document baseline verb family (REQ-07.003).
+/// The document baseline verb family (REQ-007.003).
 pub const DOCUMENT_BASELINE_VERBS: &[Verb] = &[
     Verb::Create,
     Verb::List,
@@ -1706,7 +1706,7 @@ fn document_field_args(descriptor: &TypeDescriptor, verb: Verb) -> Vec<ArgSpec> 
 }
 
 /// The fixed title contract of every document model (ADR-036 decision 24,
-/// REQ-07.003).
+/// REQ-007.003).
 ///
 /// The title is not a field and is not generated from the field sequence:
 /// `create` and `create-group` take it as the first positional `TITLE` and
@@ -2120,7 +2120,7 @@ fn document_record(
     }
 }
 
-/// Resolve a document descriptor's status model from its entry (REQ-07.001).
+/// Resolve a document descriptor's status model from its entry (REQ-007.001).
 ///
 /// Status-list invariants that need the raw declaration are checked here: an
 /// explicit empty list, duplicates, the two fixed main statuses, and status

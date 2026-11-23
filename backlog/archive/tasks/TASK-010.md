@@ -11,16 +11,16 @@ dependencies:
   - TASK-009
   - TASK-005
 references:
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-02.001.md
-  - docs/requirements/business/REQ-02.003.md
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-03.002.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-002.001.md
+  - docs/requirements/business/REQ-002.003.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-003.002.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/specifications/search-tasks-milestones-and-releases.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-005-task-command-behavior.md
   - docs/business-rules/BR-006-milestone-command-behavior.md
   - docs/business-rules/BR-007-release-command-behavior.md
@@ -61,4 +61,4 @@ Extend `papyrus search` so task, milestone, and release records are searched in 
 
 
 ## Notes
-Quality review (gatekeeper): Ready to close. All AC #1-#9 pass; DoD pass. cargo build/test/clippy/fmt all pass. 8 search_backlog_cli tests pass. Scope: src/search.rs + tests. NFR-02.002/NFR-04.001/NFR-04.002 addressed.
+Quality review (gatekeeper): Ready to close. All AC #1-#9 pass; DoD pass. cargo build/test/clippy/fmt all pass. 8 search_backlog_cli tests pass. Scope: src/search.rs + tests. NFR-002.002/NFR-004.001/NFR-004.002 addressed.

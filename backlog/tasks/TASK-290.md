@@ -6,7 +6,7 @@ updated_date: '2026-11-20T18:20:49Z'
 labels: []
 references:
   - ADR-036
-  - REQ-07.004
+  - REQ-007.004
 status: Done
 assignee:
   - task-refiner

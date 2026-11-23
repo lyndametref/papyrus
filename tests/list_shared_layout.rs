@@ -1,7 +1,7 @@
 //! TASK-142: every enabled artifact family renders through the shared list
 //! layout, with the fixed header sequence and its declared family slots.
 //!
-//! The task descriptor is the REQ-06.013 board and is asserted there instead.
+//! The task descriptor is the REQ-006.013 board and is asserted there instead.
 //! Archived records are absent from every list and from the board's cards.
 
 use std::collections::BTreeMap;

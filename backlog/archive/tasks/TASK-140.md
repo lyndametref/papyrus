@@ -16,13 +16,11 @@ dependencies:
   - TASK-138
   - TASK-139
 references:
-  - docs/requirements/business/REQ-06.017.md
+  - docs/requirements/business/REQ-006.017.md
   - docs/architecture/adr/ADR-0025-bundled-katex-client-side-math-rendering.md
   - >-
     docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md
-  - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
-  - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - docs/specifications/browser-math-and-diagram-rendering.md
   - docs/specifications/browser-shell-shared-list-layout-and-page-width.md
@@ -40,9 +38,9 @@ ordinal: 41580
 
 
 ## Description
-**Why.** REQ-06.017 requires browser-side math rendering that works fully offline, keeps CLI output as source text, and degrades to source instead of breaking the page. ADR-0025 is Accepted: vendored KaTeX 0.16.11 (shipped by TASK-143), a non-Markdown delimiter pre-pass in `browser::render`, and a placeholder whose initial content is the escaped source.
+**Why.** REQ-006.017 requires browser-side math rendering that works fully offline, keeps CLI output as source text, and degrades to source instead of breaking the page. ADR-0025 is Accepted: vendored KaTeX 0.16.11 (shipped by TASK-143), a non-Markdown delimiter pre-pass in `browser::render`, and a placeholder whose initial content is the escaped source.
 
-**Authority.** REQ-06.017; ADR-0025 decisions 2-10; the feature specification `docs/specifications/browser-math-and-diagram-rendering.md` §2-§9, which is the canonical contract for the field map, the delimiter edge rules, the markup, and the CSP. That page is deliberately separate from `docs/specifications/browser-shell-shared-list-layout-and-page-width.md`: TASK-144 owns that page's §3/§4/§7 and is editing the shell files, so this ticket references it and must not edit it.
+**Authority.** REQ-006.017; ADR-0025 decisions 2-10; the feature specification `docs/specifications/browser-math-and-diagram-rendering.md` §2-§9, which is the canonical contract for the field map, the delimiter edge rules, the markup, and the CSP. That page is deliberately separate from `docs/specifications/browser-shell-shared-list-layout-and-page-width.md`: TASK-144 owns that page's §3/§4/§7 and is editing the shell files, so this ticket references it and must not edit it.
 
 **What.** The delimiter pre-pass in `browser::render`, the KaTeX client pass, conditional asset emission, the `font-src` CSP delta, and the tests that pin the fallback and the no-Markdown boundary.
 

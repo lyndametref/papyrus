@@ -23,15 +23,15 @@ Ordered feature increments (milestones). Each milestone delivers a usable, insta
 - m-9: Audit Records — search (TASK-48), browser (TASK-26), design review (TASK-49), packaging (TASK-50).
 - m-11: Technical Specifications — domain model (TASK-21), search (TASK-56), browser (TASK-57), design review (TASK-58), packaging (TASK-59).
 - m-12: Final Cross-Type Integration and Record Metadata — shared record envelope (TASK-63), identity translation (TASK-64), CLI front-matter options (TASK-65), design review (TASK-66), metadata projection (TASK-67), document-record migration (TASK-68), task/milestone migration (TASK-69), legacy removal (TASK-70), Backlog.md round-trip gate (TASK-71), lifecycle page (TASK-72), final cross-type design review (TASK-60), unified search (TASK-18), cross-type browser (TASK-19), packaging (TASK-20), id_padding constraint (TASK-74), interactive init walkthrough (TASK-75), browser skills design review (TASK-76), browser skills page (TASK-77).
-- m-15: Use Cases and Test Documentation — manage use cases, test cases, and test reports from the CLI (TASK-78), search (TASK-80), browser exposure (TASK-81), design review mockup (TASK-79), packaging and verification (TASK-82). Should-have document types (REQ-05.012/013/014); lifecycle active → deprecated; front-matter required. Placed before Release 1.0.
+- m-15: Use Cases and Test Documentation — manage use cases, test cases, and test reports from the CLI (TASK-78), search (TASK-80), browser exposure (TASK-81), design review mockup (TASK-79), packaging and verification (TASK-82). Should-have document types (REQ-005.012/013/014); lifecycle active → deprecated; front-matter required. Placed before Release 1.0.
 - m-14: Release 1.0 — two tasks, both Low priority: the release-level upgrade notes TASK-99 (ordinal 39160) and the release gate TASK-73 (labelled release, ordinal 40000, last). m-14 holds no implementation or specification work and stays open and isolated so more requirements can be added before 1.0 without redefining the gate. Closing it requires the feature milestone m-16 to be fully Done plus TASK-20 (m-12) and TASK-82 (m-15), with build/tests passing and the security audit complete; TASK-104 (m-16) is part of the feature milestone and must be accepted by the gate before it closes.
 - m-16: Release 1.0 - Native Layout, Import, and Browser Refinements — the extension feature milestone, 20 tasks, all High priority: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90, init/config TASK-91, cursor-driven init walkthrough conformance TASK-104 (ordinal 39085, directly after TASK-91), import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, backlog kanban board specification TASK-101, mockup revision TASK-102 and implementation TASK-103, verification and packaging TASK-98. Placed before the release milestone; TASK-73 depends on its final tasks.
-- m-17: Config-Defined Document Types and Artifact Categories — REQ-07.001/002/003/004 plus REQ-06.014 and the REQ-01.002 list-valued keys; one feature milestone after Release 1.0, thirteen tasks TASK-105 to TASK-117, all High priority, ordinals 41000-41110. Delivers the runtime artifact registry and descriptors, the dynamic `papyrus <slug>` family with `status`, fail-closed `document_types` validation and repair, the generic content model, registry-derived search and browser views, init defaults without `deploy`, and the upgrade documentation. Man-page work is excluded: ADR-0021 is Proposed and NFR-03.003 remains a recorded release risk. No release gate is created; whether this ships as Release 1.1 or folds into an open release is an owner decision.
+- m-17: Config-Defined Document Types and Artifact Categories — REQ-007.001/002/003/004 plus REQ-006.014 and the REQ-001.002 list-valued keys; one feature milestone after Release 1.0, thirteen tasks TASK-105 to TASK-117, all High priority, ordinals 41000-41110. Delivers the runtime artifact registry and descriptors, the dynamic `papyrus <slug>` family with `status`, fail-closed `document_types` validation and repair, the generic content model, registry-derived search and browser views, init defaults without `deploy`, and the upgrade documentation. Man-page work is excluded: ADR-0021 is Proposed and NFR-003.003 remains a recorded release risk. No release gate is created; whether this ships as Release 1.1 or folds into an open release is an owner decision.
 
 - m-18: Registry Consolidation and Release Close - follow-ups from the m-17 architecture checkpoint and TASK-117 verification; seven tasks TASK-118 to TASK-124, ordinals 41200-41260. Closes the release-blocking `papyrus release close` gap G-5, refactors the two ADR-0016/0017 deviations in code (descriptor-driven typed dispatch through `document::run`, registry-based record descriptor resolution) and removes the process-global descriptor cache and slug leaks, then clears G-4 and F-117-1 and adds init/registry and archive-terminology drift guards. Every dependency is inside m-18; no release milestone or release ticket is created.
 - m-19: Architecture Checkpoint Follow-ups: Mockup Archive and ADR Alignment - owner decisions of 2026-11-15 on the m-18 architecture checkpoint: fix the UI-mockup archive ordering in code, amend ADR-0016/0017/0018/0023 instead of refactoring built-ins, and plan every follow-up. Five tasks TASK-125 to TASK-129, ordinals 41300-41340: TASK-125 routes mockup archive, supersede, and edit-with-move through `record::store::archive_content`; TASK-126 amends the four ADRs and regenerates the ADR index; TASK-127 corrects the browser and init specifications; TASK-128 aligns the domain model and glossary and removes the empty legacy `deprecated/` folders; TASK-129 adds C0/DEL/C1 parity to the path sanitizers. Every dependency is inside m-19; no release milestone or release ticket is created.
-- m-20: Milestone Lifecycle Drift Follow-ups - follow-up to m-19 after the m-19 architecture checkpoint found residual milestone drift: ADR-0017 constraint 3 and ADR-0023 decision 2 already record the close-only lifecycle, but the descriptor/record layer and two documents still describe an archived milestone. Three tasks TASK-134 to TASK-136, ordinals 41400-41420: TASK-134 sets `ArchivePolicy::None` for the milestone template, removes the lifecycle archive location from `RecordDescriptor::resolve_archived_directory`, preserves legacy reads and the import write to `backlog/archive/milestones/`, and stops `relocate_if_archived` from moving an `archived` milestone; TASK-135 rewrites the REQ-06.013 archived-milestone clauses and regenerates the business requirement index; TASK-136 corrects `docs/specifications/milestone-and-release-management.md` to the close-only lifecycle and records the superseded wording. TASK-135 and TASK-136 follow TASK-134; every dependency is inside m-20; no release milestone or release ticket is created.
-- m-21: Diagnostics, Browser Shell, and Offline Rendering — REQ-01.008 plus REQ-06.015/06.016/06.017 and the 2026-11-15 edits to REQ-01.002, REQ-01.004, REQ-02.003, REQ-05.007, REQ-06.013, REQ-06.014, and REQ-07.002. Fourteen tasks TASK-137 to TASK-150, ordinals 41500-41620: the read-only `check` command and its duplicate-ID repair, the browser shell with a server-side width contract and one shared list layout, collapsible navigation, the vendored asset pipeline with package notices, KaTeX math, Mermaid diagrams, the per-milestone `Clean up all` board action, the specification revision, and packaged plus end-to-end verification. ADR-0025, ADR-0027, ADR-0028, and ADR-0029 are Accepted; ADR-0026 is Proposed, so TASK-146, TASK-148, and TASK-150 are blocked until it is accepted. Every dependency is inside m-21; no release milestone or release ticket is created.
+- m-20: Milestone Lifecycle Drift Follow-ups - follow-up to m-19 after the m-19 architecture checkpoint found residual milestone drift: ADR-0017 constraint 3 and ADR-0023 decision 2 already record the close-only lifecycle, but the descriptor/record layer and two documents still describe an archived milestone. Three tasks TASK-134 to TASK-136, ordinals 41400-41420: TASK-134 sets `ArchivePolicy::None` for the milestone template, removes the lifecycle archive location from `RecordDescriptor::resolve_archived_directory`, preserves legacy reads and the import write to `backlog/archive/milestones/`, and stops `relocate_if_archived` from moving an `archived` milestone; TASK-135 rewrites the REQ-006.013 archived-milestone clauses and regenerates the business requirement index; TASK-136 corrects `docs/specifications/milestone-and-release-management.md` to the close-only lifecycle and records the superseded wording. TASK-135 and TASK-136 follow TASK-134; every dependency is inside m-20; no release milestone or release ticket is created.
+- m-21: Diagnostics, Browser Shell, and Offline Rendering — REQ-001.008 plus REQ-006.015/06.016/06.017 and the 2026-11-15 edits to REQ-001.002, REQ-001.004, REQ-002.003, REQ-005.007, REQ-006.013, REQ-006.014, and REQ-007.002. Fourteen tasks TASK-137 to TASK-150, ordinals 41500-41620: the read-only `check` command and its duplicate-ID repair, the browser shell with a server-side width contract and one shared list layout, collapsible navigation, the vendored asset pipeline with package notices, KaTeX math, Mermaid diagrams, the per-milestone `Clean up all` board action, the specification revision, and packaged plus end-to-end verification. ADR-0025, ADR-0027, ADR-0028, and ADR-0029 are Accepted; ADR-0026 is Proposed, so TASK-146, TASK-148, and TASK-150 are blocked until it is accepted. Every dependency is inside m-21; no release milestone or release ticket is created.
 
 ## Removed
 
@@ -73,38 +73,38 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ### Front-matter and Backlog.md interoperability (2026-11-08)
 
-- REQ-05.010 — Record Metadata in YAML Front Matter: TASK-63 (parser, descriptors, key registry), TASK-65 (options and timestamps), TASK-68 (document records), TASK-69 (tasks/milestones and `release`), TASK-70 (no legacy metadata carriers).
-- REQ-05.011 — Maintain Record Metadata Through All Commands: TASK-65 (create/update options), TASK-67 (browser save and `updated_date`), TASK-68 and TASK-69 (lazy per-record migration, managed types only, frozen bodies, legacy conversion with per-file diff), TASK-70 (single write path).
-- REQ-06.003 — Describe Managed Artifacts and Their Lifecycles in the Browser: TASK-66 (design and approval), TASK-72 (implementation).
-- REQ-06.004 — Use Front-Matter Metadata in CLI and Browser Views: TASK-66 (design and approval), TASK-67 (one projection, browser save, read-only timestamps).
-- REQ-01.005 — Stable Record IDs and two ID spaces: TASK-64 (translation, reference translation, input rejection), TASK-67 (display ID in every projection).
-- NFR-04.003 — Backlog.md task and milestone interoperability: TASK-64 (identity), TASK-69 (layout and additive keys), TASK-71 (two-direction round-trip gate), TASK-20 (packaged verification).
-- REQ-05.008 — UI mockup metadata stays in HTML: TASK-63 and TASK-68 exclude HTML/mockups; no front matter is written to mockups.
+- REQ-005.010 — Record Metadata in YAML Front Matter: TASK-63 (parser, descriptors, key registry), TASK-65 (options and timestamps), TASK-68 (document records), TASK-69 (tasks/milestones and `release`), TASK-70 (no legacy metadata carriers).
+- REQ-005.011 — Maintain Record Metadata Through All Commands: TASK-65 (create/update options), TASK-67 (browser save and `updated_date`), TASK-68 and TASK-69 (lazy per-record migration, managed types only, frozen bodies, legacy conversion with per-file diff), TASK-70 (single write path).
+- REQ-006.003 — Describe Managed Artifacts and Their Lifecycles in the Browser: TASK-66 (design and approval), TASK-72 (implementation).
+- REQ-006.004 — Use Front-Matter Metadata in CLI and Browser Views: TASK-66 (design and approval), TASK-67 (one projection, browser save, read-only timestamps).
+- REQ-001.005 — Stable Record IDs and two ID spaces: TASK-64 (translation, reference translation, input rejection), TASK-67 (display ID in every projection).
+- NFR-004.003 — Backlog.md task and milestone interoperability: TASK-64 (identity), TASK-69 (layout and additive keys), TASK-71 (two-direction round-trip gate), TASK-20 (packaged verification).
+- REQ-005.008 — UI mockup metadata stays in HTML: TASK-63 and TASK-68 exclude HTML/mockups; no front matter is written to mockups.
 
 ### Project setup and configuration (2026-11-09)
 
-- REQ-01.001 — Initialize a Papyrus Project: TASK-2 (baseline, done), TASK-75 (interactive walkthrough).
-- REQ-01.005 — Stable Record IDs and two ID spaces: TASK-64 (translation), TASK-67 (display ID in every projection), TASK-74 (id_padding constraint).
-- REQ-01.006 — Interactive Init Walkthrough: TASK-75 (first implementation), TASK-85 (specification), TASK-91 (space-toggle walkthrough, nonconforming presentation), TASK-104 (cursor-driven conformance).
-- REQ-01.007 — ID Padding Constraint for File IDs: TASK-74.
-- REQ-06.005 — Browser Skills Page for Agent Workflow Configuration: TASK-76 (design review), TASK-77 (implementation).
+- REQ-001.001 — Initialize a Papyrus Project: TASK-2 (baseline, done), TASK-75 (interactive walkthrough).
+- REQ-001.005 — Stable Record IDs and two ID spaces: TASK-64 (translation), TASK-67 (display ID in every projection), TASK-74 (id_padding constraint).
+- REQ-001.006 — Interactive Init Walkthrough: TASK-75 (first implementation), TASK-85 (specification), TASK-91 (space-toggle walkthrough, nonconforming presentation), TASK-104 (cursor-driven conformance).
+- REQ-001.007 — ID Padding Constraint for File IDs: TASK-74.
+- REQ-006.005 — Browser Skills Page for Agent Workflow Configuration: TASK-76 (design review), TASK-77 (implementation).
 
 ### Use cases and test documentation (2026-11-10)
 
-- REQ-05.012 — Manage Use Cases: TASK-78 (CLI management), TASK-80 (search), TASK-81 (browser exposure), TASK-79 (design review mockup), TASK-82 (packaging and verification). Should-have; lifecycle active → deprecated; front-matter required (REQ-05.010).
-- REQ-05.013 — Manage Test Cases: TASK-78, TASK-80, TASK-81, TASK-79, TASK-82.
-- REQ-05.014 — Manage Test Reports: TASK-78, TASK-80, TASK-81, TASK-79, TASK-82.
-- Open question: REQ-05.012/013/014 state management via the `req` command, which conflicts with BR-009 (req is business-requirements only). BR-018/019/020 recommend a dedicated per-type command (`use-case`, `test-case`, `test-report`) following the tech-spec pattern (BR-017). Resolution is tracked as AC #5 of TASK-78 and must be decided before implementation.
+- REQ-005.012 — Manage Use Cases: TASK-78 (CLI management), TASK-80 (search), TASK-81 (browser exposure), TASK-79 (design review mockup), TASK-82 (packaging and verification). Should-have; lifecycle active → deprecated; front-matter required (REQ-005.010).
+- REQ-005.013 — Manage Test Cases: TASK-78, TASK-80, TASK-81, TASK-79, TASK-82.
+- REQ-005.014 — Manage Test Reports: TASK-78, TASK-80, TASK-81, TASK-79, TASK-82.
+- Open question: REQ-005.012/013/014 state management via the `req` command, which conflicts with BR-009 (req is business-requirements only). BR-018/019/020 recommend a dedicated per-type command (`use-case`, `test-case`, `test-report`) following the tech-spec pattern (BR-017). Resolution is tracked as AC #5 of TASK-78 and must be decided before implementation.
 
 ## Requirement change update (2026-11-06)
 
-- REQ-05.009 now defines technical specifications as a managed documentation type with the `tech-spec` command (BR-017, README, domain model); REQ-05.007 includes technical specifications in the document lifecycle.
+- REQ-005.009 now defines technical specifications as a managed documentation type with the `tech-spec` command (BR-017, README, domain model); REQ-005.007 includes technical specifications in the document lifecycle.
 - TASK-55 unblocked: `blocked` label removed; documented command contract now exists. No milestone, dependency, or ordering change: TASK-55 remains in m-4 at ordinal 17500 depending on TASK-13.
 - TASK-21 (m-11, Done) remains the domain-model/requirements definition task; TASK-55 does not depend on it to avoid a backward cross-milestone dependency.
 
 ## Requirement change update (2026-11-08)
 
-- New requirements REQ-05.010, REQ-05.011, REQ-06.003, REQ-06.004, and NFR-04.003 are validated; ADR-0007, ADR-0008, and ADR-0009 define the staged delivery.
+- New requirements REQ-005.010, REQ-005.011, REQ-006.003, REQ-006.004, and NFR-004.003 are validated; ADR-0007, ADR-0008, and ADR-0009 define the staged delivery.
 - Placement decision: the work is merged into m-12 rather than added as a post-final milestone. All m-12 tasks were To Do, m-12 is the declared final increment, and front matter changes every record file and both presentation surfaces. A new milestone after m-12 would invalidate TASK-20's packaging and TASK-60's final design review and would require a second packaging pass.
 - Reorder within m-12: TASK-60 (final cross-type design review) moves from ordinal 30000 to 30095 and now depends on TASK-66, so the final review covers the front-matter and lifecycle UI. TASK-18 gains TASK-68; TASK-19 gains TASK-67 and TASK-72; TASK-20 gains TASK-69, TASK-70, TASK-71, and TASK-72. No task was moved across a milestone and no in-progress task was reordered.
 - Release decision: m-14 `Release 1.0` with release ticket TASK-73, depending on TASK-20. Version 1.0 is a planning assumption; rename the milestone and ticket if the user selects another version.
@@ -112,23 +112,23 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ## Requirement change update (2026-11-09)
 
-- New requirements REQ-01.006, REQ-01.007, and REQ-06.005 are validated; REQ-01.001, REQ-01.005, and the REQ-06 group were updated; REQ-07/08/09 were removed (canonicalized).
+- New requirements REQ-001.006, REQ-001.007, and REQ-006.005 are validated; REQ-001.001, REQ-001.005, and the REQ-006 group were updated; REQ-007/08/09 were removed (canonicalized).
 - Placement decision: merge into m-12 rather than a post-final milestone, consistent with the 2026-11-08 front-matter decision. Adding a milestone after m-12 would invalidate TASK-20 packaging and TASK-60 final design review and require a second packaging pass; TASK-20 and TASK-73 already gate the release.
-- REQ-01.007 (TASK-74) and REQ-01.006 (TASK-75) are foundational and scheduled early in m-12 (ordinals 30005, 30006); TASK-75 depends on TASK-74. They do not reopen archived TASK-2 scope beyond the new behavior.
-- REQ-06.005 is a browser surface: TASK-76 (design review, ordinal 30093) precedes TASK-60 so the final design review covers it; TASK-77 (implementation, ordinal 30098.5) depends on TASK-76, TASK-72, and TASK-67; TASK-19 gains TASK-77 and TASK-60 gains TASK-76.
+- REQ-001.007 (TASK-74) and REQ-001.006 (TASK-75) are foundational and scheduled early in m-12 (ordinals 30005, 30006); TASK-75 depends on TASK-74. They do not reopen archived TASK-2 scope beyond the new behavior.
+- REQ-006.005 is a browser surface: TASK-76 (design review, ordinal 30093) precedes TASK-60 so the final design review covers it; TASK-77 (implementation, ordinal 30098.5) depends on TASK-76, TASK-72, and TASK-67; TASK-19 gains TASK-77 and TASK-60 gains TASK-76.
 - Deferred TASK-69 gaps (active relocation, no-drift, interop) remain tracked by TASK-70 and TASK-71 and are not reopened; new tasks do not duplicate them.
 - TASK-67 is refined and in progress on branch task/TASK-67 and is not modified; new tasks depend on it rather than changing it.
 - Release decision: m-14 `Release 1.0` (TASK-73) remains gated on TASK-20, which now includes TASK-74, TASK-75, and TASK-77; no new release ticket is required.
 
 ## Requirement change update (2026-11-10)
 
-- New requirements REQ-05.012, REQ-05.013, and REQ-05.014 are validated (Should have; document types under REQ-05; lifecycle active → deprecated; front-matter required). BR-018, BR-019, and BR-020 define per-type behavior.
+- New requirements REQ-005.012, REQ-005.013, and REQ-005.014 are validated (Should have; document types under REQ-005; lifecycle active → deprecated; front-matter required). BR-018, BR-019, and BR-020 define per-type behavior.
 - Placement decision: unlike the 2026-11-08/09 front-matter and skills work, these are new document types not yet implemented anywhere, so they cannot be merged into the completed m-12. A new milestone m-15 "Use Cases and Test Documentation" is created and placed before Release 1.0. m-14 (TASK-73) now also depends on TASK-82 (m-15 packaging) in addition to TASK-20.
 - The three types share one combined milestone and one task per pattern category (CLI management, search, browser exposure, design review mockup, packaging/verification) because they share the lifecycle and front-matter contract; per-type CLI command naming remains an open question (see above).
 - No in-progress task is reordered; TASK-73 gains a dependency only.
 ## Requirement change update (2026-11-11) — Release 1.0 extension
 
-- Settled inputs: requirements commit 5fd5046 and architecture commit 1d4914c. NFR-04.004 adopted and NFR-04.003 superseded; REQ-01.005 single Papyrus ID space; REQ-05.010 and REQ-05.011 Backlog.md clauses removed; REQ-01.001, REQ-01.002, and REQ-01.003 changed; REQ-01.006 now a single space-toggle TTY walkthrough; REQ-06.003 extended; REQ-06.006 to REQ-06.012 added. ADR-0010 to ADR-0013 accepted; ADR-0007, ADR-0008, and ADR-0009 superseded.
+- Settled inputs: requirements commit 5fd5046 and architecture commit 1d4914c. NFR-004.004 adopted and NFR-004.003 superseded; REQ-001.005 single Papyrus ID space; REQ-005.010 and REQ-005.011 Backlog.md clauses removed; REQ-001.001, REQ-001.002, and REQ-001.003 changed; REQ-001.006 now a single space-toggle TTY walkthrough; REQ-006.003 extended; REQ-006.006 to REQ-006.012 added. ADR-0010 to ADR-0013 accepted; ADR-0007, ADR-0008, and ADR-0009 superseded.
 - Roadmap correction: the earlier roadmap closed Release 1.0 without the native record layout, the one-way import, and the new browser surfaces, so it no longer covered the requirement set. The work is added to the Release 1.0 delivery, not to a separate later release: ADR-0010 decision 11 and ADR-0011 decision 9 require the layout and the import in the same release, and no completed packaging or audit is invalidated.
 - Milestone restructure (user decisions 2026-11-11): the release milestone and the feature work are separated. m-14 Release 1.0 holds only release-level work — the release-level upgrade notes TASK-99 and the release gate TASK-73, both Low priority — and stays open and isolated, because more requirements may still arrive before 1.0. The implementation and specification work lives in the new m-16 Release 1.0 - Native Layout, Import, and Browser Refinements (TASK-83 to TASK-98, all High). The release milestone depends on the feature milestone, never the reverse.
 - Order inside m-16: specifications TASK-83 to TASK-86, design review TASK-87, native layout TASK-88, task and milestone adoption TASK-89, relocation TASK-90 and init/config TASK-91, import TASK-92, browser surfaces TASK-93 to TASK-96, serializer removal TASK-97, verification and packaging TASK-98. TASK-99 follows the feature work at ordinal 39160 and TASK-73 closes the release at ordinal 40000. TASK-73 depends on TASK-99, TASK-98, TASK-91, TASK-20, and TASK-82; TASK-91 is listed explicitly because nothing else depends on it.
@@ -138,25 +138,25 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ### Coverage of the changed and new requirements
 
-- NFR-04.004 — TASK-83 (specification), TASK-88 (no translation, no backlog/config.yml), TASK-89 (no Backlog body conversion), TASK-92 (one-way import), TASK-97 (removal and enforcement), TASK-98 (verification on a sample project), TASK-99 (upgrade notes), TASK-73 (gate and re-audit). Own-store migration deferred: TASK-100, archived.
-- NFR-04.003 — superseded, no work planned; the historical round-trip suites and fixtures are deleted by TASK-89 and TASK-97.
-- REQ-01.005 — TASK-83, TASK-84, TASK-88 (single ID, allocation, resolution), TASK-92 (imported IDs), TASK-93 (browser ID surfaces), TASK-97 (storage-ID JSON removal), TASK-98 (verification).
-- REQ-05.010 — TASK-84, TASK-88 (front-matter id), TASK-89 (task and milestone adoption, key set), TASK-92 (imported record format).
-- REQ-05.011 — TASK-84, TASK-89 (lazy front-matter-only adoption), TASK-97 (single write path).
-- REQ-01.001 — TASK-85 (specification), TASK-91 (non-empty directory, --force replacement).
-- REQ-01.002 — TASK-85, TASK-90 (relocation), TASK-94 (browser delegates to config set).
-- REQ-01.003 — TASK-85, TASK-91 (missing-configuration runtime error).
-- REQ-01.006 — TASK-85, TASK-91 (space-toggle TTY walkthrough), TASK-104 (cursor-driven presentation, navigation, clamping, Enter/EOF confirmation).
-- REQ-06.003 — TASK-86, TASK-87, TASK-95.
-- REQ-06.006 — TASK-86, TASK-93.
-- REQ-06.007 — TASK-86, TASK-96.
-- REQ-06.008 — TASK-86, TASK-87, TASK-94.
-- REQ-06.009 — TASK-86, TASK-93.
-- REQ-06.010 — TASK-86, TASK-93.
-- REQ-06.011 — TASK-86, TASK-93.
-- REQ-06.012 — TASK-86, TASK-87, TASK-93.
-- REQ-06.013 — TASK-101 (specification for the per-milestone kanban board and the card status control), TASK-102 (MOCK-0002 revision and explicit approval), TASK-103 (rendering, release grouping, card order and links, drag-and-drop and non-drag status change, persistence and failure path).
-- Unchanged requirements that run through rewritten code paths stay covered by the existing Done tasks and are re-verified by TASK-98: REQ-02, REQ-03, REQ-04, REQ-05.001 to REQ-05.009, REQ-05.012 to REQ-05.014, REQ-06.001, REQ-06.002, REQ-06.004, REQ-06.005.
+- NFR-004.004 — TASK-83 (specification), TASK-88 (no translation, no backlog/config.yml), TASK-89 (no Backlog body conversion), TASK-92 (one-way import), TASK-97 (removal and enforcement), TASK-98 (verification on a sample project), TASK-99 (upgrade notes), TASK-73 (gate and re-audit). Own-store migration deferred: TASK-100, archived.
+- NFR-004.003 — superseded, no work planned; the historical round-trip suites and fixtures are deleted by TASK-89 and TASK-97.
+- REQ-001.005 — TASK-83, TASK-84, TASK-88 (single ID, allocation, resolution), TASK-92 (imported IDs), TASK-93 (browser ID surfaces), TASK-97 (storage-ID JSON removal), TASK-98 (verification).
+- REQ-005.010 — TASK-84, TASK-88 (front-matter id), TASK-89 (task and milestone adoption, key set), TASK-92 (imported record format).
+- REQ-005.011 — TASK-84, TASK-89 (lazy front-matter-only adoption), TASK-97 (single write path).
+- REQ-001.001 — TASK-85 (specification), TASK-91 (non-empty directory, --force replacement).
+- REQ-001.002 — TASK-85, TASK-90 (relocation), TASK-94 (browser delegates to config set).
+- REQ-001.003 — TASK-85, TASK-91 (missing-configuration runtime error).
+- REQ-001.006 — TASK-85, TASK-91 (space-toggle TTY walkthrough), TASK-104 (cursor-driven presentation, navigation, clamping, Enter/EOF confirmation).
+- REQ-006.003 — TASK-86, TASK-87, TASK-95.
+- REQ-006.006 — TASK-86, TASK-93.
+- REQ-006.007 — TASK-86, TASK-96.
+- REQ-006.008 — TASK-86, TASK-87, TASK-94.
+- REQ-006.009 — TASK-86, TASK-93.
+- REQ-006.010 — TASK-86, TASK-93.
+- REQ-006.011 — TASK-86, TASK-93.
+- REQ-006.012 — TASK-86, TASK-87, TASK-93.
+- REQ-006.013 — TASK-101 (specification for the per-milestone kanban board and the card status control), TASK-102 (MOCK-0002 revision and explicit approval), TASK-103 (rendering, release grouping, card order and links, drag-and-drop and non-drag status change, persistence and failure path).
+- Unchanged requirements that run through rewritten code paths stay covered by the existing Done tasks and are re-verified by TASK-98: REQ-002, REQ-003, REQ-004, REQ-005.001 to REQ-005.009, REQ-005.012 to REQ-005.014, REQ-006.001, REQ-006.002, REQ-006.004, REQ-006.005.
 
 ### Specification revisions
 
@@ -170,31 +170,31 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 - TASK-100 (import this repository own backlog store into the native layout once) — deferred by user decision on 2026-11-11 until after Release 1.0; archived, outside m-14 and m-16, and not a release dependency. Restore it when the migration is scheduled, before this repository starts relying on Papyrus for its own records.
 
-## Requirement change update (2026-11-11) — Backlog kanban board (REQ-06.013)
+## Requirement change update (2026-11-11) — Backlog kanban board (REQ-006.013)
 
-- Changed requirement: REQ-06.013 Present the Backlog as a Per-Milestone Kanban Board (Should have, validated, 12 acceptance criteria), from project-owner feedback; the REQ-06 group description now includes the backlog kanban presentation. Source requirement IDs: REQ-06.013, with REQ-01.002 (configured task statuses), REQ-02.001 and REQ-02.002 (task records and lifecycle), REQ-06.002, NFR-01.002, and NFR-05.001.
+- Changed requirement: REQ-006.013 Present the Backlog as a Per-Milestone Kanban Board (Should have, validated, 12 acceptance criteria), from project-owner feedback; the REQ-006 group description now includes the backlog kanban presentation. Source requirement IDs: REQ-006.013, with REQ-001.002 (configured task statuses), REQ-002.001 and REQ-002.002 (task records and lifecycle), REQ-006.002, NFR-001.002, and NFR-005.001.
 - Placement (user directive): milestone m-16, priority High, no work in m-14. m-16 is the release feature milestone and is still fully To Do, so the change extends the Release 1.0 delivery without reopening completed work and without redefining the release gate.
 - Ordering rule applied: the board is a browser list surface with a write path, so the specification and the approved mockup precede the implementation (no unapproved mockup is implemented), and the implementation follows TASK-97, which deletes the legacy browser write helpers and leaves one shared write path. Building the board earlier would mean writing against the path TASK-97 removes.
 - Tasks: TASK-101 (specification revision, ordinal 39035, depends on TASK-86) -> TASK-102 (MOCK-0002 revision and explicit user approval, ordinal 39045) -> TASK-103 (implementation, ordinal 39145, depends on TASK-97, TASK-101, TASK-102).
 - Release gate: no change to TASK-73's dependency list. TASK-98 gains TASK-103, so the packaged build and the verification cover the board, and TASK-73's existing dependency on TASK-98 covers the new work transitively. TASK-99 is unaffected.
 - Hard constraints encoded: the status change uses the existing browser write contract (ADR-0006 version token, ADR-0013 single writer) and introduces no new module, stack, or non-functional requirement; the specification drift in browser-backlog-records-ui.md section 4 and browser-tasks-milestones-and-releases.md section 3 is fixed before implementation; a materially revised mockup requires explicit user approval before implementation starts.
-- Requirement coverage: REQ-06.013 -> TASK-101, TASK-102, TASK-103; REQ-01.002 (configured statuses drive the columns) -> TASK-101, TASK-103; REQ-02.002 (status change and field preservation) -> TASK-103; REQ-06.002 and NFR-01.002 (served in the local browser) -> TASK-103; NFR-05.001 (named browsers) -> TASK-103 tests.
+- Requirement coverage: REQ-006.013 -> TASK-101, TASK-102, TASK-103; REQ-001.002 (configured statuses drive the columns) -> TASK-101, TASK-103; REQ-002.002 (status change and field preservation) -> TASK-103; REQ-006.002 and NFR-001.002 (served in the local browser) -> TASK-103; NFR-005.001 (named browsers) -> TASK-103 tests.
 
-## Requirement change update (2026-11-13) — REQ-01.006 cursor-driven init walkthrough
+## Requirement change update (2026-11-13) — REQ-001.006 cursor-driven init walkthrough
 
-- Changed requirement: REQ-01.006 Interactive Init Walkthrough at `papyrus init <project_name>` (Should have, validated). The artifact-activation step must be a single cursor-driven list: exactly one highlighted selectable row starting on the first selectable artifact, Up/Down or `k`/`j` navigation, Space toggles the highlighted artifact, Enter confirms and continues, redraw after every keypress, navigation clamped at both ends, task/milestone/release shown as always active and never highlighted or toggled, typed space-separated tokens explicitly rejected, and end of input on the list confirms and continues. No NFR or integration impact; no new flag or environment variable.
-- Classification: conformance gap, not a new requirement. TASK-91 delivered the space-toggle list as a static render plus a one-line token prompt (`src/init.rs`, `build_config_interactive`), so REQ-01.006 was only partly met when TASK-91 was closed Done. TASK-91 is not reopened and not re-scoped; the correction is a separate task so its other delivered behavior (non-empty-directory init, `--force`, missing-config failure) is not disturbed.
+- Changed requirement: REQ-001.006 Interactive Init Walkthrough at `papyrus init <project_name>` (Should have, validated). The artifact-activation step must be a single cursor-driven list: exactly one highlighted selectable row starting on the first selectable artifact, Up/Down or `k`/`j` navigation, Space toggles the highlighted artifact, Enter confirms and continues, redraw after every keypress, navigation clamped at both ends, task/milestone/release shown as always active and never highlighted or toggled, typed space-separated tokens explicitly rejected, and end of input on the list confirms and continues. No NFR or integration impact; no new flag or environment variable.
+- Classification: conformance gap, not a new requirement. TASK-91 delivered the space-toggle list as a static render plus a one-line token prompt (`src/init.rs`, `build_config_interactive`), so REQ-001.006 was only partly met when TASK-91 was closed Done. TASK-91 is not reopened and not re-scoped; the correction is a separate task so its other delivered behavior (non-empty-directory init, `--force`, missing-config failure) is not disturbed.
 - Placement (no new milestone): TASK-104 goes to m-16, the feature milestone that delivered the init work, and reopens that milestone from 14/14 to 14/15 Done. Creating a milestone after m-16 would sit between the feature work and the release gate for a single CLI defect, and m-14 stays release-only per the 2026-11-11 decision.
-- Ordering: ordinal 39085, immediately after TASK-91 (39080) and before TASK-92 (39090), so the init surface is corrected before the import and browser surfaces that were ordered after it. Dependencies: TASK-104 -> TASK-91 only. Priority High, matching every m-16 task; REQ-01.006 criticality (Should have) is not changed and order inside the milestone is expressed by ordinal.
+- Ordering: ordinal 39085, immediately after TASK-91 (39080) and before TASK-92 (39090), so the init surface is corrected before the import and browser surfaces that were ordered after it. Dependencies: TASK-104 -> TASK-91 only. Priority High, matching every m-16 task; REQ-001.006 criticality (Should have) is not changed and order inside the milestone is expressed by ordinal.
 - Verification: TASK-98 (packaging and verification) is already Done and is not re-scoped. TASK-104 carries its own pseudo-TTY test coverage and a real-TTY check, and the release gate TASK-73 must accept TASK-104 before closing. TASK-73 is currently archived in To Do; restoring it and adding the dependency is a status change owned by the user through `orchestrator`, so the dependency is recorded here rather than edited into the archived ticket.
 - Specification drift found while checking coverage: `docs/specifications/interactive-init-walkthrough-for-artifact-activation.md` section 2 states only a space-toggle list without the cursor contract, section 1.2 says prompts are read line-by-line, and section 4.4 keeps `y`/`yes`/`n`/`no` activation prompts. Correlating the specification with the requirement is an acceptance criterion of TASK-104 rather than a separate specification task, because the text changes only describe the one implementation being corrected.
-- Requirement coverage: REQ-01.006 -> TASK-85 (specification), TASK-91 (delivered walkthrough), TASK-104 (cursor-driven conformance). REQ-01.001 and REQ-01.007 remain covered by TASK-91 and are unchanged; BR-016 behavior (only activated types enabled) is unchanged.
+- Requirement coverage: REQ-001.006 -> TASK-85 (specification), TASK-91 (delivered walkthrough), TASK-104 (cursor-driven conformance). REQ-001.001 and REQ-001.007 remain covered by TASK-91 and are unchanged; BR-016 behavior (only activated types enabled) is unchanged.
 - No other roadmap item changes: milestones, priorities, ordinals of existing tasks, and all other requirement coverage are unaffected.
 
 ## Requirement change update (2026-11-13) — artifact categories and config-defined document types
 
-- Changed requirement set (validated, all Pass): REQ-07.001 Artifact categories and status model, REQ-07.002 Configure document types and slugs, REQ-07.003 Dispatch config-defined document commands, REQ-07.004 Generic content model, REQ-06.014 Browser views for config-defined types, and the REQ-01.002 list-valued configuration keys. Architecture: ADR-0016 to ADR-0020 and ADR-0022 to ADR-0024 accepted 2026-11-13. ADR-0021 (man pages) is Proposed and deferred by the owner; no man-page work is planned, and NFR-03.003 is recorded as a release risk.
-- Roadmap entry (owner top priority): **Config-defined document types**, one ordered feature spanning registry/descriptors, command dispatch, configuration validation and repair, the generic document handler, search, browser, init defaults, tests, and documentation. Source requirement IDs: REQ-07.001, REQ-07.002, REQ-07.003, REQ-07.004, REQ-06.014, REQ-01.002. Rationale: the four current partial models (record descriptors, per-type clap enums, browser Category, hard-coded search keys) make a configured type unreachable; one registry-backed model is the only way to satisfy "add a type without code" consistently across every surface.
+- Changed requirement set (validated, all Pass): REQ-007.001 Artifact categories and status model, REQ-007.002 Configure document types and slugs, REQ-007.003 Dispatch config-defined document commands, REQ-007.004 Generic content model, REQ-006.014 Browser views for config-defined types, and the REQ-001.002 list-valued configuration keys. Architecture: ADR-0016 to ADR-0020 and ADR-0022 to ADR-0024 accepted 2026-11-13. ADR-0021 (man pages) is Proposed and deferred by the owner; no man-page work is planned, and NFR-003.003 is recorded as a release risk.
+- Roadmap entry (owner top priority): **Config-defined document types**, one ordered feature spanning registry/descriptors, command dispatch, configuration validation and repair, the generic document handler, search, browser, init defaults, tests, and documentation. Source requirement IDs: REQ-007.001, REQ-007.002, REQ-007.003, REQ-007.004, REQ-006.014, REQ-001.002. Rationale: the four current partial models (record descriptors, per-type clap enums, browser Category, hard-coded search keys) make a configured type unreachable; one registry-backed model is the only way to satisfy "add a type without code" consistently across every surface.
 - Milestone decision: a single feature milestone, **m-17 Config-Defined Document Types and Artifact Categories**. It is not merged into m-14 (release-only) or m-16 (Release 1.0 feature scope, delivered): this is an artifact-model change after Release 1.0, and a second milestone would only split one coherent increment. No release milestone or release ticket is created; the release vehicle is an owner decision (see Open Questions).
 - Task set (13 tasks, all High priority, all To Do): TASK-105 registry and descriptors; TASK-106 ADR-0019 correction; TASK-107 record-layer archive/status refactor; TASK-110 generic document handler; TASK-108 command-tree cutover, built-in table, help, static command and `nfreq` removal; TASK-109 fail-closed configuration validation and repair mode; TASK-111 list-valued configuration keys; TASK-112 init defaults and status seeding; TASK-113 search integration; TASK-114 browser registry-derived views and filters; TASK-115 business-rule updates; TASK-116 upgrade notes and README; TASK-117 cross-surface and packaged verification.
 
@@ -235,19 +235,19 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ### Coverage
 
-- REQ-07.001 — TASK-105 (category and status models), TASK-107 (main status, archive operation, no restore, tolerant read), TASK-110 (status command), TASK-114 (status display and filter), TASK-115 (rules).
-- REQ-07.002 — TASK-105 (document_types model), TASK-109 (slug/prefix/directory/status validation, duplicate keys, whole-map, repair), TASK-111 (list values), TASK-112 (default set without deploy), TASK-108 (slug dispatch and help), TASK-115 (BR-016).
-- REQ-07.003 — TASK-108 (dynamic command family, help, exit 2, static removal), TASK-110 (baseline verbs and extensions), TASK-112 (default entries usable as commands), TASK-115 (BR-001), TASK-117 (CLI verification).
-- REQ-07.004 — TASK-105 (generic descriptor), TASK-110 (generic content model and ID/path rules), TASK-114 (generic browser views), TASK-117 (end-to-end).
-- REQ-06.014 — TASK-114 (list/detail/edit, status filter, visibility), TASK-113 (search visibility), TASK-117 (browser verification).
-- REQ-01.002 — TASK-105 (config fields), TASK-109 (load/repair), TASK-111 (list-valued set/get), TASK-112 (init output).
-- NFR-02.002 and NFR-04.002 — TASK-109 (reject-only validation and containment); NFR-01.003 — TASK-114 offline views; NFR-03.003 — no task, release risk recorded by TASK-116 and TASK-117.
+- REQ-007.001 — TASK-105 (category and status models), TASK-107 (main status, archive operation, no restore, tolerant read), TASK-110 (status command), TASK-114 (status display and filter), TASK-115 (rules).
+- REQ-007.002 — TASK-105 (document_types model), TASK-109 (slug/prefix/directory/status validation, duplicate keys, whole-map, repair), TASK-111 (list values), TASK-112 (default set without deploy), TASK-108 (slug dispatch and help), TASK-115 (BR-016).
+- REQ-007.003 — TASK-108 (dynamic command family, help, exit 2, static removal), TASK-110 (baseline verbs and extensions), TASK-112 (default entries usable as commands), TASK-115 (BR-001), TASK-117 (CLI verification).
+- REQ-007.004 — TASK-105 (generic descriptor), TASK-110 (generic content model and ID/path rules), TASK-114 (generic browser views), TASK-117 (end-to-end).
+- REQ-006.014 — TASK-114 (list/detail/edit, status filter, visibility), TASK-113 (search visibility), TASK-117 (browser verification).
+- REQ-001.002 — TASK-105 (config fields), TASK-109 (load/repair), TASK-111 (list-valued set/get), TASK-112 (init output).
+- NFR-002.002 and NFR-004.002 — TASK-109 (reject-only validation and containment); NFR-001.003 — TASK-114 offline views; NFR-003.003 — no task, release risk recorded by TASK-116 and TASK-117.
 
 ### Risks and sequencing notes
 
 - **Help surface:** changes only in TASK-108, in one commit sequence. Any documentation or test that asserts the old static command list must change there, not earlier.
-- **NFR-03.003:** config-defined slugs have no man page. ADR-0021 is Proposed and deferred, so the release notes must not claim compliance for those slugs; TASK-116 records the gap and TASK-117 verifies the package without asserting such a page.
-- **Upgrade data:** `deprecated/` folders become inert and are not migrated; users must move files and edit metadata by hand. This is accepted by REQ-05.007/ADR-0022 and must be prominent in the upgrade notes.
+- **NFR-003.003:** config-defined slugs have no man page. ADR-0021 is Proposed and deferred, so the release notes must not claim compliance for those slugs; TASK-116 records the gap and TASK-117 verifies the package without asserting such a page.
+- **Upgrade data:** `deprecated/` folders become inert and are not migrated; users must move files and edit metadata by hand. This is accepted by REQ-005.007/ADR-0022 and must be prominent in the upgrade notes.
 - **Configuration break:** whole-map `document_types` removes the implicit default merge, and `deploy` disappears from new and existing effective sets unless declared. The aggregated validator message and `init --force` are the recovery path.
 - **Parallel work:** after TASK-109, TASK-111 and TASK-112 can run in parallel; TASK-113 and TASK-114 can run in parallel; TASK-115 can run alongside TASK-113/TASK-114 once TASK-108/109/110/111/112 are done.
 - **Split candidates during refinement:** TASK-108 (tree + help + removal), TASK-110 (handler + typed delegation), TASK-114 (4.4k-line browser refactor), and TASK-117 (five test surfaces + packaging). TASK-109 can split validation from repair mode if the change set is too large for one review.
@@ -255,14 +255,14 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 ### Open questions
 
 - Release vehicle: whether m-17 ships as Release 1.1 or folds into an open release. No release milestone or ticket is created until the owner decides.
-- ADR-0021: man-page generation and the NFR-03.003 interpretation remain undecided. No man-page task is created; TASK-116 and TASK-117 only record the risk.
+- ADR-0021: man-page generation and the NFR-003.003 interpretation remain undecided. No man-page task is created; TASK-116 and TASK-117 only record the risk.
 - Specification pages that describe static per-type commands and per-category browser pages will be stale after TASK-108 and TASK-114. No specification task was in the requested scope; decide whether to add one before implementation or accept the ADRs and business rules as the contract.
-- REQ-06.014 leaves navigation grouping and display names open; TASK-114 follows ADR-0020's grouped default and slug-derived labels.
+- REQ-006.014 leaves navigation grouping and display names open; TASK-114 follows ADR-0020's grouped default and slug-derived labels.
 
 ## Requirement change update (2026-11-14) - m-17 follow-ups and registry consolidation
 
 - Inputs: the m-17 architecture checkpoint and the TASK-117 verification dispositions. Owner decisions: open a follow-up for G-5; refactor the code rather than amend ADR-0016/ADR-0017 for typed-module dispatch and the descriptor cache; plan the follow-ups and continue. No requirement, business rule, or ADR changed, so this is a planning update, not a requirement change.
-- Roadmap entry: **Registry consolidation and release close**, one feature increment after m-17. Source requirement and rule IDs: BR-007, REQ-03.002, REQ-07.001 (release close); ADR-0016, ADR-0017 (dispatch and registry); REQ-01.002 and BR-016 (configuration surface); NFR-02.002 (input validation); ADR-0022 (archive terminology).
+- Roadmap entry: **Registry consolidation and release close**, one feature increment after m-17. Source requirement and rule IDs: BR-007, REQ-003.002, REQ-007.001 (release close); ADR-0016, ADR-0017 (dispatch and registry); REQ-001.002 and BR-016 (configuration surface); NFR-002.002 (input validation); ADR-0022 (archive terminology).
 - Milestone decision: new **m-18 Registry Consolidation and Release Close**, not an extension of the completed m-17. m-17 is Done and its 13 tasks are not reopened; the work ranges over release, CLI dispatch, the record layer, configuration, and sanitizers, and splitting it would separate the release blocker from the refactor that makes the same surfaces consistent.
 - Release coupling: no release milestone and no release ticket are created. There is no gate to add G-5 to, and the m-17 release vehicle (Release 1.1 or an open release) is still an owner decision. Until that decision, `release-ready` stays no for the m-17 increment and m-18 is the work that clears it.
 
@@ -292,17 +292,17 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ### Coverage
 
-- BR-007, REQ-03.002, REQ-07.001 - TASK-118 (the `close` verb, the fixed `planned -> released` transition, browser text).
+- BR-007, REQ-003.002, REQ-007.001 - TASK-118 (the `close` verb, the fixed `planned -> released` transition, browser text).
 - ADR-0016 - TASK-119 (every document dispatch through `document::run`, descriptor-built commands). ADR-0017 - TASK-119 (descriptor-driven commands), TASK-120 (single registry source for record descriptors), TASK-121 (registry-owned descriptors, no leaked identity).
-- REQ-01.002, BR-016 - TASK-122 (`document_types.<slug>.default_status` inspectable through `config list`, validation and repair unchanged).
-- NFR-02.002 - TASK-123 (C0 and DEL rejected in single-line input).
+- REQ-001.002, BR-016 - TASK-122 (`document_types.<slug>.default_status` inspectable through `config list`, validation and repair unchanged).
+- NFR-002.002 - TASK-123 (C0 and DEL rejected in single-line input).
 - ADR-0022 and the document lifecycle - TASK-124 (archive terminology, no behavior change) plus the init/registry default-set guard.
 
 ### Accepted and deferred items
 
 - G-1 - `config set` cannot bootstrap a document type. Accepted as documented behavior; the direct-edit workaround and the error naming the missing field stand. No task.
 - G-2, G-3 - upgrade-note and README wording findings already recorded by TASK-117. No task; they are documentation corrections outside this increment.
-- NFR-03.003 man-page gap - remains owned by the deferred ADR-0021 decision. No man-page task is created, and no m-18 task may claim compliance for config-defined slugs.
+- NFR-003.003 man-page gap - remains owned by the deferred ADR-0021 decision. No man-page task is created, and no m-18 task may claim compliance for config-defined slugs.
 
 ### Open questions
 
@@ -312,7 +312,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 ## Planning update (2026-11-15) - m-18 architecture checkpoint follow-ups
 
 - Inputs: the m-18 architecture checkpoint and the owner decisions of 2026-11-15: **fix the ui-mockup code**, **amend ADR-0016 rather than refactor built-ins**, and **plan all follow-ups**. TASK-118..TASK-124 are Done. No requirement changed, so this is a planning update, not a requirement change.
-- Roadmap entry: **Architecture checkpoint follow-ups: mockup archive and ADR alignment**, one correction increment after m-18. Source references: ADR-0022 decisions 2 and 8, ADR-0018 decision 3, ADR-0016, ADR-0017, ADR-0023 decision 2, REQ-05.007, REQ-05.008, REQ-07.001, REQ-01.001, NFR-02.002.
+- Roadmap entry: **Architecture checkpoint follow-ups: mockup archive and ADR alignment**, one correction increment after m-18. Source references: ADR-0022 decisions 2 and 8, ADR-0018 decision 3, ADR-0016, ADR-0017, ADR-0023 decision 2, REQ-005.007, REQ-005.008, REQ-007.001, REQ-001.001, NFR-002.002.
 - Milestone decision: new **m-19 Architecture Checkpoint Follow-ups: Mockup Archive and ADR Alignment**. m-18 is Done and is not reopened; the work spans the mockup module, four ADRs, two specification pages, the domain model/glossary, and the sanitizers, so it does not belong in a completed milestone.
 - Release coupling: no release milestone and no release ticket are created. The release vehicle for the m-17/m-18 work is still an owner decision, and these are corrections, not a shippable feature increment.
 
@@ -341,11 +341,11 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ### Coverage
 
-- ADR-0022 decisions 2 and 8, ADR-0018 decision 3, REQ-05.007, REQ-05.008 - TASK-125 (mockup archive, supersede, edit-with-move, delete; HTML metadata and exit codes preserved). TASK-126 records the exception that TASK-125 keeps.
+- ADR-0022 decisions 2 and 8, ADR-0018 decision 3, REQ-005.007, REQ-005.008 - TASK-125 (mockup archive, supersede, edit-with-move, delete; HTML metadata and exit codes preserved). TASK-126 records the exception that TASK-125 keeps.
 - ADR-0016, ADR-0017, ADR-0023 decision 2 - TASK-126 (derive/builder split and constraint 2, verbs across all categories, `ArchivePolicy::None` for releases, regenerated index).
-- REQ-05.007, REQ-07.001, REQ-01.001 - TASK-127 (browser and init specifications, OQ-1 resolved).
-- REQ-05.007, REQ-07.001 - TASK-128 (business object model and glossary lifecycles, empty legacy folder removal).
-- NFR-02.001, NFR-02.002 - TASK-129 (path sanitizer control-character parity).
+- REQ-005.007, REQ-007.001, REQ-001.001 - TASK-127 (browser and init specifications, OQ-1 resolved).
+- REQ-005.007, REQ-007.001 - TASK-128 (business object model and glossary lifecycles, empty legacy folder removal).
+- NFR-002.001, NFR-002.002 - TASK-129 (path sanitizer control-character parity).
 
 ### Accepted and deferred items
 
@@ -356,12 +356,12 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 ### Open questions
 
 - Release vehicle: whether the m-17/m-18/m-19 work ships as Release 1.1 or folds into an open release remains an owner decision. No release ticket exists to record it.
-- ADR-0021 and the NFR-03.003 man-page gap remain deferred; no task in m-19 claims man-page compliance.
+- ADR-0021 and the NFR-003.003 man-page gap remain deferred; no task in m-19 claims man-page compliance.
 
 ## Planning update (2026-11-15) - m-19 architecture checkpoint follow-ups
 
 - Inputs: m-19 is Done. Its architecture checkpoint found residual milestone drift: the ADRs amended by TASK-132 are correct, but the descriptor/record layer and two documents still describe an archived milestone. No new requirement is introduced; this is a correction and planning update.
-- Roadmap entry: **Milestone Lifecycle Drift Follow-ups**, one correction increment after m-19. Source references: ADR-0017 constraint 3, ADR-0023 decision 2, ADR-0022 decision 5, REQ-03.001, REQ-06.013.
+- Roadmap entry: **Milestone Lifecycle Drift Follow-ups**, one correction increment after m-19. Source references: ADR-0017 constraint 3, ADR-0023 decision 2, ADR-0022 decision 5, REQ-003.001, REQ-006.013.
 - Milestone decision: new **m-20 Milestone Lifecycle Drift Follow-ups**. m-19 is Done and is not reopened; the work spans code, a requirement, and a specification page.
 - Release coupling: no release milestone and no release ticket are created. The release vehicle for the m-17/m-18/m-19/m-20 work remains an owner decision.
 
@@ -370,7 +370,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 | Ordinal | Task | Priority | Depends on | Assignee |
 |---|---|---|---|---|
 | 41400 | TASK-134 Align the milestone descriptor and record layer with the close-only milestone lifecycle | High | - | rust-dev |
-| 41410 | TASK-135 Rewrite REQ-06.013 archived-milestone clauses to the close-only milestone lifecycle | Medium | TASK-134 | requirements-engineer |
+| 41410 | TASK-135 Rewrite REQ-006.013 archived-milestone clauses to the close-only milestone lifecycle | Medium | TASK-134 | requirements-engineer |
 | 41420 | TASK-136 Correct the milestone and release specification to the close-only milestone lifecycle | Medium | TASK-134 | business-analyst |
 
 ### Ordering rationale
@@ -387,9 +387,9 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ### Coverage
 
-- ADR-0017 constraint 3, ADR-0023 decision 2, ADR-0022 decision 5, REQ-03.001 - TASK-134 (descriptor `ArchivePolicy::None`, no lifecycle archive location, legacy read/import preservation, relocation guard, regression test).
-- REQ-06.013 - TASK-135 (browser board wording and business requirement index); REQ-03.001 is added to its traceability.
-- REQ-03.001, REQ-03.002 - TASK-136 (milestone and release specification correction).
+- ADR-0017 constraint 3, ADR-0023 decision 2, ADR-0022 decision 5, REQ-003.001 - TASK-134 (descriptor `ArchivePolicy::None`, no lifecycle archive location, legacy read/import preservation, relocation guard, regression test).
+- REQ-006.013 - TASK-135 (browser board wording and business requirement index); REQ-003.001 is added to its traceability.
+- REQ-003.001, REQ-003.002 - TASK-136 (milestone and release specification correction).
 
 ### Accepted and deferred items
 
@@ -403,22 +403,22 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 
 ## Requirement change update (2026-11-15) - diagnostics, browser shell, and offline rendering
 
-- Inputs: the validated requirement set for **REQ-01.008** (`papyrus check`), **REQ-06.015** (content width and collapsible navigation), **REQ-06.016** (uniform list layout), and **REQ-06.017** (offline math and Mermaid diagrams), plus the 2026-11-15 edits to REQ-01.002, REQ-01.004, REQ-02.003, REQ-05.007, REQ-06.013, REQ-06.014, and REQ-07.002. Architecture gate: ADR-0025 (KaTeX), ADR-0027 (vendored assets), ADR-0028 (browser shell, list, width, nav), and ADR-0029 (`check`) are Accepted; ADR-0026 (Mermaid) is **Proposed** and PlantUML is excluded.
-- Roadmap entry: **Diagnostics, Browser Shell, and Offline Rendering**, one feature increment after m-20. Source requirement IDs: REQ-01.002, REQ-01.004, REQ-01.008, REQ-02.003, REQ-05.007, REQ-06.013, REQ-06.014, REQ-06.015, REQ-06.016, REQ-06.017, REQ-07.002; NFR-01.002, NFR-01.003, NFR-02.002, NFR-03.001, NFR-05.001, NFR-06.002.
+- Inputs: the validated requirement set for **REQ-001.008** (`papyrus check`), **REQ-006.015** (content width and collapsible navigation), **REQ-006.016** (uniform list layout), and **REQ-006.017** (offline math and Mermaid diagrams), plus the 2026-11-15 edits to REQ-001.002, REQ-001.004, REQ-002.003, REQ-005.007, REQ-006.013, REQ-006.014, and REQ-007.002. Architecture gate: ADR-0025 (KaTeX), ADR-0027 (vendored assets), ADR-0028 (browser shell, list, width, nav), and ADR-0029 (`check`) are Accepted; ADR-0026 (Mermaid) is **Proposed** and PlantUML is excluded.
+- Roadmap entry: **Diagnostics, Browser Shell, and Offline Rendering**, one feature increment after m-20. Source requirement IDs: REQ-001.002, REQ-001.004, REQ-001.008, REQ-002.003, REQ-005.007, REQ-006.013, REQ-006.014, REQ-006.015, REQ-006.016, REQ-006.017, REQ-007.002; NFR-001.002, NFR-001.003, NFR-002.002, NFR-003.001, NFR-005.001, NFR-006.002.
 - Milestone decision: new **m-21 Diagnostics, Browser Shell, and Offline Rendering**. m-20 is Done and is not reopened; the work adds a CLI command, a browser shell refactor, vendored assets, two offline renderers, and a package contract, so it cannot be attached to a completed correction milestone.
 - Release coupling: no release milestone and no release ticket are created. The release vehicle for m-17 to m-21 remains an owner decision, and this increment changes package contents, notices, and the binary-size budget, so the eventual release gate must depend on TASK-149 and TASK-150.
 
 ### Requirement impact
 
-- REQ-01.008 (new) - **covered**: TASK-137 scanners, tolerant self-load, `CommandOutput.exit_code`, exit 4, `--json`; TASK-138 `--fix`; TASK-139 reserved slug and help; TASK-140 README and business rules; TASK-150 end-to-end.
-- REQ-06.015 (new) - **covered**: TASK-141 server-side `PageWidth`; TASK-144 nav collapse, persistence, `.app--full`, `.bleed`; TASK-149 and TASK-150 verification.
-- REQ-06.016 (new) - **covered**: TASK-141 shared list layout and characterization fixtures; TASK-142 migration of every family, deletion of the second list path, marker test; TASK-148 specification.
-- REQ-06.017 (new) - **covered**: TASK-143 asset pipeline; TASK-145 KaTeX; TASK-146 Mermaid (blocked on ADR-0026); TASK-148 specification; TASK-150 verification.
-- REQ-06.013 (edited) - **covered**: TASK-147 adds the per-milestone `Clean up all` action, which the board does not implement today; TASK-144 makes the board uncapped. The existing board, release separators, and status control are unchanged.
-- REQ-01.002, REQ-01.004, REQ-07.002 (edited) - **covered**: TASK-137 adds `check` to the tolerant repair surfaces and exit 4 as a findings outcome; TASK-139 reserves the `check` slug; TASK-140 documents both.
-- REQ-05.007 (edited) - **covered**: TASK-137 never reads or inventories a `deprecated/` folder and reports no finding for it.
-- REQ-06.014 (edited) - **covered**: TASK-142 gives every configured document type the shared list layout, including the status filter and archived exclusion.
-- REQ-02.003 (edited) - **no change needed**: `papyrus task list` has no interactive mode and no `--plain` flag today, so the removal is already the delivered state; dependency readiness semantics are unchanged by this set.
+- REQ-001.008 (new) - **covered**: TASK-137 scanners, tolerant self-load, `CommandOutput.exit_code`, exit 4, `--json`; TASK-138 `--fix`; TASK-139 reserved slug and help; TASK-140 README and business rules; TASK-150 end-to-end.
+- REQ-006.015 (new) - **covered**: TASK-141 server-side `PageWidth`; TASK-144 nav collapse, persistence, `.app--full`, `.bleed`; TASK-149 and TASK-150 verification.
+- REQ-006.016 (new) - **covered**: TASK-141 shared list layout and characterization fixtures; TASK-142 migration of every family, deletion of the second list path, marker test; TASK-148 specification.
+- REQ-006.017 (new) - **covered**: TASK-143 asset pipeline; TASK-145 KaTeX; TASK-146 Mermaid (blocked on ADR-0026); TASK-148 specification; TASK-150 verification.
+- REQ-006.013 (edited) - **covered**: TASK-147 adds the per-milestone `Clean up all` action, which the board does not implement today; TASK-144 makes the board uncapped. The existing board, release separators, and status control are unchanged.
+- REQ-001.002, REQ-001.004, REQ-007.002 (edited) - **covered**: TASK-137 adds `check` to the tolerant repair surfaces and exit 4 as a findings outcome; TASK-139 reserves the `check` slug; TASK-140 documents both.
+- REQ-005.007 (edited) - **covered**: TASK-137 never reads or inventories a `deprecated/` folder and reports no finding for it.
+- REQ-006.014 (edited) - **covered**: TASK-142 gives every configured document type the shared list layout, including the status filter and archived exclusion.
+- REQ-002.003 (edited) - **no change needed**: `papyrus task list` has no interactive mode and no `--plain` flag today, so the removal is already the delivered state; dependency readiness semantics are unchanged by this set.
 - Partial or obsolete items: none.
 
 ### Task order
@@ -479,7 +479,7 @@ All REQ/NFR IDs remain traced via task references. TASK-17 marked obsolete; scop
 - ADR-0027 decisions 1 to 10 - TASK-143 (asset table, digests, notices), TASK-146 (Mermaid entry), TASK-149 (package, budget, offline reference tests).
 - ADR-0028 decisions 1 to 8 - TASK-141 (shell, list, `PageWidth`), TASK-142 (migration), TASK-144 (nav, CSS, accessibility), TASK-148 (specification).
 - ADR-0029 decisions 1 to 11 - TASK-137 (tolerant load, scanners, exit code, `--json`, read-only primitive), TASK-138 (repair, refusals, prompt, concurrency), TASK-139 (reserved name, help), TASK-140 (documentation).
-- REQ-01.008, REQ-06.015, REQ-06.016, REQ-06.017 - mapped task by task in the requirement impact section above; no unexplained gap.
+- REQ-001.008, REQ-006.015, REQ-006.016, REQ-006.017 - mapped task by task in the requirement impact section above; no unexplained gap.
 
 ### Accepted, deferred, and out-of-scope items
 

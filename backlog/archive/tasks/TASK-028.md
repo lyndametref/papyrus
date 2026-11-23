@@ -16,14 +16,13 @@ references:
   - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
   - docs/specifications/browser-requirements.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - TASK-6
   - TASK-7
-  - docs/requirements/non-functional/NFR-02.002.md
+  - docs/requirements/non-functional/NFR-002.002.md
   - docs/architecture/adr/ADR-0001-implementation-language-rust.md
   - docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md
-  - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
   - src/browser/records.rs
   - src/browser/mod.rs
@@ -41,7 +40,7 @@ Scope of this review: verify the ADR against the code actually delivered in m-1 
 
 Review must check, at minimum:
 - Decision vs. delivered code: version token composition, 400/409 handling, `create_new` temporary file with numeric suffix retry, `sync_all`, permission copy, rename, best-effort directory sync, failure-path cleanup, save-then-reread, exact ID matching, `Context::ensure_within` on every path, unknown-section preservation, section order, and trailing-newline rule.
-- Context accuracy: the claim that the CLI and browser can write the same files, and the constraints attributed to NFR-04.001 and NFR-04.002.
+- Context accuracy: the claim that the CLI and browser can write the same files, and the constraints attributed to NFR-004.001 and NFR-004.002.
 - Consequences and residual risks: the documented check-then-rename race is stated honestly; any residual risk not recorded (for example per-record config re-reads on write, duplicate record parsing between read and write paths, temporary-file leftovers after crash).
 - Checkpoint follow-ups the review must either fold into the ADR or explicitly defer: per-record config re-reads, duplicate record parsing, test temp-directory hygiene for write tests, and the manpage/CLI write-path claims that overlap record writes.
 
@@ -69,9 +68,9 @@ Acceptance of the ADR content is an explicit user decision: the ticket may only 
 ## Implementation Notes
 1. Read ADR-0006 end to end; record its Status (Proposed), Date, Context claims, Decision bullets, Consequences, Risks/mitigations, Alternatives, and References.
 2. Read the delivered m-1 implementation and tests: src/browser/records.rs (version_token, valid_version_token, apply_edit, write_atomic), src/browser/mod.rs (form_post, api_post, resolve_record), src/context.rs (ensure_within); tests/browser_cli.rs (edit round-trip, stale version, atomic write, permissions, symlink escape).
-3. Read the cited specifications, requirements, business rules, and ADRs: docs/specifications/browser-requirements.md sections 5, 7 (esp. 7.10-7.12), 9; docs/requirements/non-functional/NFR-04.001.md, NFR-04.002.md, NFR-02.002.md; docs/architecture/adr/ADR-0001, ADR-0004, ADR-0005.
+3. Read the cited specifications, requirements, business rules, and ADRs: docs/specifications/browser-requirements.md sections 5, 7 (esp. 7.10-7.12), 9; docs/requirements/non-functional/NFR-004.001.md, NFR-004.002.md, NFR-002.002.md; docs/architecture/adr/ADR-0001, ADR-0004, ADR-0005.
 4. Verify Decision vs delivered code point by point: version token composition "<mtime-seconds>.<mtime-nanos>.<length>"; 400 on missing/malformed token; 409 on mismatch with no write; matching token proceeds; create_new temporary file with numeric suffix retry; sync_all; permission copy; rename; best-effort directory sync; failure-path cleanup; save-then-reread (303 redirect re-reads from disk; JSON re-reads and returns updated record); exact, case-sensitive ID resolution against active directory listing; Context::ensure_within on every read/write path (record directory, record file, temporary file); unknown-section preservation content-identically; original section order; first heading "# <ID> <title>"; single trailing LF.
-5. Verify Context accuracy: the claim that the CLI and browser can write the same files (compare CLI write path in src/requirement.rs with browser write path); constraints attributed to NFR-04.001 (text-file persistence) and NFR-04.002 (project-directory boundary).
+5. Verify Context accuracy: the claim that the CLI and browser can write the same files (compare CLI write path in src/requirement.rs with browser write path); constraints attributed to NFR-004.001 (text-file persistence) and NFR-004.002 (project-directory boundary).
 6. Verify Consequences and residual risks against reality; list any risk not recorded (per-record config re-reads on write; duplicate record parsing between read and write paths; temporary-file leftovers after crash; CLI write-path non-atomicity and possible data loss relative to browser edits).
 7. Verify module references and boundaries: src/browser/records.rs, src/browser/mod.rs, src/context.rs; tests/browser_cli.rs.
 8. Review each checkpoint follow-up and decide fold into ADR or explicitly defer: per-record config re-reads; duplicate record parsing; test temp-directory hygiene for write tests; manpage/CLI write-path claims overlapping record writes.
@@ -110,9 +109,9 @@ AMEND (amendments applied). Core decision (optimistic concurrency via metadata v
 17. First heading "# <ID> <title>" - apply_edit lines.push(format!("# {} {}", id, title)); tests t14 - match
 18. Single trailing LF - apply_edit pops trailing empties, joins "\n", push '\n'; tests parse_and_preserve_unknown_sections - match
 19. Context accuracy: CLI and browser write same files - Both target same active dirs; CLI uses fs::write (non-atomic); location claim holds, preservation/atomicity differ (amended) - partial (amended)
-20. NFR-04.001 text-file persistence - Writes .md UTF-8 text files only - match
-21. NFR-04.002 project boundary - ensure_within on all paths; symlink escape -> 404; tests t19 - match
-22. NFR-02.002 input sanitization - valid_id, validate_title, validate_multiline, percent-decode, ensure_within - match
+20. NFR-004.001 text-file persistence - Writes .md UTF-8 text files only - match
+21. NFR-004.002 project boundary - ensure_within on all paths; symlink escape -> 404; tests t19 - match
+22. NFR-002.002 input sanitization - valid_id, validate_title, validate_multiline, percent-decode, ensure_within - match
 23. Check-then-rename race stated honestly - ADR decision + consequences + spec 7.12.12 state it - match
 
 ## Discrepancies

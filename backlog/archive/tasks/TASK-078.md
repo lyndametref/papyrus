@@ -20,15 +20,14 @@ references:
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/requirements/non-functional/NFR-04.004.md
-  - docs/requirements/business/REQ-01.005.md
+  - docs/requirements/non-functional/NFR-004.004.md
+  - docs/requirements/business/REQ-001.005.md
   - docs/specifications/migrate-tasks-and-milestones-to-the-backlog-md-layout.md
-  - >-
     docs/specifications/translate-papyrus-and-backlog-md-ids-at-the-storage-boundary.md
   - docs/specifications/verify-backlog-md-round-trip-interoperability.md
   - docs/specifications/papyrus-native-record-layout-and-single-id-space.md
   - docs/specifications/import-backlog-md-records.md
-  - docs/requirements/business/REQ-01.002.md
+  - docs/requirements/business/REQ-001.002.md
 priority: high
 type: docs
 ordinal: 39000
@@ -40,7 +39,7 @@ ADR-0010, ADR-0011, ADR-0012, and ADR-0013 (accepted 2026-11-11) replace the Bac
 
 Deliverables:
 1. Record the three legacy specifications (migrate-tasks-and-milestones-to-the-backlog-md-layout.md, translate-papyrus-and-backlog-md-ids-at-the-storage-boundary.md, verify-backlog-md-round-trip-interoperability.md) as superseded, naming the superseding ADRs, with no live behaviour contract remaining.
-2. Author docs/specifications/papyrus-native-record-layout-and-single-id-space.md defining the Papyrus-native record layout and single ID space: configuration-driven directories per record family, <ID>.md filenames (decisions <ID>-<slug>.md), tolerant read stems, front-matter id authoritative, allocation without offsets with milestones starting at 1, archive and deprecate as moves, and the intentional invisibility of Backlog.md stems. Traceable to ADR-0010, REQ-01.005, and REQ-01.002.
+2. Author docs/specifications/papyrus-native-record-layout-and-single-id-space.md defining the Papyrus-native record layout and single ID space: configuration-driven directories per record family, <ID>.md filenames (decisions <ID>-<slug>.md), tolerant read stems, front-matter id authoritative, allocation without offsets with milestones starting at 1, archive and deprecate as moves, and the intentional invisibility of Backlog.md stems. Traceable to ADR-0010, REQ-001.005, and REQ-001.002.
 3. Author docs/specifications/import-backlog-md-records.md defining papyrus import backlog: invocation and options, source scope and exclusions, planned ID allocation, field and body mapping, status normalization, collision and duplicate handling, the one-way non-idempotent caveat, exit codes, and containment. Agrees with ADR-0011.
 4. Update README command documentation to carry the import command with its options, the one-way caveat, and the excluded-scope statement, and to remove any claim of Backlog.md file compatibility.
 5. Ensure no specification states a Backlog.md storage ID, an m-0 offset, dual ID spaces, or a Backlog.md round-trip or file-compatibility gate as current behaviour.
@@ -49,7 +48,7 @@ The upgrade-notes contract is defined in the import specification section 11: af
 
 ## Acceptance Criteria
 - [x] The specifications migrate-tasks-and-milestones-to-the-backlog-md-layout.md, translate-papyrus-and-backlog-md-ids-at-the-storage-boundary.md, and verify-backlog-md-round-trip-interoperability.md are recorded as superseded, name the superseding ADR, and no longer state a live behaviour contract.
-- [x] A specification defines the Papyrus-native record layout and single ID space: configuration-driven directories per record family, <ID>.md filenames (decisions <ID>-<slug>.md), tolerant read stems, front-matter id as authoritative, allocation without offsets with milestones starting at 1, archive and deprecate as moves, and the intentional invisibility of Backlog.md stems. It is traceable to ADR-0010, REQ-01.005, and REQ-01.002.
+- [x] A specification defines the Papyrus-native record layout and single ID space: configuration-driven directories per record family, <ID>.md filenames (decisions <ID>-<slug>.md), tolerant read stems, front-matter id as authoritative, allocation without offsets with milestones starting at 1, archive and deprecate as moves, and the intentional invisibility of Backlog.md stems. It is traceable to ADR-0010, REQ-001.005, and REQ-001.002.
 - [ ] A specification defines papyrus import backlog: invocation and options, source scope and exclusions, planned ID allocation, field and body mapping, status normalization, collision and duplicate handling, the one-way non-idempotent caveat, exit codes, and containment. It agrees with ADR-0011.
 - [x] The README command documentation carries the import command with its options, the one-way caveat, and the excluded-scope statement, and no longer claims Backlog.md file compatibility.
 - [ ] No specification states a Backlog.md storage ID, an m-0 offset, dual ID spaces, or a Backlog.md round-trip or file-compatibility gate as current behaviour.

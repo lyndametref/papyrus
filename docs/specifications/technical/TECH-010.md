@@ -12,18 +12,18 @@ references:
   - ADR-0012
   - ADR-0013
   - BR-005
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-01.005
-  - REQ-02
-  - REQ-02.001
-  - REQ-02.002
-  - REQ-02.003
-  - REQ-02.004
-  - REQ-05.010
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-001.005
+  - REQ-002
+  - REQ-002.001
+  - REQ-002.002
+  - REQ-002.003
+  - REQ-002.004
+  - REQ-005.010
   - TASK-001
   - TASK-10
   - TASK-11
@@ -40,26 +40,26 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the `task` commands so a project contributor can create, inspect, update, list, filter, sort, archive, restore, and delete tasks, with stable IDs, configurable workflow status, and text-file persistence inside the project directory. This ticket implements REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, and REQ-02.004, together with the documented command contract in BR-005. It provides the task records that later tickets search (TASK-10) and expose in the browser (TASK-11).
+Deliver the `task` commands so a project contributor can create, inspect, update, list, filter, sort, archive, restore, and delete tasks, with stable IDs, configurable workflow status, and text-file persistence inside the project directory. This ticket implements REQ-002, REQ-002.001, REQ-002.002, REQ-002.003, and REQ-002.004, together with the documented command contract in BR-005. It provides the task records that later tickets search (TASK-10) and expose in the browser (TASK-11).
 
 ## Scope
 
 ### In scope
 
-- `papyrus task create <title> [options]` (BR-005, REQ-02.001).
-- `papyrus task list [options]`, including all documented filters, `--limit`, `--sort`, and `--watch` (BR-005, REQ-02.003).
-- `papyrus task view <id>` and the equivalent `papyrus task <id>` (BR-005, REQ-02.002).
-- `papyrus task edit <id> [options]` (BR-005, REQ-02.002).
-- `papyrus task archive <id>`, `restore <id>`, and `delete <id> [--force]` (BR-005, REQ-02.004).
-- Task identity: stable IDs of the form `<task_prefix>-<number>` (default `TASK-001`) using configured `task_prefix` and `id_padding` (REQ-02.001, BR-005).
-- Task workflow status drawn from configured `statuses`, with new tasks using configured `default_status` (default `ToDo`) (REQ-02.001, BR-005, REQ-01.005).
-- Task-to-milestone assignment: zero or one milestone per task (REQ-02, REQ-02.001, BR-005).
-- Task dependencies: zero or more task IDs (REQ-02, REQ-02.001, BR-005).
-- Task fields: title, description, repeatable acceptance criteria, labels, assignee, comments (REQ-02.001, REQ-02.002, BR-005).
-- Release filtering that collects tasks whose milestone belongs to the requested release (REQ-02.003, BR-005).
-- Persistence as UTF-8 text only inside the project directory (NFR-04.001, NFR-04.002).
-- Input sanitization by normalization/escaping before use (NFR-02.002).
-- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-01.004).
+- `papyrus task create <title> [options]` (BR-005, REQ-002.001).
+- `papyrus task list [options]`, including all documented filters, `--limit`, `--sort`, and `--watch` (BR-005, REQ-002.003).
+- `papyrus task view <id>` and the equivalent `papyrus task <id>` (BR-005, REQ-002.002).
+- `papyrus task edit <id> [options]` (BR-005, REQ-002.002).
+- `papyrus task archive <id>`, `restore <id>`, and `delete <id> [--force]` (BR-005, REQ-002.004).
+- Task identity: stable IDs of the form `<task_prefix>-<number>` (default `TASK-001`) using configured `task_prefix` and `id_padding` (REQ-002.001, BR-005).
+- Task workflow status drawn from configured `statuses`, with new tasks using configured `default_status` (default `ToDo`) (REQ-002.001, BR-005, REQ-001.005).
+- Task-to-milestone assignment: zero or one milestone per task (REQ-002, REQ-002.001, BR-005).
+- Task dependencies: zero or more task IDs (REQ-002, REQ-002.001, BR-005).
+- Task fields: title, description, repeatable acceptance criteria, labels, assignee, comments (REQ-002.001, REQ-002.002, BR-005).
+- Release filtering that collects tasks whose milestone belongs to the requested release (REQ-002.003, BR-005).
+- Persistence as UTF-8 text only inside the project directory (NFR-004.001, NFR-004.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
+- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-001.004).
 
 ### Out of scope
 
@@ -74,8 +74,8 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 
 ### 1. Project and configuration context
 
-1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
-2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
+1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-001.003, NFR-004.002).
+2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-004.002).
 3. The effective configuration supplies `task_prefix` (default `TASK`), `id_padding` (default 3), `backlog_directory` (default `backlog/`), `statuses` (default `ToDo, Initiated, Refined, Implemented, Validated, Done`), and `default_status` (default `ToDo`).
 4. Task records are stored under the configured backlog directory: active tasks in `<backlog_directory>/tasks/`, archived tasks in `<backlog_directory>/archive/tasks/` (Papyrus-native layout, ADR-0010), and legacy archives under `<backlog_directory>/tasks/archived/` are read as archived. These directories are created as needed; `init` already creates the active task directory.
 
@@ -174,16 +174,16 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 
 ### 10. Persistence and sanitization
 
-1. Tasks are stored as UTF-8 Markdown text files named `<ID>.md` in their respective folders (NFR-04.001).
-2. File content begins with a YAML front-matter block (REQ-05.010, ADR-0012): the general keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references` in canonical order, followed by the task keys `status`, `assignee` (YAML list), `milestone`, `dependencies`, `ordinal`, `documentation`, `type`. Tasks have no `# <ID> <title>` heading. The body contains only content sections: `## Description` (when provided), `## Acceptance Criteria` (when any, one per line as `- [ ] <criteria>`), and `## Comments` (when any, one entry per comment as `- **<author>**: <text>`). Metadata is never mirrored into sections. A write to a legacy record moves its values to front matter and retires the title heading and the `## Status`, `## Assignee`, `## Milestone`, `## Labels`, and `## Dependencies` sections (ADR-0012 decisions 4 and 5). Read adoption adds the block only and leaves the legacy body byte-identical (ADR-0012 decision 9).
-3. All user-controlled input (title, description, status, milestone ID, dependency IDs, labels, assignee, acceptance criteria, comments, comment author) is sanitized by normalization/escaping before use (NFR-02.002).
-4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
-5. No reads or writes occur outside the canonicalized project directory (NFR-04.002).
-6. No binary data is written (NFR-04.001).
+1. Tasks are stored as UTF-8 Markdown text files named `<ID>.md` in their respective folders (NFR-004.001).
+2. File content begins with a YAML front-matter block (REQ-005.010, ADR-0012): the general keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references` in canonical order, followed by the task keys `status`, `assignee` (YAML list), `milestone`, `dependencies`, `ordinal`, `documentation`, `type`. Tasks have no `# <ID> <title>` heading. The body contains only content sections: `## Description` (when provided), `## Acceptance Criteria` (when any, one per line as `- [ ] <criteria>`), and `## Comments` (when any, one entry per comment as `- **<author>**: <text>`). Metadata is never mirrored into sections. A write to a legacy record moves its values to front matter and retires the title heading and the `## Status`, `## Assignee`, `## Milestone`, `## Labels`, and `## Dependencies` sections (ADR-0012 decisions 4 and 5). Read adoption adds the block only and leaves the legacy body byte-identical (ADR-0012 decision 9).
+3. All user-controlled input (title, description, status, milestone ID, dependency IDs, labels, assignee, acceptance criteria, comments, comment author) is sanitized by normalization/escaping before use (NFR-002.002).
+4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-002.002).
+5. No reads or writes occur outside the canonicalized project directory (NFR-004.002).
+6. No binary data is written (NFR-004.001).
 
 ### 11. Common CLI controls and outcomes
 
-1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-01.004).
+1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-001.004).
 2. Missing or invalid usage (including missing required title, mutually exclusive flags, invalid `--limit`) exits 2 when it is a usage error, or 4 when it is a validation error, following clap's classification.
 3. Unknown record, milestone, or dependency ID exits 3.
 4. Validation/conflict (unnormalizable input, mutually exclusive flags, already-archived task, unknown status, self-dependency) exits 4.
@@ -233,8 +233,8 @@ Deliver the `task` commands so a project contributor can create, inspect, update
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-02, REQ-02.001, REQ-02.002, REQ-02.003, REQ-02.004 |
-| Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
+| Requirement | REQ-002, REQ-002.001, REQ-002.002, REQ-002.003, REQ-002.004 |
+| Non-functional | NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-005 (task command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0012 (YAML front matter), ADR-0013 (shared record envelope) |
 | Ticket | TASK-9 |

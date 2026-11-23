@@ -237,7 +237,7 @@ fn board_is_full_width_and_every_other_route_is_capped() {
     }
 
     // The board is a route, not a record type: task detail and edit share the
-    // `task` slug and must stay capped (REQ-06.015, AC6).
+    // `task` slug and must stay capped (REQ-006.015, AC6).
     for path in ["/doc/TASK-001", "/doc/TASK-001/edit"] {
         let html = server.get(path);
         assert!(

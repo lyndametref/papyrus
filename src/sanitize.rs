@@ -203,7 +203,7 @@ pub fn sanitize_name(input: &str) -> Option<String> {
 pub fn sanitize_path_component(input: &str) -> Option<String> {
     // Evaluate the control-character predicate on the raw component before the
     // trim below: failing input must be rejected, not silently shortened
-    // (NFR-02.002). This also subsumes the former explicit NUL check.
+    // (NFR-002.002). This also subsumes the former explicit NUL check.
     if has_control_character(input) {
         return None;
     }

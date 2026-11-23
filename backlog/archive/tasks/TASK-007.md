@@ -13,11 +13,11 @@ milestone: MS-002
 dependencies:
   - TASK-006
 references:
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/specifications/search-browser-milestone-packaging-and-verification.md
@@ -32,7 +32,7 @@ ordinal: 7000
 ## Description
 Package and verify the search/browser requirements milestone (m-1): rebuild the amd64 .deb from the post-TASK-6 source, verify its metadata, licensing, and contents, install and uninstall it in an isolated Debian Forky environment, and smoke-test the installed binary to prove that both `search` and the offline local browser work over requirement content. Add one milestone-level integration test and update docs/packaging.md with the Forky-only supported release, procedures, checklist, and observed results. No new product behavior is added.
 
-Supported release: Debian Forky only (amd64), per ADR-0003 and NFR-03.002. Debian Trixie and any other release are not claimed or verified.
+Supported release: Debian Forky only (amd64), per ADR-0003 and NFR-003.002. Debian Trixie and any other release are not claimed or verified.
 
 Scope (in):
 - Rebuild target/release/papyrus and papyrus_<version>_amd64.deb via scripts/build-deb.sh (unchanged) with pinned Rust 1.99.1; cargo build --release must run first because the script reuses an existing binary.
@@ -47,7 +47,7 @@ Scope (in):
 Scope (out):
 - No new product features, commands, options, record types, or UI changes (TASK-8 onward).
 - No verification or support claim for Debian Trixie or any release other than Forky.
-- No real-GUI browser rendering checks (markup/asset-level only; NFR-05.001 remains covered by TASK-6 and MOCK-0001).
+- No real-GUI browser rendering checks (markup/asset-level only; NFR-005.001 remains covered by TASK-6 and MOCK-0001).
 - No re-run of the runtime dependency-license audit (no new runtime dependencies).
 - No changes to requirements, business rules, ADRs, or packaging scripts; product code changes only as a minimal bug fix if verification exposes a defect, reported in the notes.
 - No new UI mockups.
@@ -72,7 +72,7 @@ Open questions (non-blocking, each with a default in the specification):
 Specification: docs/specifications/search-browser-milestone-packaging-and-verification.md
 
 ## Acceptance Criteria
-- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides both search over requirement content and the local browser over requirement content; Debian Trixie and any other release are not claimed or verified.
+- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides both search over requirement content and the local browser over requirement content; Debian Trixie and any other release are not claimed or verified.
 - [x] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists both search and browser (guards against packaging a stale binary).
 - [x] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [x] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.
@@ -132,8 +132,8 @@ Current package baseline (stale): Package papyrus, Version 0.1.0, Architecture a
 Test baseline: cargo test PASS - 131 tests (33 unit + 41 browser_cli + 20 cli + 5 milestone_smoke + 11 req_cli + 21 search_cli).
 
 Refinement decisions:
-- Supported release corrected to Debian Forky only (amd64) in AC #1; Trixie is not claimed or verified (ADR-0003, NFR-03.002, which is already amended to Forky only).
-- AC #3 (original) rewritten as AC #12: browser verification is markup/asset-level (real-GUI rendering is out of scope; NFR-05.001 stays covered by TASK-6 and MOCK-0001).
+- Supported release corrected to Debian Forky only (amd64) in AC #1; Trixie is not claimed or verified (ADR-0003, NFR-003.002, which is already amended to Forky only).
+- AC #3 (original) rewritten as AC #12: browser verification is markup/asset-level (real-GUI rendering is out of scope; NFR-005.001 stays covered by TASK-6 and MOCK-0001).
 - New milestone test: tests/search_browser_smoke.rs (2 tests), not an extension of tests/milestone_smoke.rs.
 - No UI mockup needed; MOCK-0001 unchanged.
 
@@ -175,5 +175,5 @@ AC coverage: #1 (Forky-only install, search + browser), #2 (release build + `--h
 Deviations / notes:
 - `scripts/build-deb.sh` intentionally left unchanged (AC #4 and DoD #7 require packaging scripts unchanged). The stale-binary hazard is mitigated by the documented mandatory `cargo build --release` plus the pre-package `--help` assertion; both were executed.
 - No product bug was found and no product code was changed.
-- OQ-1 limitation recorded in `docs/packaging.md`: verification is markup/asset-level; no GUI Firefox/Edge/Safari run. NFR-05.001 remains covered by TASK-6 and MOCK-0001.
-- Version stays 0.1.0 (OQ-4); Debian Trixie and other releases are not claimed or verified (ADR-0003, NFR-03.002).
+- OQ-1 limitation recorded in `docs/packaging.md`: verification is markup/asset-level; no GUI Firefox/Edge/Safari run. NFR-005.001 remains covered by TASK-6 and MOCK-0001.
+- Version stays 0.1.0 (OQ-4); Debian Trixie and other releases are not claimed or verified (ADR-0003, NFR-003.002).

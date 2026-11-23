@@ -22,21 +22,21 @@ references:
   - MOCK-0005
   - MOCK-0006
   - MOCK-006
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-05
-  - REQ-05.007
-  - REQ-05.008
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-005
+  - REQ-005.007
+  - REQ-005.008
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-15
   - TASK-23
@@ -57,7 +57,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), and TASK-24 (UI specifications) so it also serves the UI-mockup store: active UI mockups. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`ui-mockup`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-05.008 and the web-visibility part of REQ-05.007 for the browser surface under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for UI mockups. Deprecated mockups are hidden from lists and unreachable by URL, exactly as deprecated UI specifications and glossary terms.
+Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), and TASK-24 (UI specifications) so it also serves the UI-mockup store: active UI mockups. The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`ui-mockup`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-005.008 and the web-visibility part of REQ-005.007 for the browser surface under REQ-006.002, and advances NFR-001.002 (display and edit all Papyrus content) for UI mockups. Deprecated mockups are hidden from lists and unreachable by URL, exactly as deprecated UI specifications and glossary terms.
 
 UI mockups differ from the sibling document types in one material way: the persisted record is a self-contained HTML review package authored by `@ui-designer`, not a Markdown document with sections. The browser edits only the mockup metadata (title, UI specification ids, references) and must preserve every other byte of the package. Whole-file regeneration of a mockup (for example by reusing the CLI's stub serializer) is forbidden because it destroys the design artifact.
 
@@ -211,7 +211,7 @@ Record views in this specification follow the shared single record view layout d
 1. Deprecated mockups live in the active directory's `deprecated/` subfolder. That folder is never scanned for records, never listed, never counted, and never resolved.
 2. A request for a deprecated mockup's ID returns `404` on `GET /doc/{id}`, `GET /doc/{id}/edit`, `POST /doc/{id}`, `GET /api/doc/{id}`, and `POST /api/doc/{id}`, exactly as for an unknown ID.
 3. A mockup that is superseded is deprecated by definition (TASK-38 section 7) and is therefore also hidden and unreachable.
-4. No browser control changes deprecation or supersession state; those remain CLI-only (REQ-05.007).
+4. No browser control changes deprecation or supersession state; those remain CLI-only (REQ-005.007).
 
 ### 10. JSON API
 
@@ -246,7 +246,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The stored mockup HTML is untrusted data. It is never served as a page, never inlined into a response, never parsed as HTML for rendering, and never used to build a path. Only the extracted metadata values are escaped and rendered.
 3. Tag controls are keyboard operable, every input has a `<label>` or accessible name, remove controls are labelled `Remove <value>`, and the add input is labelled. Focus is not trapped.
 4. The sidebar's UI Mockups entry and the mockup list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
@@ -316,7 +316,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Duplicate `specs`/`refs` values are rejected because the tag fields model a set; this is stricter than the CLI, which stores whatever it is given.
 - Assumption: The tag field's no-JavaScript fallback uses one text input per value plus a trailing empty input with the same field name; this preserves the approved chip layout with JavaScript and keeps the form usable without it.
 - Assumption: The JSON API exposes `task`, `status`, and `superseded_by` read-only, consistent with sibling record shapes, even though the browser pages do not display them.
-- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-005.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
@@ -330,7 +330,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.007, REQ-05.008, REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
+| Requirement | REQ-005, REQ-005.007, REQ-005.008, REQ-006, REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-38 (mockup CLI), TASK-40, TASK-41 (UI design), TASK-42 (packaging), TASK-86 |

@@ -10,13 +10,13 @@ references:
   - ADR-0011
   - ADR-0012
   - ADR-0013
-  - NFR-04.002
-  - NFR-04.004
-  - REQ-01.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-01.005
-  - REQ-05.010
+  - NFR-004.002
+  - NFR-004.004
+  - REQ-001.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-001.005
+  - REQ-005.010
   - TASK-100
   - TASK-83
   - TASK-88
@@ -33,7 +33,7 @@ status: verified
 ## Description
 ## Purpose
 
-Define the one-way import of Backlog.md task and milestone records into Papyrus records: invocation and options, source scope and exclusions, planned ID allocation, field and body mapping, status normalization, collision and duplicate handling, the one-way non-idempotent caveat, exit codes, and containment. This specification implements ADR-0011 and NFR-04.004 and is the only supported bridge from a Backlog.md store into the Papyrus-native layout (see `papyrus-native-record-layout-and-single-id-space.md`).
+Define the one-way import of Backlog.md task and milestone records into Papyrus records: invocation and options, source scope and exclusions, planned ID allocation, field and body mapping, status normalization, collision and duplicate handling, the one-way non-idempotent caveat, exit codes, and containment. This specification implements ADR-0011 and NFR-004.004 and is the only supported bridge from a Backlog.md store into the Papyrus-native layout (see `papyrus-native-record-layout-and-single-id-space.md`).
 
 ## Scope
 
@@ -47,8 +47,8 @@ Define the one-way import of Backlog.md task and milestone records into Papyrus 
 - Body mapping from Backlog.md marker sections to the Papyrus section layout.
 - Collision and duplicate handling, including `--allow-existing`.
 - One-way, non-idempotent semantics; no persisted mapping.
-- Exit codes per REQ-01.004.
-- Containment per NFR-04.002.
+- Exit codes per REQ-001.004.
+- Containment per NFR-004.002.
 - Upgrade-notes contract for the one-time import.
 
 ### Out of scope
@@ -68,12 +68,12 @@ papyrus import backlog --from <source-project-dir> [--source-backlog-dir <dir>]
                        [--dry-run] [--allow-existing] [--report <path>]
 ```
 
-1. The target project is selected per REQ-01.003 (`--dir`, `PAPYRUS_DIR`, cwd) and must have a `papyrus.config.yml`; otherwise the command fails as a runtime error (REQ-01.003, REQ-01.004).
+1. The target project is selected per REQ-001.003 (`--dir`, `PAPYRUS_DIR`, cwd) and must have a `papyrus.config.yml`; otherwise the command fails as a runtime error (REQ-001.003, REQ-001.004).
 2. `--from` names the Backlog.md project root; `--source-backlog-dir` defaults to `<from>/backlog` for projects that do not use the default folder name.
 3. `--dry-run` performs phase 1 and phase 2 fully and prints the plan and report without writing anything.
 4. `--allow-existing` is required when the target already holds any record of a family being imported; without it the command refuses before writing (section 7).
-5. `--report <path>` writes the same report to a path inside the project directory only; a path outside is a validation error (NFR-04.002). The report is diagnostic output, never a machine-readable store that later commands consult.
-6. Exit codes follow REQ-01.004: `0` when every in-scope source record was imported (or planned, for a dry run); `1` runtime/validation failure; import with skipped records exits non-zero and the summary lists them.
+5. `--report <path>` writes the same report to a path inside the project directory only; a path outside is a validation error (NFR-004.002). The report is diagnostic output, never a machine-readable store that later commands consult.
+6. Exit codes follow REQ-001.004: `0` when every in-scope source record was imported (or planned, for a dry run); `1` runtime/validation failure; import with skipped records exits non-zero and the summary lists them.
 
 ### 2. Source scope
 
@@ -83,7 +83,7 @@ papyrus import backlog --from <source-project-dir> [--source-backlog-dir <dir>]
 | `backlog/archive/tasks/*.md` | Imported as archived tasks |
 | `backlog/milestones/*.md` | Imported as milestones |
 | `backlog/archive/milestones/*.md` | Imported as archived milestones |
-| `backlog/docs/**`, `backlog/drafts/**`, `backlog/archive/drafts/**`, `backlog/decisions/**` | Not read as records; counted and reported as excluded by NFR-04.004 |
+| `backlog/docs/**`, `backlog/drafts/**`, `backlog/archive/drafts/**`, `backlog/decisions/**` | Not read as records; counted and reported as excluded by NFR-004.004 |
 | `backlog/config.yml`, `backlog/.locks/**` | Source metadata only; never written; the source status vocabulary and prefixes may be read to interpret the source |
 
 1. Only `.md` files whose stem matches the source family's storage form (`<prefix>-<number>`, optionally followed by ` - <slug>`) are candidates. Anything else in a source directory is reported as skipped.
@@ -96,7 +96,7 @@ papyrus import backlog --from <source-project-dir> [--source-backlog-dir <dir>]
 2. Ties, duplicate source numbers, and unparseable source numbers are ordered by source path and reported as source anomalies.
 3. Phase 2 resolves every reference against the completed plan, and validates statuses, timestamps, and destinations.
 4. Phase 3 writes. The plan is computed once, so a failed write can never shift a later number.
-5. The plan is printed by both a dry run and a real import. It is the only record of the source→Papyrus mapping: no mapping file, sidecar, marker key, or extra front-matter field is written, because that would be the parallel ID space NFR-04.004 and REQ-01.005 forbid. The source ID is not persisted in the imported record.
+5. The plan is printed by both a dry run and a real import. It is the only record of the source→Papyrus mapping: no mapping file, sidecar, marker key, or extra front-matter field is written, because that would be the parallel ID space NFR-004.004 and REQ-001.005 forbid. The source ID is not persisted in the imported record.
 
 ### 4. Field mapping and content preservation
 
@@ -117,7 +117,7 @@ papyrus import backlog --from <source-project-dir> [--source-backlog-dir <dir>]
 | other source keys | any remaining key (`priority`, …) | Preserved verbatim, so no metadata is lost and no source key-set validation exists |
 | `release` (milestones) | none | Not written. Backlog.md has no release and Papyrus does not infer one from milestone names |
 
-1. Timestamps are normalized to the quoted ISO-8601 UTC form of REQ-05.010; a source value in another format is replaced by the import time and reported.
+1. Timestamps are normalized to the quoted ISO-8601 UTC form of REQ-005.010; a source value in another format is replaced by the import time and reported.
 2. Reading a Backlog.md file must reuse the shared front-matter/document parser and writing must reuse `record::store::write_atomic`; a Backlog-specific parser or serializer is prohibited (ADR-0013 downstream constraint 2).
 
 ### 5. Body mapping
@@ -136,7 +136,7 @@ Backlog.md marker sections are converted to the record's native section layout, 
 1. Marker comment lines are removed.
 2. Unknown sections, free text, and any content outside a recognized marker block are appended verbatim in file order, so nothing is discarded.
 3. Milestone bodies keep a single `## Description` with the source text verbatim.
-4. Tasks acquire no `# <ID> <title>` heading (REQ-05.010).
+4. Tasks acquire no `# <ID> <title>` heading (REQ-005.010).
 5. Archived source records are written to the archived destination directory.
 
 ### 6. Status normalization
@@ -163,13 +163,13 @@ Backlog.md marker sections are converted to the record's native section layout, 
 
 1. The import is a one-time bridge per source store. A second run against the same source allocates new numbers and therefore duplicates records; this is documented, and `--dry-run` plus the same-title report are the review mechanisms.
 2. No marker, lock file, import registry, or source-state database is created.
-3. Nothing in the import is bidirectional: the source is opened read-only, and Papyrus never regenerates Backlog.md files afterwards (NFR-04.004).
+3. Nothing in the import is bidirectional: the source is opened read-only, and Papyrus never regenerates Backlog.md files afterwards (NFR-004.004).
 4. The source is left byte-identical after import.
 
 ### 9. Security and containment
 
 1. Source paths are resolved and checked for existence and readability.
-2. Destination paths go through `Context::ensure_within` before any write (NFR-04.002).
+2. Destination paths go through `Context::ensure_within` before any write (NFR-004.002).
 3. Symlinked records whose real path escapes either root are refused.
 4. No source content is echoed into logs beyond the reported titles and paths.
 
@@ -206,7 +206,7 @@ The README command documentation (man page) must carry:
 ## Inputs and outputs
 
 - Input: a source project directory (and optional source backlog directory), target project context, and the import options.
-- Output: imported Papyrus records under the configured directories, a printed plan/report, optional report file, exit code per REQ-01.004.
+- Output: imported Papyrus records under the configured directories, a printed plan/report, optional report file, exit code per REQ-001.004.
 - No persistent mapping or registry is produced.
 
 ## Assumptions
@@ -226,19 +226,19 @@ The README command documentation (man page) must carry:
 - `docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md`
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md`
 - `docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md`
-- `docs/requirements/business/REQ-01.002.md`
-- `docs/requirements/business/REQ-01.003.md`
-- `docs/requirements/business/REQ-01.004.md`
-- `docs/requirements/business/REQ-01.005.md`
-- `docs/requirements/non-functional/NFR-04.002.md`
-- `docs/requirements/non-functional/NFR-04.004.md`
+- `docs/requirements/business/REQ-001.002.md`
+- `docs/requirements/business/REQ-001.003.md`
+- `docs/requirements/business/REQ-001.004.md`
+- `docs/requirements/business/REQ-001.005.md`
+- `docs/requirements/non-functional/NFR-004.002.md`
+- `docs/requirements/non-functional/NFR-004.004.md`
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-83 (specification); TASK-92 (implementation); TASK-99 (upgrade notes) |
-| Requirements | NFR-04.004, REQ-01.005, REQ-01.002, REQ-01.003, REQ-01.004, REQ-05.010, NFR-04.002 |
+| Requirements | NFR-004.004, REQ-001.005, REQ-001.002, REQ-001.003, REQ-001.004, REQ-005.010, NFR-004.002 |
 | ADRs | ADR-0010, ADR-0011, ADR-0012, ADR-0013 |
 | Related tickets | TASK-88, TASK-89, TASK-90, TASK-92, TASK-97, TASK-98, TASK-99, TASK-100 |
 | Source | src/import/*, src/record/*, src/task.rs, src/milestone.rs, src/config.rs, src/context.rs |

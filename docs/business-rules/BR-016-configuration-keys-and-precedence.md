@@ -15,7 +15,7 @@ status: active
 
 ## Rationale
 
-Based on REQ-01.002 — Read and Edit Project Configuration, REQ-01.003 — Select Project and Configuration Context, REQ-07.001 — Organize Artifacts into Three Categories, REQ-07.002 — Configure Document Types and Slugs, REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models, and REQ-01.008 — Run Project Diagnostics, this rule exists because configuration is the only place document types, their slugs, prefixes, directories, status vocabularies, fields, and role field sets are declared, and the entry is now nested rather than flat: the loader must resolve a sparse entry against the seed deterministically, validate the whole map fail-closed with a diagnostic that names the exact nested path, and still leave a repair path, or one mistyped entry would make every command unusable and the project could not be fixed through Papyrus itself.
+Based on REQ-001.002 — Read and Edit Project Configuration, REQ-001.003 — Select Project and Configuration Context, REQ-007.001 — Organize Artifacts into Three Categories, REQ-007.002 — Configure Document Types and Slugs, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, and REQ-001.008 — Run Project Diagnostics, this rule exists because configuration is the only place document types, their slugs, prefixes, directories, status vocabularies, fields, and role field sets are declared, and the entry is now nested rather than flat: the loader must resolve a sparse entry against the seed deterministically, validate the whole map fail-closed with a diagnostic that names the exact nested path, and still leave a repair path, or one mistyped entry would make every command unusable and the project could not be fixed through Papyrus itself.
 
 ## Applicability
 
@@ -89,4 +89,4 @@ This order is unchanged by the nested document-type model, and the seed is the l
 
 - `papyrus config get|set|unset|list` load tolerantly, validate the configuration that would result, and refuse an invalid write.
 - `papyrus init --force` replaces the file with the generated default set.
-- `papyrus check` loads tolerantly, reports each configuration diagnostic as a `config-invalid` finding, runs only the checks that do not depend on the effective `document_types` set, and repairs no configuration value (REQ-01.008).
+- `papyrus check` loads tolerantly, reports each configuration diagnostic as a `config-invalid` finding, runs only the checks that do not depend on the effective `document_types` set, and repairs no configuration value (REQ-001.008).

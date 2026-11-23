@@ -15,7 +15,7 @@ status: active
 
 ## Rationale
 
-Based on REQ-05.012 — Manage Use Cases, REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-07.002 — Configure Document Types and Slugs, and REQ-07.003 — Dispatch Config-Defined Document Commands, this rule exists because a use case is a stable, traceable document that adds an applicability section to the plain document shape, and deleting `src/use_case.rs` must not lose either section or the command behavior around them. The command family, the `--description` and `--applicability` options, the `## Description` then `## Applicability` body order, and the status model must all be reconstructed from the descriptor, with no per-type module, verb table, or help text. The exact field list is recorded here because the seed is the only definition of a built-in type: changing a field is a requirement or ADR change, and a project must be able to add a field by editing its configuration file alone, without a code change (RE-010 D14).
+Based on REQ-005.012 — Manage Use Cases, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-007.002 — Configure Document Types and Slugs, and REQ-007.003 — Dispatch Config-Defined Document Commands, this rule exists because a use case is a stable, traceable document that adds an applicability section to the plain document shape, and deleting `src/use_case.rs` must not lose either section or the command behavior around them. The command family, the `--description` and `--applicability` options, the `## Description` then `## Applicability` body order, and the status model must all be reconstructed from the descriptor, with no per-type module, verb table, or help text. The exact field list is recorded here because the seed is the only definition of a built-in type: changing a field is a requirement or ADR change, and a project must be able to add a field by editing its configuration file alone, without a code change (RE-010 D14).
 
 ## Applicability
 
@@ -43,7 +43,7 @@ Applies to every invocation of `papyrus use-case` and to every use-case record, 
 
 ### User extensibility and seed contract
 
-- Adding a field is a configuration file edit: a project adds an entry to the type's `fields` sequence, and Papyrus generates the option, help, body section, and browser form input from it with no code change, rebuild, or per-type module (RE-010 D14, REQ-07.002).
+- Adding a field is a configuration file edit: a project adds an entry to the type's `fields` sequence, and Papyrus generates the option, help, body section, and browser form input from it with no code change, rebuild, or per-type module (RE-010 D14, REQ-007.002).
 - The field list above is the seed contract for `use-case`; changing a field key, heading, kind, required flag, verbs, option, or front-matter key is a requirement change (ADR-036 decision 30), never a silent behavior change.
 
 ### Lists and references
@@ -59,8 +59,8 @@ Applies to every invocation of `papyrus use-case` and to every use-case record, 
 
 ## Requirements
 
-- REQ-05.012
-- REQ-07.004
-- REQ-07.002
-- REQ-07.003
-- REQ-05.007
+- REQ-005.012
+- REQ-007.004
+- REQ-007.002
+- REQ-007.003
+- REQ-005.007

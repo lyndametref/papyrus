@@ -14,8 +14,8 @@ help-determinism test were updated.
 
 | Code | Documented cause | Authority |
 | --- | --- | --- |
-| `T` | Uniform title contract: positional `TITLE` on create and the uniform `--title` form, including the previously missing edit titles. | REQ-07.003; TASK-257 |
-| `G` | `--term` removed from glossary create/edit; the positional `TITLE` or `--title` replaces it. | REQ-05.003, BR-011 |
+| `T` | Uniform title contract: positional `TITLE` on create and the uniform `--title` form, including the previously missing edit titles. | REQ-007.003; TASK-257 |
+| `G` | `--term` removed from glossary create/edit; the positional `TITLE` or `--title` replaces it. | REQ-005.003, BR-011 |
 | `P` | Engine-generated verb about lines and option/argument prose derived from the document model and field sequence. | ADR-042 item 2 |
 | `V` | `--group` is no longer clap-required on `req`/`nfr create`; the engine validates the group and the title. | ADR-042 item 2; TASK-256 |
 | `F` | Seed-derived required/optional fields and field order (ADR-036 decision 29), including removal of the `-d` short on `--description`. | ADR-036 decision 29 |

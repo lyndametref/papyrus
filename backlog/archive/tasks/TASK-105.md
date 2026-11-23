@@ -14,20 +14,20 @@ dependencies:
   - TASK-102
 documentation:
   - docs/architecture/adr/ADR-0018-generic-document-content-model.md
-  - docs/requirements/business/REQ-07.004.md
-  - docs/requirements/business/REQ-07.001.md
+  - docs/requirements/business/REQ-007.004.md
+  - docs/requirements/business/REQ-007.001.md
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-07.003.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/business/REQ-06.014.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-007.003.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/business/REQ-006.014.md
 priority: high
 ordinal: 41020
 ---
@@ -231,10 +231,10 @@ Definition of Done:
 # Open questions
 
 1. Per-type option metadata (`--view`, `--rationale`, `--applicability`, `--type`) for typed baseline verbs: whether `document::run` should expose them through a generic option set or whether typed modules retain their own create/edit option sets. Deferred to TASK-108/114 per user instruction; this task's generic path maps only title, description, labels, and references.
-2. Whether a generic `list` should gain a status filter to match the browser filter of REQ-06.014. Current requirement defines no document-list filters; none is added here.
+2. Whether a generic `list` should gain a status filter to match the browser filter of REQ-006.014. Current requirement defines no document-list filters; none is added here.
 3. Whether `--editor` should refresh `updated_date` when it changes the description file. Current behavior (tech-spec) does not refresh through the editor path; kept as-is.
 4. Whether `view` should resolve an archived record by id. Proposed: no, per ADR-0022 decision 10; archived records are not viewable by id. Confirm during TASK-108.
-5. Whether delete confirmation and `--force` live in the CLI or the handler. Proposed: CLI gates, handler performs removal, matching REQ-05.007.
+5. Whether delete confirmation and `--force` live in the CLI or the handler. Proposed: CLI gates, handler performs removal, matching REQ-005.007.
 
 # Risks
 

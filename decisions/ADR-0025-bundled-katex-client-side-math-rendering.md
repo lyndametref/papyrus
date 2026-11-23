@@ -16,7 +16,7 @@ accepted
 
 ## Context
 
-REQ-06.017 requires the local web interface to render math formulas embedded in managed record content, fully offline, with all assets bundled, in the supported browsers (NFR-05.001), without arbitrary script execution (NFR-02.002), and with a rendering dependency that is open source and permits linking in a GPLv3-or-later application (NFR-06.002). Malformed input must degrade to visible source text instead of breaking the page.
+REQ-006.017 requires the local web interface to render math formulas embedded in managed record content, fully offline, with all assets bundled, in the supported browsers (NFR-005.001), without arbitrary script execution (NFR-002.002), and with a rendering dependency that is open source and permits linking in a GPLv3-or-later application (NFR-006.002). Malformed input must degrade to visible source text instead of breaking the page.
 
 Current shape that this decision must fit:
 
@@ -25,9 +25,9 @@ Current shape that this decision must fit:
 - No record body is displayed today. The detail pages render curated sections (`description`, `rationale`, `context`, `consequences`, `content`, `story`, `applicability`, `definition`, `view`) and never the raw file.
 - The binary is 4.2 MiB (`.deb` 1.28 MiB) with four Rust dependencies (`clap`, `serde`, `serde_json`, `yaml_serde`).
 
-Forces: offline and single-binary (NFR-01.003, NFR-03.001, ADR-0002); no new Rust crate and no build toolchain beyond `cargo` (ADR-0001, ADR-0004); the CSP must not be weakened in `script-src`; the source text must remain the only stored value, so rendering cannot rewrite records; and the browser must stay usable without JavaScript (ADR-0005).
+Forces: offline and single-binary (NFR-001.003, NFR-003.001, ADR-0002); no new Rust crate and no build toolchain beyond `cargo` (ADR-0001, ADR-0004); the CSP must not be weakened in `script-src`; the source text must remain the only stored value, so rendering cannot rewrite records; and the browser must stay usable without JavaScript (ADR-0005).
 
-REQ-06.017 states that rendering happens **in the browser only** and that CLI output shows source text unchanged, which removes server-side preprocessing from the option space at requirement level; it is still recorded below so the exclusion is traceable.
+REQ-006.017 states that rendering happens **in the browser only** and that CLI output shows source text unchanged, which removes server-side preprocessing from the option space at requirement level; it is still recorded below so the exclusion is traceable.
 
 ## Decision
 1. **Math is rendered client-side by KaTeX, vendored into the binary.** No TeX engine, service, or preprocessing step exists on the server. `papyrus` and every non-browser surface keep printing the stored source text; the browser prints the same source until a client script replaces the placeholder.
@@ -57,7 +57,7 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 
    `script-src` is unchanged, so no script path other than the embedded assets can execute.
 
-   *Revision (2026-11-16, architecture decision): the `style-src 'self'` value is confirmed and the loss of KaTeX's inline `style` attributes is accepted, not repaired. KaTeX sets `style` attributes on generated nodes (`mspace` widths and rule geometry, hbox height/vertical-align, `\color` output, and the `errorColor` of a rejected formula); the browser drops each one under this policy. The visible cost is bounded — spacing can deviate by a fraction of an em and a rejected formula shows uncoloured — and no content, structure, or execution path changes. The alternatives are rejected on mechanism, not taste: a nonce matches `<style>`/`<link>` elements and never a `style` attribute, and KaTeX emits no style element for math; hashes cannot enumerate content-dependent widths and `style-src-attr`/`'unsafe-hashes'` are not available on all of NFR-05.001's browsers (Firefox 100 lacks them); `'unsafe-inline'` would relax every page for a cosmetic deviation, and its use by Mermaid (ADR-0026 decision 5) is a separate decision about an injected `<style>` element. TASK-146 therefore does not inherit this rule, and the math pass must render correctly without `'unsafe-inline'`.*
+   *Revision (2026-11-16, architecture decision): the `style-src 'self'` value is confirmed and the loss of KaTeX's inline `style` attributes is accepted, not repaired. KaTeX sets `style` attributes on generated nodes (`mspace` widths and rule geometry, hbox height/vertical-align, `\color` output, and the `errorColor` of a rejected formula); the browser drops each one under this policy. The visible cost is bounded — spacing can deviate by a fraction of an em and a rejected formula shows uncoloured — and no content, structure, or execution path changes. The alternatives are rejected on mechanism, not taste: a nonce matches `<style>`/`<link>` elements and never a `style` attribute, and KaTeX emits no style element for math; hashes cannot enumerate content-dependent widths and `style-src-attr`/`'unsafe-hashes'` are not available on all of NFR-005.001's browsers (Firefox 100 lacks them); `'unsafe-inline'` would relax every page for a cosmetic deviation, and its use by Mermaid (ADR-0026 decision 5) is a separate decision about an injected `<style>` element. TASK-146 therefore does not inherit this rule, and the math pass must render correctly without `'unsafe-inline'`.*
 
 7. **Sanitisation is structural.** `trust: false` disables `\href`, `\url`, `\includegraphics`, `\htmlClass`, and `\htmlData`; KaTeX output is built from its own text nodes; the TeX source reaches it as a string attribute, never as HTML. The attribute is escaped by the existing escaping rules. A record cannot make KaTeX emit a script or a remote reference.
 
@@ -76,7 +76,7 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 
 **Positive:**
 
-- REQ-06.017's offline, bundled, single-binary, and graceful-degradation criteria are met with one asset family and no runtime dependency.
+- REQ-006.017's offline, bundled, single-binary, and graceful-degradation criteria are met with one asset family and no runtime dependency.
 - The CSP keeps `script-src 'self'`, `default-src 'none'`, and no `eval`; the only relaxation is `font-src 'self'`, which cannot execute anything.
 - The fallback is the source text by construction, not by error handling, so a browser without JavaScript and a browser with a broken asset behave identically and acceptably.
 - Restricting the pre-pass to `$`/`$$`/fenced math keeps ADR-0005's "no Markdown renderer" decision intact and keeps the served markup auditable.
@@ -94,7 +94,7 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 - *Dollar-sign false positives*: a record with prices renders oddly. Mitigation: require the `$…$` form to open on a non-space and close on a non-space, disallow a newline inside inline math, and document `\$`; block math (`$$`, fenced) is unambiguous and is the recommended form.
 - *Asset drift or tampering*: the vendored file is committed with a SHA-256 and a licence file, and a test asserts the embedded bytes match the recorded digest.
 - *CSP regression*: one test asserts the exact CSP string per response class; a second asserts KaTeX renders with that CSP in the supported browsers.
-- *Font rendering differences across the three supported browsers*: NFR-05.001 verification must include a math page on Firefox 100+, Edge 130+, and Safari 18+.
+- *Font rendering differences across the three supported browsers*: NFR-005.001 verification must include a math page on Firefox 100+, Edge 130+, and Safari 18+.
 - *Licence uncertainty on the font files*: KaTeX code is MIT and its woff2 fonts are SIL OFL-1.1; the OFL review must complete before acceptance. If it fails, the recorded fallback is MathJax 3 with SVG output (Apache-2.0, no web fonts, no `font-src`), which needs its own ADR because the asset weight and the CSP delta differ.
 
 ## Alternatives Considered
@@ -103,9 +103,9 @@ REQ-06.017 states that rendering happens **in the browser only** and that CLI ou
 |---|---|---|
 | KaTeX, vendored, client-side, `font-src 'self'` (this ADR) | Selected | Smallest bundle (≈560 KB), no `eval`, permissive licences, synchronous DOM rendering that keeps the source-text fallback trivial. *Revision 2026-11-16: this row previously read "no inline style". KaTeX does emit inline `style` attributes, which `style-src 'self'` drops; the cosmetic deviation is accepted and the CSP is unchanged (decision 6 revision note).* |
 | MathJax 3, vendored, SVG output | Rejected for now | Apache-2.0 and no web fonts (no CSP delta), but ≈1.4–2 MB, slower startup, and its SVG pipeline adds DOM/style behaviour that needs its own review; kept as the licence fallback. |
-| Server-side TeX preprocessing in Rust | Rejected | Excluded by REQ-06.017 ("rendering happens in the browser only"), and no TeX engine exists among the four current crates. |
+| Server-side TeX preprocessing in Rust | Rejected | Excluded by REQ-006.017 ("rendering happens in the browser only"), and no TeX engine exists among the four current crates. |
 | Server-side preprocessing in a helper process (TeX Live, `pandoc`) | Rejected | Breaks single-binary packaging (ADR-0002), offline guarantee, and adds an external runtime. |
-| MathJax or KaTeX from a CDN | Rejected | Violates NFR-01.003 and ADR-0005's no-remote-asset rule. |
+| MathJax or KaTeX from a CDN | Rejected | Violates NFR-001.003 and ADR-0005's no-remote-asset rule. |
 | Render math into the stored record at write time (SVG or MathML in the file) | Rejected | Rewrites record content, breaks source-of-truth and the preservation rule (ADR-0013), and duplicates the rendering contract in the CLI. |
 | Full Markdown rendering (headings, lists, emphasis, math) | Rejected | Contradicts ADR-0005 and expands the sanitisation surface far beyond this requirement. |
 
@@ -136,9 +136,9 @@ Consequences for downstream tickets: TASK-146 keeps ADR-0026 decision 5 and does
 
 ## References
 
-- `docs/requirements/business/REQ-06.017.md` — render math and diagrams in the browser.
-- `docs/requirements/business/REQ-06.015.md` — content-width rules that apply to rendered output.
-- `docs/requirements/non-functional/NFR-01.003.md`, `NFR-02.002.md`, `NFR-03.001.md`, `NFR-05.001.md`, `NFR-06.002.md`.
+- `docs/requirements/business/REQ-006.017.md` — render math and diagrams in the browser.
+- `docs/requirements/business/REQ-006.015.md` — content-width rules that apply to rendered output.
+- `docs/requirements/non-functional/NFR-001.003.md`, `NFR-002.002.md`, `NFR-003.001.md`, `NFR-005.001.md`, `NFR-006.002.md`.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — transport, templates, CSP baseline, no Markdown renderer.
 - `docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md` — how vendored assets are embedded, served, and licensed.
 - `docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md` — width classes applied to rendered output.

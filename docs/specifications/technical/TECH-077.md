@@ -8,10 +8,10 @@ references:
   - ADR-0019
   - ADR-036
   - ADR-041
-  - NFR-04.002
-  - NFR-02.002
-  - REQ-07.002
-  - REQ-07.004
+  - NFR-004.002
+  - NFR-002.002
+  - REQ-007.002
+  - REQ-007.004
   - BR-016
 status: verified
 ---
@@ -31,7 +31,7 @@ impl Config {
 ```
 
 - Single validator. Returns all diagnostics joined by \n (one per line), or Ok(()).
-- Some(project_dir) enables symlink-aware containment (NFR-04.002);
+- Some(project_dir) enables symlink-aware containment (NFR-004.002);
   None is string-level only (FS-free callers, registry, tests).
 - Diagnostics are collected across all entries and all field sequences, not
   fail-fast. An invalid entry is never skipped, cleaned, or normalized.

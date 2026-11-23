@@ -6,10 +6,10 @@ updated_date: '2026-11-22T12:13:02Z'
 labels: []
 references:
   - AUD-139
-  - REQ-07.002
-  - REQ-07.004
-  - REQ-01.002
-  - REQ-06.019
+  - REQ-007.002
+  - REQ-007.004
+  - REQ-001.002
+  - REQ-006.019
   - ADR-036
   - ADR-041
   - ADR-0019
@@ -73,7 +73,7 @@ Invariants:
 
 Assumptions and notes:
 - AUD-139's H-1 recommendation is the authoritative resolution; the start commit c3103fc materialized the full default map and TC-114 is the newer regression expectation.
-- TC-114's literal clause "no other seed entry is written to the file" and REQ-07.002's "never materializes the whole seed set" are in tension with full-seed materialization. The implementer must not edit those records, must make the observable contract true (other seed types remain effective after set and unset), and must record the wording conflict for Phase 2 in the task comment.
+- TC-114's literal clause "no other seed entry is written to the file" and REQ-007.002's "never materializes the whole seed set" are in tension with full-seed materialization. The implementer must not edit those records, must make the observable contract true (other seed types remain effective after set and unset), and must record the wording conflict for Phase 2 in the task comment.
 - The equality of seed slots and the static presentation table is a temporary cross-check, removed by MS-035; it must not change browser output in this task.
 - `fields` and role field sequences remain configuration-file data and are not `config set` targets.
 - L-3 and L-8 are explicitly out of scope and remain open in their owning milestones.
@@ -96,7 +96,7 @@ Definition of done: each correction in scope items 1 to 6 has a recorded result 
 - [ ] No production behaviour changes beyond the corrected configuration surface; cargo test is green and cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean.
 - [ ] The task comment maps every AUD-139 finding to its result and records L-3 as owned by MS-034 and L-8 as owned by MS-036.
 ## Comments
-- **rust-dev**: rust-dev AUD-139 results. H-1: resolution now keeps every seed slug effective when a file declares only some; config set and unset still write only the edited entry (minimal file); config list shows nfr and glossary, papyrus nfr --help succeeds; integration test covers both set and unset. Records conflict for Phase 2: REQ-07.002 and TC-114 say never materialize the whole seed set, while the audit text mentions full materialization; implemented the minimal-file implicit-seed resolution. M-1: raw and typed validators aggregated in one deterministic pass. M-2: order, enabled, statuses, and slots type errors use document_types.<slug>.<path>. M-3: field key, option, heading, required-create, and kebab-case grammar validated; every config list leaf resolves via config get in keyed and indexed form. M-4: decision-33 user defaults projected into config list and config get without file write; declared values override. M-5: declared slots validate empty key or label, structural keys, reserved keys except group on grouped seed types, and duplicates; seed slots cross-checked against routes PRESENTATION until MS-035. M-6: independent fixture facts for prefix, directory, enabled, statuses, and default status with a negative mutation test. L-1: HTML metadata status rule keyed on DocumentModel::SingleHtmlMockup, with a non-mockup custom status test. L-2: merge_role gives YAML and direct Config the same partial role result including seed hidden visibility. L-4: cross-type set and unset assertions. L-5: guard scans every top-level read module, normalizes whitespace, and has a planted violation test in document.rs. L-6: bracketed set and unset selectors rejected with a clear message, with leaf-category round trips. L-7: grouped record descriptor unions group and member fields. L-3 is owned by MS-034. L-8 is owned by MS-036. Suite 1224 passed, clippy -D warnings clean, fmt clean. No commit per instruction.
+- **rust-dev**: rust-dev AUD-139 results. H-1: resolution now keeps every seed slug effective when a file declares only some; config set and unset still write only the edited entry (minimal file); config list shows nfr and glossary, papyrus nfr --help succeeds; integration test covers both set and unset. Records conflict for Phase 2: REQ-007.002 and TC-114 say never materialize the whole seed set, while the audit text mentions full materialization; implemented the minimal-file implicit-seed resolution. M-1: raw and typed validators aggregated in one deterministic pass. M-2: order, enabled, statuses, and slots type errors use document_types.<slug>.<path>. M-3: field key, option, heading, required-create, and kebab-case grammar validated; every config list leaf resolves via config get in keyed and indexed form. M-4: decision-33 user defaults projected into config list and config get without file write; declared values override. M-5: declared slots validate empty key or label, structural keys, reserved keys except group on grouped seed types, and duplicates; seed slots cross-checked against routes PRESENTATION until MS-035. M-6: independent fixture facts for prefix, directory, enabled, statuses, and default status with a negative mutation test. L-1: HTML metadata status rule keyed on DocumentModel::SingleHtmlMockup, with a non-mockup custom status test. L-2: merge_role gives YAML and direct Config the same partial role result including seed hidden visibility. L-4: cross-type set and unset assertions. L-5: guard scans every top-level read module, normalizes whitespace, and has a planted violation test in document.rs. L-6: bracketed set and unset selectors rejected with a clear message, with leaf-category round trips. L-7: grouped record descriptor unions group and member fields. L-3 is owned by MS-034. L-8 is owned by MS-036. Suite 1224 passed, clippy -D warnings clean, fmt clean. No commit per instruction.
 - **rust-dev**: Mechanical doc edit: TECH-077 section 5 seed-overlay bullets replaced; ADR-041 added to references; status set to draft. Verified with papyrus tech-spec view (exit 0) and papyrus check (no new findings, exit 0). Only TECH-077.md changed (12 insertions, 4 deletions). Not committed.
 - **architect**: architect conformance test
 - **architect**: -

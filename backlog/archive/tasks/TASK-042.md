@@ -12,11 +12,11 @@ milestone: MS-005
 dependencies:
   - TASK-013
 references:
-  - docs/requirements/business/REQ-05.005.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.005.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-013-rule-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
@@ -31,16 +31,16 @@ ordinal: 17300
 Implement the `rule` commands so contributors can create, list, view, edit, deprecate, and restore business rules, with stable IDs and text-file persistence inside the project directory.
 
 Scope (in):
-- `papyrus rule create <title> --description <text> --rationale <text> --applicability <text> [--requirement <id>...]` (BR-013, REQ-05.005).
-- `papyrus rule list` (BR-013, REQ-05.005).
-- `papyrus rule view <id>` (BR-013, REQ-05.005).
-- `papyrus rule edit <id> [--title <title>] [-d <description>] [--requirement <id>...] [--no-requirement [<id>]] [--editor]` (BR-013, REQ-05.005).
-- `papyrus rule deprecate <id>` and `papyrus rule restore <id>` (BR-013, REQ-05.007).
-- Stable IDs of the form <prefix>-<number> (default RUL-001) using configured document_types.rule prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-05.005, REQ-05.007, BR-013, BR-016).
-- Business-rule fields: title, description, rationale, applicability, and zero or more business-requirement references (REQ-05.005, BR-013).
-- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID and content (REQ-05.005, REQ-05.007, BR-013).
-- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-02.002, NFR-04.001, NFR-04.002).
-- Common CLI controls and outcomes inherited from TASK-2 (REQ-01.004).
+- `papyrus rule create <title> --description <text> --rationale <text> --applicability <text> [--requirement <id>...]` (BR-013, REQ-005.005).
+- `papyrus rule list` (BR-013, REQ-005.005).
+- `papyrus rule view <id>` (BR-013, REQ-005.005).
+- `papyrus rule edit <id> [--title <title>] [-d <description>] [--requirement <id>...] [--no-requirement [<id>]] [--editor]` (BR-013, REQ-005.005).
+- `papyrus rule deprecate <id>` and `papyrus rule restore <id>` (BR-013, REQ-005.007).
+- Stable IDs of the form <prefix>-<number> (default RUL-001) using configured document_types.rule prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-005.005, REQ-005.007, BR-013, BR-016).
+- Business-rule fields: title, description, rationale, applicability, and zero or more business-requirement references (REQ-005.005, BR-013).
+- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID and content (REQ-005.005, REQ-005.007, BR-013).
+- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-002.002, NFR-004.001, NFR-004.002).
+- Common CLI controls and outcomes inherited from TASK-2 (REQ-001.004).
 
 Scope (out):
 - Search and browser access for business rules (TASK-44, TASK-25).

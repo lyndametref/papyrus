@@ -485,7 +485,7 @@ fn row_dates(view: Option<&crate::record::view::RecordView>) -> String {
 fn status_filter_html(descriptor: &TypeDescriptor, selected: Option<&str>) -> String {
     let mut options = String::new();
     // A disabled, default-selected placeholder keeps an untouched form from
-    // submitting `status` while still showing a prompt (REQ-07.005, AC6/AC7).
+    // submitting `status` while still showing a prompt (REQ-007.005, AC6/AC7).
     // `Show all` is the explicit reset; there is no empty selectable option.
     if selected.is_none() {
         options.push_str("<option value=\"\" disabled selected>Status</option>");
@@ -2237,7 +2237,7 @@ pub fn inventory_page(cfg: &Config, chrome: Chrome<'_>, cards: &[InventoryCard])
     }
     section.push_str("</section>");
     let title = "Papyrus \u{2014} Browser inventory".to_string();
-    let subheading = "All Papyrus record types in one navigation (REQ-06.002, NFR-01.002).";
+    let subheading = "All Papyrus record types in one navigation (REQ-006.002, NFR-001.002).";
     let body = render_template(
         LIST_TEMPLATE,
         &[("heading", "Browser inventory"), ("subheading", subheading)],

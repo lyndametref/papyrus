@@ -20,21 +20,21 @@ references:
   - MOCK-0001
   - MOCK-0002
   - MOCK-0003
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-04
-  - REQ-04.001
-  - REQ-04.002
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-004
+  - REQ-004.001
+  - REQ-004.002
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-13
   - TASK-15
@@ -53,7 +53,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements) and TASK-11 (backlog records) so it also serves the decisions store: active decision records (ADR, BDR, and configured types). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`decision`), its record model, list/view/edit screens, API endpoints, and tests. It implements the decisions-store part of REQ-06.002 under the same requirement, and advances NFR-01.002 (display and edit all Papyrus content) for decision records. It implements REQ-04.001 and REQ-04.002 for the browser surface.
+Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements) and TASK-11 (backlog records) so it also serves the decisions store: active decision records (ADR, BDR, and configured types). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`decision`), its record model, list/view/edit screens, API endpoints, and tests. It implements the decisions-store part of REQ-006.002 under the same requirement, and advances NFR-001.002 (display and edit all Papyrus content) for decision records. It implements REQ-004.001 and REQ-004.002 for the browser surface.
 
 ## Scope
 
@@ -70,7 +70,7 @@ Extend the offline, project-local, read-and-edit web interface delivered by TASK
 
 ### Out of scope
 
-- Creating, archiving, restoring, or deleting decisions from the browser; changing record IDs or decision types. These remain CLI-only (REQ-04.002, BR-008).
+- Creating, archiving, restoring, or deleting decisions from the browser; changing record IDs or decision types. These remain CLI-only (REQ-004.002, BR-008).
 - Managing requirement references from a decision in the browser — they appear as literal text in the fields, consistent with the CLI (decision-records-management.md).
 - Browsing glossary terms, UI specifications, business rules, audit records, deployment records, or specification documents — later tickets (TASK-23 … TASK-27, TASK-57).
 - Search inside the browser UI, Markdown rendering, rich-text editing, attachments, or file uploads.
@@ -167,7 +167,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 9. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. Templates may be extended with decision-specific placeholders; unknown placeholders are left untouched as in the baseline.
 3. The sidebar's Decisions entry and the decision list/view/edit templates are the only rendering additions.
 
@@ -208,7 +208,7 @@ UI mockups are required before any UI implementation work and must be approved b
 |---|---|
 | AC-1 | The browser displays and edits active decision records in addition to requirement and backlog content. |
 | AC-2 | Browser operations remain offline-capable, use project-local text-file persistence, sanitize input, and access no paths outside the project directory except during init. |
-| AC-3 | The expanded interface renders in Firefox 115+ (NFR-05.001). |
+| AC-3 | The expanded interface renders in Firefox 115+ (NFR-005.001). |
 | AC-4 | Archived decisions are not listed and return `404` by URL. |
 | AC-5 | Optimistic concurrency and atomic writes hold for the new record type. |
 
@@ -221,7 +221,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The configured decision statuses and the documented transition graph govern the `status` field in the browser.
 - Assumption: A new MOCK id (MOCK-0003) is allocated for the extension rather than modifying the approved MOCK-0001/MOCK-0002 in place, per the global sequential-id rule.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
-- Assumption: AC #3 (real-browser verification in Firefox 115+) and NFR-05.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
+- Assumption: AC #3 (real-browser verification in Firefox 115+) and NFR-005.001 are deferred follow-ups, not blocking for this ticket; tracked as a follow-up rather than a release gate.
 - Assumption: The decision type is read-only in the browser; creating decisions or changing their type remains CLI-only.
 - Assumption: Supersession in the browser follows the CLI rule: `--superseded-by` cannot be combined with `--status`; the browser enforces the same mutual exclusion as a validation error.
 
@@ -239,11 +239,11 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-04, REQ-04.001, REQ-04.002 |
+| Requirement | REQ-006, REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012, REQ-004, REQ-004.001, REQ-004.002 |
 | Business rule | BR-004 (browser command behavior), BR-008 (decision command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-13, TASK-15, TASK-86 |
-| Increment boundary | REQ-06.002 covers both stores; the documentation-store part (requirements) was delivered by TASK-6/TASK-7, the backlog-store part by TASK-11, the decisions-store part by this ticket. |
+| Increment boundary | REQ-006.002 covers both stores; the documentation-store part (requirements) was delivered by TASK-6/TASK-7, the backlog-store part by TASK-11, the decisions-store part by this ticket. |
 | UI mockups | MOCK-0001 (approved baseline); MOCK-0002 (approved); MOCK-0003 (pending) — `docs/specifications/ui/mockups/MOCK-0003-browser-decision-records-review.html` |
 | Related specification | `docs/specifications/browser-requirements.md` (TASK-6 baseline), `docs/specifications/browser-tasks-milestones-and-releases.md` (TASK-11), `docs/specifications/decision-records-management.md` (TASK-13) |
 | Related specification | `docs/specifications/ui/browser-decision-records-ui.md` (UI description) |

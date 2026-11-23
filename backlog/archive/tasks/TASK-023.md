@@ -15,19 +15,17 @@ dependencies:
   - TASK-015
 references:
   - README.md
-  - docs/requirements/business/REQ-05.003.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.003.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
   - docs/specifications/browser-glossary-terms.md
   - docs/specifications/ui/browser-glossary-terms-ui.md
 documentation:
-  - docs/specifications/browser-glossary-terms.md
-  - docs/specifications/ui/browser-glossary-terms-ui.md
 type: feature
 ordinal: 23300
 ---

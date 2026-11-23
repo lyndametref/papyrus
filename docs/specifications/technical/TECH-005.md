@@ -10,11 +10,11 @@ references:
   - ADR-0003
   - BR-009
   - BR-010
-  - NFR-03.002
-  - NFR-06.001
-  - NFR-06.002
-  - REQ-01
-  - REQ-05
+  - NFR-003.002
+  - NFR-006.001
+  - NFR-006.002
+  - REQ-001
+  - REQ-005
   - TASK-1
   - TASK-2
   - TASK-3
@@ -47,7 +47,7 @@ Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config 
 - New product features, command behavior, or record types (TASK-5 onward).
 - Changes to req/nfreq implementation except bug fixes found during verification.
 - Verification on Debian Trixie or any release other than Forky (see OQ-1).
-- Advertising support for any Debian release beyond Forky (NFR-03.002 amendment pending).
+- Advertising support for any Debian release beyond Forky (NFR-003.002 amendment pending).
 - UI mockups or web UI.
 - Changes to requirements files (`docs/requirements/`) or business rules (`docs/business-rules/`).
 - Refreshing the runtime dependency-license audit table (TASK-1 audit remains valid; no new runtime dependencies were added by TASK-2/TASK-3 beyond those already audited).
@@ -112,7 +112,7 @@ Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config 
 
 - Assumption: Rust 1.99.1 via rustup and `dpkg-deb` are available in the build environment (ADR-0001, ADR-0003).
 - Assumption: an isolated Debian Forky environment (container/chroot/VM) is available for install/uninstall/smoke tests; the host is never modified.
-- Assumption: Trixie verification is not performed in this task; supported-release claim is narrowed to Forky (ADR-0003). Amending NFR-03.002 to match is pending and out of this ticket's scope (see OQ-1).
+- Assumption: Trixie verification is not performed in this task; supported-release claim is narrowed to Forky (ADR-0003). Amending NFR-003.002 to match is pending and out of this ticket's scope (see OQ-1).
 - Assumption: the Cargo package version remains the single source of truth for the `.deb` version and `--version` output.
 - Assumption: the TASK-1 runtime dependency-license audit remains valid; no new runtime dependencies were introduced by TASK-2/TASK-3 that are absent from that audit (yaml_serde and serde_json were already audited).
 - Assumption: automated integration tests use the built binary (`CARGO_BIN_EXE_papyrus`) and temp directories, consistent with existing `tests/req_cli.rs` and `tests/cli.rs`.
@@ -120,15 +120,15 @@ Package the current Papyrus feature set (TASK-1 foundation + TASK-2 init/config 
 
 ## Open questions
 
-- OQ-1: NFR-03.002 still states "Debian Trixie, Forky, and later Debian releases". This task and ADR-0003 narrow the verified/advertised target to Forky only. Amending NFR-03.002 (and any linked docs) requires the requirements-engineer and is out of this ticket's write scope. Until amended, the ticket's supported-release claim conflicts with NFR-03.002 as written. **Blocker for marking execution-ready if strict requirement alignment is required.**
+- OQ-1: NFR-003.002 still states "Debian Trixie, Forky, and later Debian releases". This task and ADR-0003 narrow the verified/advertised target to Forky only. Amending NFR-003.002 (and any linked docs) requires the requirements-engineer and is out of this ticket's write scope. Until amended, the ticket's supported-release claim conflicts with NFR-003.002 as written. **Blocker for marking execution-ready if strict requirement alignment is required.**
 - OQ-2: Whether the new integration test duplicates existing `tests/req_cli.rs` coverage or adds a consolidated end-to-end lifecycle test; implementation should avoid redundant tests and prefer filling gaps (exit-code matrix, ID preservation).
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-01, REQ-05 |
-| Non-functional | NFR-03.002, NFR-06.001, NFR-06.002 |
+| Requirement | REQ-001, REQ-005 |
+| Non-functional | NFR-003.002, NFR-006.001, NFR-006.002 |
 | Business rule | BR-009 (req), BR-010 (nfreq) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Forky-only supported release; supersedes ADR-0002) |
 | Ticket | TASK-4 |

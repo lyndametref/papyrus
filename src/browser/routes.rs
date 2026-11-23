@@ -8,7 +8,7 @@
 
 use crate::registry::{ArtifactCategory as CategoryKind, ArtifactRegistry, TypeDescriptor};
 
-/// The three sidebar groups (REQ-06.003).
+/// The three sidebar groups (REQ-006.003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NavGroup {
     Backlog,

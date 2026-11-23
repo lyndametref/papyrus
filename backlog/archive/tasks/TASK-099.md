@@ -14,10 +14,10 @@ milestone: MS-017
 dependencies:
   - TASK-086
 references:
-  - docs/requirements/business/REQ-01.006.md
+  - docs/requirements/business/REQ-001.006.md
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
-  - docs/requirements/business/REQ-01.001.md
-  - docs/requirements/business/REQ-01.007.md
+  - docs/requirements/business/REQ-001.001.md
+  - docs/requirements/business/REQ-001.007.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/business-rules/BR-018-use-case-document-type-behavior.md
   - docs/business-rules/BR-019-test-case-document-type-behavior.md
@@ -33,7 +33,7 @@ ordinal: 39085
 
 
 ## Description
-Conformance gap against REQ-01.006. `papyrus init` must present artifact activation as a single cursor-driven list. The shipped `src/init.rs` (`build_config_interactive`, ~lines 152-187) still prints a static `[x]` block and reads one line of space-separated artifact names, so the user cannot move a cursor or toggle a row; only typed tokens work. This ticket replaces that presentation. No new requirement is introduced and no CLI surface changes.
+Conformance gap against REQ-001.006. `papyrus init` must present artifact activation as a single cursor-driven list. The shipped `src/init.rs` (`build_config_interactive`, ~lines 152-187) still prints a static `[x]` block and reads one line of space-separated artifact names, so the user cannot move a cursor or toggle a row; only typed tokens work. This ticket replaces that presentation. No new requirement is introduced and no CLI surface changes.
 
 Scope (all inside `src/init.rs` plus tests and the feature specification):
 1. Render all artifacts as one vertical list: core rows `task`, `milestone`, `release` first (fixed active marker, "always active" indication, never highlighted, never toggled), then decision types `adr`, `bdr`, then document types in schema order (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `deploy`, `tech-spec`, `use-case`, `test-case`, `test-report`). All rows start active.
@@ -76,7 +76,7 @@ Specification: `docs/specifications/interactive-init-walkthrough-for-artifact-ac
 ## Definition of Done
 - [x] #1 `cargo test` passes, including `tests/no_drift.rs` and the non-interactive init cases.
 - [x] #2 `cargo fmt --check` is clean.
-- [x] #3 The generated `papyrus.config.yml` validates (REQ-01.007) and only activated artifacts are enabled (BR-016).
+- [x] #3 The generated `papyrus.config.yml` validates (REQ-001.007) and only activated artifacts are enabled (BR-016).
 - [x] #4 No new CLI flag, environment variable, or configuration key is introduced.
 - [x] #5 No new crate dependency is added; terminal handling follows the TASK-104 architecture decision (ADR recorded in `docs/architecture/adr/`).
 - [x] #6 Behavior is verified on a real TTY, not only by unit tests: cursor movement, Space toggle, Enter confirm, end-of-input confirm, Ctrl-C, and terminal input mode restored afterwards; the verification is recorded in the implementation notes.
@@ -107,7 +107,7 @@ Architecture of record: ADR-0015 (`docs/architecture/adr/ADR-0015-cursor-driven-
 
 5. Tests: unit tests in `src/init.rs` drive the list through a test-local `ScriptedKeySource` and a `Vec<u8>` writer, asserting frames and the written `papyrus.config.yml` (initial cursor, movement, clamping, toggle, core rows unreachable, unrelated keys, Enter, EOF, Ctrl-C, degraded path); `tests/cli.rs` keeps covering the non-TTY defaults path; the real keyboard path is verified manually on a TTY and recorded in the notes.
 
-6. Documentation: REQ-01.006 conformance plus specification section 2 rewrite and section 1.2/4.4 cleanup (done during refinement); ADR-0015 records the decision and ADR-0014 its rejection. README/BR-002 wording is unchanged because the current manpage text stays accurate.
+6. Documentation: REQ-001.006 conformance plus specification section 2 rewrite and section 1.2/4.4 cleanup (done during refinement); ADR-0015 records the decision and ADR-0014 its rejection. README/BR-002 wording is unchanged because the current manpage text stays accurate.
 
 
 ## Notes

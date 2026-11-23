@@ -14,23 +14,22 @@ dependencies:
   - TASK-008
   - TASK-009
 references:
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-02.001.md
-  - docs/requirements/business/REQ-02.002.md
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-03.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-002.001.md
+  - docs/requirements/business/REQ-002.002.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-003.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/specifications/ui/mockups/MOCK-0002-browser-backlog-records-review.html
   - docs/specifications/browser-tasks-milestones-and-releases.md
 documentation:
   - docs/specifications/ui/browser-backlog-records-ui.md
-  - docs/specifications/browser-tasks-milestones-and-releases.md
 type: feature
 ordinal: 10000
 ---
@@ -87,15 +86,15 @@ Test requirements (T-11a–T-11j, spec §10):
 - T-11i: JSON API returns the documented shapes and rejects bad bodies.
 - T-11j: build, tests, clippy, and formatting pass with existing dependencies only.
 
-Deferred (follow-up, non-blocking): AC #10 real-browser verification in Firefox/Edge/Safari 100+ and NFR-05.001.
+Deferred (follow-up, non-blocking): AC #10 real-browser verification in Firefox/Edge/Safari 100+ and NFR-005.001.
 
 
 ## Notes
 UI mockup MOCK-0002 approved by the user on 2026-11-04 (TASK-11). Extends MOCK-0001 shell: single combined backlog view, kanban by status, expandable milestones, framed tags, bullet-list acceptance criteria, tag-based dependency editing, searchable milestone dropdown. Registry and UI description updated to approved.
 
-Deferred follow-up (non-blocking): AC #10 real-browser verification (Firefox/Edge/Safari 100+) and NFR-05.001 are tracked as follow-up, not a release gate for this ticket.
+Deferred follow-up (non-blocking): AC #10 real-browser verification (Firefox/Edge/Safari 100+) and NFR-005.001 are tracked as follow-up, not a release gate for this ticket.
 
-Quality review (gatekeeper, recheck): Ready to close. All AC #1-#9 pass; AC #10 deferred (real-browser, non-blocking). DoD #1-#6 pass. 10 T-11 tests pass; cargo build/test (150 passed)/clippy/fmt all pass. Scope: browser code + tests + spec/doc. NFR-01.002/003, NFR-02.002, NFR-04.001/002 addressed; NFR-05.001 deferred.
+Quality review (gatekeeper, recheck): Ready to close. All AC #1-#9 pass; AC #10 deferred (real-browser, non-blocking). DoD #1-#6 pass. 10 T-11 tests pass; cargo build/test (150 passed)/clippy/fmt all pass. Scope: browser code + tests + spec/doc. NFR-001.002/003, NFR-002.002, NFR-004.001/002 addressed; NFR-005.001 deferred.
 
 
 ## Comments

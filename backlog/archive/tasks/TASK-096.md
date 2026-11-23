@@ -13,13 +13,12 @@ milestone: MS-017
 dependencies:
   - TASK-081
 references:
-  - docs/requirements/business/REQ-06.013.md
+  - docs/requirements/business/REQ-006.013.md
   - docs/specifications/ui/browser-backlog-records-ui.md
   - docs/specifications/browser-tasks-milestones-and-releases.md
   - docs/specifications/ui/mockups/README.md
   - docs/specifications/browser-spec-revisions-task-101.md
 documentation:
-  - docs/specifications/browser-spec-revisions-task-101.md
 priority: high
 type: docs
 ordinal: 39035
@@ -27,7 +26,7 @@ ordinal: 39035
 
 
 ## Description
-Revise the browser specification corpus so it states the per-milestone kanban board contract required by REQ-06.013, and name the mockup revision that must be approved before implementation.
+Revise the browser specification corpus so it states the per-milestone kanban board contract required by REQ-006.013, and name the mockup revision that must be approved before implementation.
 
 Scope (in): revise docs/specifications/browser-tasks-milestones-and-releases.md (section 3 List page) and docs/specifications/ui/browser-backlog-records-ui.md (section 4 Backlog view) so they state:
 - Per-milestone kanban board: milestones stay expandable/collapsible; an expanded milestone shows its tasks in one column per configured task status, in configured order, with empty-status columns still visible.
@@ -57,9 +56,9 @@ Open questions: OQ-1 whether any flat task listing remains reachable alongside t
 - [ ] #1 All target browser specifications (browser-tasks-milestones-and-releases.md, browser-backlog-records-ui.md) revised and internally consistent
 - [ ] #2 No revised section describes releases as separators between a flat milestone list or status change as drag-only
 - [ ] #3 The MOCK-0002 revision is named and must be approved (TASK-102) before implementation
-- [ ] #4 Traceability sections cite REQ-06.013, ADR-0006, and ADR-0013
+- [ ] #4 Traceability sections cite REQ-006.013, ADR-0006, and ADR-0013
 - [ ] #5 Requirements and business rules files are unchanged
 
 
 ## Notes
-Revised docs/specifications/browser-tasks-milestones-and-releases.md §3 (List page) to the per-milestone kanban board contract (release grouping, tasks-without-milestone section, card order/contents, status-change via drag + non-drag control, archived exclusion, design-decision list). Revised docs/specifications/ui/browser-backlog-records-ui.md §4 (Backlog view) accordingly. Updated mockups/README.md to note MOCK-0002 requires revision and re-approval under TASK-102. Traceability cites REQ-06.013, ADR-0006, ADR-0013.
+Revised docs/specifications/browser-tasks-milestones-and-releases.md §3 (List page) to the per-milestone kanban board contract (release grouping, tasks-without-milestone section, card order/contents, status-change via drag + non-drag control, archived exclusion, design-decision list). Revised docs/specifications/ui/browser-backlog-records-ui.md §4 (Backlog view) accordingly. Updated mockups/README.md to note MOCK-0002 requires revision and re-approval under TASK-102. Traceability cites REQ-006.013, ADR-0006, ADR-0013.

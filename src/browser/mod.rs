@@ -836,7 +836,7 @@ fn view_descriptor(state: &RequestState<'_>, slug: &str) -> Option<TypeDescripto
 
 /// Validate the optional list status filter: at most one `status` parameter
 /// whose value is offered by the descriptor. An explicit empty, unknown,
-/// archived, or duplicate value is 400 (NFR-02.002).
+/// archived, or duplicate value is 400 (NFR-002.002).
 fn status_filter(
     request: &Request,
     descriptor: &TypeDescriptor,

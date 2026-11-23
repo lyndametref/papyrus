@@ -16,9 +16,9 @@ accepted
 
 ## Context
 
-TASK-6 delivers the first increment of `papyrus browser`: an offline, project-local web interface over business-requirement and non-functional-requirement records. The behavior contract is `docs/specifications/browser-requirements.md`, traced to REQ-06.002, BR-004, NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.002, and NFR-05.001.
+TASK-6 delivers the first increment of `papyrus browser`: an offline, project-local web interface over business-requirement and non-functional-requirement records. The behavior contract is `docs/specifications/browser-requirements.md`, traced to REQ-006.002, BR-004, NFR-001.002, NFR-001.003, NFR-002.002, NFR-004.002, and NFR-005.001.
 
-The browser content inventory is delivered incrementally toward NFR-01.002 ("all Papyrus content"): this ADR fixes the transport, asset delivery, rendering, module boundaries, and security baseline that every later increment reuses; each increment adds document types and routes without changing this baseline. The module and route structure is intentionally extensible so a new document type is added by one module/route entry rather than a redesign.
+The browser content inventory is delivered incrementally toward NFR-001.002 ("all Papyrus content"): this ADR fixes the transport, asset delivery, rendering, module boundaries, and security baseline that every later increment reuses; each increment adds document types and routes without changing this baseline. The module and route structure is intentionally extensible so a new document type is added by one module/route entry rather than a redesign.
 
 ADR-0001 selects Rust and ADR-0004 fixes the repository-root single crate. The TASK-6 specification additionally forbids a web framework, an async runtime, a templating engine, a Markdown renderer, a second crate/application, and any new runtime dependency. Those constraints leave an unresolved architectural question: how the HTTP interface is built, how UI assets are delivered, and what security posture applies. The answer is cross-cutting because later browser increments (TASK-11, TASK-15, TASK-19, TASK-23 … TASK-27) and packaging (TASK-7, binary-only `.deb`) inherit it.
 
@@ -40,7 +40,7 @@ The alternatives considered were a Rust web framework (for example axum or actix
 ## Consequences
 **Positive:**
 
-- The browser works fully offline and needs no runtime dependency, external server, asset directory, or network fetch (NFR-01.003).
+- The browser works fully offline and needs no runtime dependency, external server, asset directory, or network fetch (NFR-001.003).
 - The package stays a single binary plus copyright, matching ADR-0002/ADR-0003 packaging and TASK-7 verification.
 - No new supply-chain surface or license audit is introduced beyond the existing dependencies.
 - The fixed route table and record-ID resolution avoid path traversal and keep the security model auditable.
@@ -52,7 +52,7 @@ The alternatives considered were a Rust web framework (for example axum or actix
 - Concurrency is limited to 16 blocking threads with no keep-alive; this is adequate for a single-user loopback interface but not for multi-user or high-throughput use.
 - Rendering is hand-rolled: the `{{name}}` substitution and raw-fragment allowlist must be maintained carefully, and there is no template engine safety net.
 - No authentication or TLS means a non-loopback bind exposes an unauthenticated read/write interface to the network; the warning is the only guard.
-- Browser-version support (NFR-05.001) is verified at markup/asset level, not by driving real GUI browsers.
+- Browser-version support (NFR-005.001) is verified at markup/asset level, not by driving real GUI browsers.
 
 **Risks and mitigations:**
 
@@ -63,7 +63,7 @@ The alternatives considered were a Rust web framework (for example axum or actix
 - *Per-request re-reads*: every request re-reads record files from disk (specification section 3.18 and ADR-0006 save-then-reread); the configuration, registry, and route table are served from the in-server snapshot of ADR-037, which is rebuilt only when the configuration file's modification time or length changes. Configuration re-reads per record are gone, and reference resolution parses each record once per request. Residual per-request record reads are accepted and tracked as performance follow-ups.
 
   *Revision (2026-11-20, amended by ADR-037): this risk bullet previously said every request re-reads configuration and record files and accepted per-record configuration re-reads. Configuration, registry, and routes now come from one mtime-invalidated snapshot, and duplicate record parsing within a request is collapsed into one request-scoped record snapshot. The no-cache rule for record content between requests is unchanged.*
-- *Deferred follow-ups (tracked, not implemented here)*: config loading moved out of `commands`; per-record config re-reads (retired by ADR-037) and duplicate record parsing within a request (collapsed by ADR-037's request-scoped record snapshot); template placeholder hardening tests; test temp-directory hygiene (older suites use `std::env::temp_dir()`); manpage/README over-promising ("both backlog and documentation stores"); NFR-01.002 scope clarification; NFR-05.001 real-browser (GUI) verification. Owners implied by affected area.
+- *Deferred follow-ups (tracked, not implemented here)*: config loading moved out of `commands`; per-record config re-reads (retired by ADR-037) and duplicate record parsing within a request (collapsed by ADR-037's request-scoped record snapshot); template placeholder hardening tests; test temp-directory hygiene (older suites use `std::env::temp_dir()`); manpage/README over-promising ("both backlog and documentation stores"); NFR-001.002 scope clarification; NFR-005.001 real-browser (GUI) verification. Owners implied by affected area.
 - *Future scale or feature pressure*: introducing a framework, async runtime, template engine, or external asset pipeline requires a new ADR; this ADR is the baseline those changes must supersede.
 ## Alternatives Considered
 
@@ -80,7 +80,7 @@ The alternatives considered were a Rust web framework (for example axum or actix
 
 - `docs/specifications/browser-requirements.md` — TASK-6 behavior contract, HTTP routes, security, assets, browser support.
 - `docs/specifications/search-browser-milestone-packaging-and-verification.md` — TASK-7 packaging and embedded-asset verification.
-- `docs/requirements/non-functional/NFR-01.002.md`, `NFR-01.003.md`, `NFR-02.001.md`, `NFR-02.002.md`, `NFR-04.001.md`, `NFR-04.002.md`, `NFR-05.001.md`.
+- `docs/requirements/non-functional/NFR-001.002.md`, `NFR-001.003.md`, `NFR-002.001.md`, `NFR-002.002.md`, `NFR-004.001.md`, `NFR-004.002.md`, `NFR-005.001.md`.
 - `docs/architecture/adr/ADR-0001-implementation-language-rust.md` — Rust and Cargo.
 - `docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md` — single-crate layout.
 - Implementation: `src/browser/mod.rs`, `src/browser/http.rs`, `src/browser/records.rs`, `src/browser/render.rs`, `src/browser/templates/`, `src/browser/app.css`, `src/browser/app.js`.

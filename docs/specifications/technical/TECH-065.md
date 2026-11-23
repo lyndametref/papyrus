@@ -15,24 +15,24 @@ references:
   - ADR-0012
   - ADR-0013
   - MOCK-0002
-  - NFR-03.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-04.004
-  - NFR-05.001
-  - NFR-06.001
-  - NFR-06.002
-  - REQ-01.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-01.005
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-06.002
-  - REQ-06.004
-  - REQ-06.008
-  - REQ-06.013
+  - NFR-003.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-004.004
+  - NFR-005.001
+  - NFR-006.001
+  - NFR-006.002
+  - REQ-001.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-001.005
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-006.002
+  - REQ-006.004
+  - REQ-006.008
+  - REQ-006.013
   - TASK-1
   - TASK-100
   - TASK-102
@@ -48,18 +48,18 @@ references:
   - TASK-98
   - TASK-99
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
 # TECH-065 Release 1.0 Native Layout, Import, Relocation, and Single ID Space Verification and Packaging
 
-> **Revised (TASK-203, 2026-11-18):** the browser configuration-view clauses — the relocation scope bullet, section 7 item 4, and the `browser view equivalence` part of the T-98-08 verification row — are retired per ADR-034 and REQ-06.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The CLI-only `config set` relocation and installed-binary verification clauses (REQ-01.002) remain current. REQ-06.008, which the retired clauses cite, is archived; the retired text is retained below as history. See TECH-080.
+> **Revised (TASK-203, 2026-11-18):** the browser configuration-view clauses — the relocation scope bullet, section 7 item 4, and the `browser view equivalence` part of the T-98-08 verification row — are retired per ADR-034 and REQ-006.018 (RE-005): the browser serves no configuration view and configuration editing is CLI-only. The CLI-only `config set` relocation and installed-binary verification clauses (REQ-001.002) remain current. REQ-006.008, which the retired clauses cite, is archived; the retired text is retained below as history. See TECH-080.
 
 ## Description
 ## Purpose
 
-Deliver ADR-0013 **stage 8**: prove end to end that the combined properties the Backlog.md renunciation depends on actually hold, then produce and verify the installable release package. The individual implementation tasks tested their own behaviour; this ticket tests the whole: adoption idempotency and byte identity, no Backlog-shaped write anywhere, one Papyrus identity on every surface, import fidelity against a real sample store, relocation that never loses a folder, and search that still indexes whole persisted text now that front matter is part of it. It closes the ADR-0013 stage 8 gate on the release that claims NFR-04.004 and produces the amd64 Debian package required by NFR-03.002.
+Deliver ADR-0013 **stage 8**: prove end to end that the combined properties the Backlog.md renunciation depends on actually hold, then produce and verify the installable release package. The individual implementation tasks tested their own behaviour; this ticket tests the whole: adoption idempotency and byte identity, no Backlog-shaped write anywhere, one Papyrus identity on every surface, import fidelity against a real sample store, relocation that never loses a folder, and search that still indexes whole persisted text now that front matter is part of it. It closes the ADR-0013 stage 8 gate on the release that claims NFR-004.004 and produces the amd64 Debian package required by NFR-003.002.
 
 This is a verification and packaging ticket. Product behaviour must not change; only a minimal defect fix is permitted when a verification step proves a defect, and such a fix is reported separately in the ticket notes.
 
@@ -73,7 +73,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 - Invisibility of an unimported Backlog.md store on every surface, and full readability after `papyrus import backlog`.
 - Single-ID proof for CLI text, CLI `--json`, browser JSON, browser HTML, and browser URLs, including rejection of a Backlog ID as an unknown record.
 - Import fidelity, excluded scope, and the documented upgrade path, verified against the sample fixture only.
-- Relocation atomicity and conflict behaviour, re-verified through the installed binary; **retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the check that the browser configuration view reaches the same `config set` path — the browser serves no configuration view, so only the CLI `config set` relocation path is re-verified.
+- Relocation atomicity and conflict behaviour, re-verified through the installed binary; **retired (TASK-203, 2026-11-18, ADR-034, REQ-006.018):** the check that the browser configuration view reaches the same `config set` path — the browser serves no configuration view, so only the CLI `config set` relocation path is re-verified.
 - Search indexing whole persisted text including front matter, and correspondence with the documented search behaviour.
 - Rust quality gates on the pinned toolchain, and the isolated Debian Forky amd64 package build, install, smoke, uninstall, and purge.
 - One new automated integration test file, `tests/release_native_layout_smoke.rs`, for the parts that can be asserted against the built binary.
@@ -85,11 +85,11 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 - Changing requirements, business rules, ADRs, packaging scripts, or Debian control metadata.
 - Authoring the Release 1.0 upgrade notes and release summary (TASK-99) and closing the release (TASK-73).
 - Version bumping. The package carries the `Cargo.toml` version unchanged (open question OQ-2).
-- Debian releases other than Forky, and architectures other than amd64 (ADR-0003, NFR-03.002).
+- Debian releases other than Forky, and architectures other than amd64 (ADR-0003, NFR-003.002).
 - Real-GUI browser runs in Firefox, Edge, or Safari; verification is markup, asset, and HTTP level (OQ-1).
 - New UI mockups or design work.
 - Repeating per-feature contract coverage already authoritative in `tests/*_cli.rs`, `tests/*_smoke.rs`, `tests/no_drift.rs`, `tests/config_relocation_cli.rs`, and `tests/import_backlog_cli.rs`.
-- New runtime dependencies; the TASK-1/TASK-4 dependency-license audit remains the reference (NFR-06.002).
+- New runtime dependencies; the TASK-1/TASK-4 dependency-license audit remains the reference (NFR-006.002).
 
 ## Behavior
 
@@ -150,7 +150,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 1. `config set backlog_directory <new>` moves every file and subfolder of the source folder, including unmanaged files, and removes the source folder when empty.
 2. A destination conflict, an unwritable destination, or a destination outside the project exits 4, moves nothing, leaves both trees intact, and persists no configuration value; the configuration file is byte-identical.
 3. A multi-segment destination is accepted and resolved relative to the project directory; every resolved path stays inside the project.
-4. **Retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the browser configuration view reaches the same relocation path: the same move performed through the view produces the same on-disk result and configuration value as the CLI, and the view never moves a folder itself. No browser configuration view exists; items 1-3 and 5 remain current for the CLI `config set` path.
+4. **Retired (TASK-203, 2026-11-18, ADR-034, REQ-006.018):** the browser configuration view reaches the same relocation path: the same move performed through the view produces the same on-disk result and configuration value as the CLI, and the view never moves a folder itself. No browser configuration view exists; items 1-3 and 5 remain current for the CLI `config set` path.
 5. Success and conflict are re-verified through the installed binary; `tests/config_relocation_cli.rs` remains authoritative for the exhaustive case matrix.
 
 ### 8. Search over whole persisted text (CLI) and browser record exposure
@@ -183,7 +183,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 
 1. `docs/packaging.md` gains a TASK-98 section recording: environment (Debian Forky amd64, glibc, `rustc`/`cargo`, clippy, `dpkg`, `fakeroot`, `unshare` availability), date with timezone, isolation method, test count, package name/size/SHA-256, quality-gate table, install/uninstall/smoke table, and recorded limitations.
 2. The ticket notes carry the same evidence summary plus the fixture hash checks, the front-matter-only search query, the relocation outcomes, and every finding raised against another ticket.
-3. The section states that Debian Forky amd64 is supported and verified, and that Trixie and other releases are not claimed or verified (ADR-0003, NFR-03.002).
+3. The section states that Debian Forky amd64 is supported and verified, and that Trixie and other releases are not claimed or verified (ADR-0003, NFR-003.002).
 4. Recorded limitations reuse the established pattern: no real-GUI browser run (OQ-1), packaging script does not force a rebuild (mitigated by building first and asserting `--help`), and any environment that could not be exercised.
 5. The repository backlog store is confirmed untouched (section 1.6) and this is stated in the evidence.
 6. Every scratch directory, isolated dpkg root, staged package tree, and temporary fixture created under `./.tmp/` is removed before the task ends, including on failure; the built `.deb` and the recorded evidence remain.
@@ -234,7 +234,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 | T-98-05 | One Papyrus ID on every surface; Backlog ID rejected | Captured CLI text, `--json`, browser HTML, JSON API, URLs; `task view task-1` exits 3 |
 | T-98-06 | Import fidelity, bodies, destinations, excluded scope | Fixture-expectation comparison of every in-scope record and the excluded counts |
 | T-98-07 | Documented upgrade path executes as written | Literal procedure run on the isolated project; plan/report kept; findings recorded |
-| T-98-08 | Relocation atomicity, conflict, containment, browser path | CLI `config set` success/conflict, hash comparisons, installed-binary re-check; **retired (TASK-203, 2026-11-18, ADR-034, REQ-06.018):** the former browser-path and browser view equivalence requirements, which the rewritten `t98_08` no longer tests because the browser serves no configuration view |
+| T-98-08 | Relocation atomicity, conflict, containment, browser path | CLI `config set` success/conflict, hash comparisons, installed-binary re-check; **retired (TASK-203, 2026-11-18, ADR-034, REQ-006.018):** the former browser-path and browser view equivalence requirements, which the rewritten `t98_08` no longer tests because the browser serves no configuration view |
 | T-98-09 | Search indexes front matter on the CLI; browser exposes the record | Front-matter-only query via `papyrus search` (text and `--json`); the same record rendered by the browser record view and the JSON API; project hash unchanged |
 | T-98-10 | Rust quality gates pass | `cargo build --release`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` |
 | T-98-11 | Debian package metadata and contents | `./scripts/build-deb.sh`, `dpkg-deb -I`, `dpkg-deb -c`, copyright inspection |
@@ -243,7 +243,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 
 ## Assumptions
 
-- Assumption: the verification host is Debian Forky amd64. At refinement it reports `forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and Rust 1.99.1 pinned by `rust-toolchain.toml`; the isolated `dpkg --instdir/--admindir` install therefore satisfies NFR-03.002's verification method without a container (OQ-3).
+- Assumption: the verification host is Debian Forky amd64. At refinement it reports `forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and Rust 1.99.1 pinned by `rust-toolchain.toml`; the isolated `dpkg --instdir/--admindir` install therefore satisfies NFR-003.002's verification method without a container (OQ-3).
 - Assumption: an isolated sample Backlog.md project is the only import source and the repository's own store is not imported in this ticket; its one-time import is deferred out of Release 1.0 (project-owner decision; TASK-100 archived).
 - Assumption: the upgrade-path check uses the release upgrade notes produced by TASK-99 when they exist at verification time; otherwise it verifies the same steps against the shipped command behaviour and records that the notes were not yet available. No dependency edge is added because TASK-99 is a later-numbered ticket.
 - Assumption: the package version stays `0.1.0`, read from `Cargo.toml`; no version bump is defined for this ticket and release versioning belongs to release orchestration (OQ-2).
@@ -258,7 +258,7 @@ This is a verification and packaging ticket. Product behaviour must not change; 
 
 None of these blocks implementation; each has a specified default.
 
-- **OQ-1 (recommended default: markup/asset/HTTP-level browser verification)** — NFR-05.001's verification method names Firefox, Edge, and Safari. This headless task verifies served markup, assets, HTTP responses, and the board status-change round trip, but does not drive a real GUI browser. Default: record the limitation and rely on the per-feature browser tests plus MOCK-0002; schedule a manual GUI pass outside this ticket if required. Non-blocking.
+- **OQ-1 (recommended default: markup/asset/HTTP-level browser verification)** — NFR-005.001's verification method names Firefox, Edge, and Safari. This headless task verifies served markup, assets, HTTP responses, and the board status-change round trip, but does not drive a real GUI browser. Default: record the limitation and rely on the per-feature browser tests plus MOCK-0002; schedule a manual GUI pass outside this ticket if required. Non-blocking.
 - **OQ-2 (recommended default: keep version 0.1.0)** — No Release 1.0 version number is defined in the requirements. Default: package the current Cargo version unchanged and let release closure (TASK-73) decide on a bump. Non-blocking; flag for the release owner.
 - **OQ-3 (recommended default: `fakeroot dpkg --instdir/--admindir` on the Forky build host)** — Whether a full Forky container or VM is mandatory. Default: the isolated install exercises Forky's glibc and `dpkg` without touching the host; the same checklist applies unchanged if a container is required. Non-blocking.
 - **OQ-4 (recommended default: upgrade notes not a blocker)** — Whether the upgrade-path verification waits for TASK-99. Default: verify the shipped behaviour and the documented steps if available, and record the ordering in the evidence. Non-blocking.
@@ -267,8 +267,8 @@ None of these blocks implementation; each has a specified default.
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005, REQ-05.007, REQ-05.010, REQ-05.011, REQ-06.002, REQ-06.004, REQ-06.008, REQ-06.013 |
-| Non-functional | NFR-03.002, NFR-04.001, NFR-04.002, NFR-04.004, NFR-05.001, NFR-06.001, NFR-06.002 |
+| Requirement | REQ-001.002, REQ-001.003, REQ-001.004, REQ-001.005, REQ-005.007, REQ-005.010, REQ-005.011, REQ-006.002, REQ-006.004, REQ-006.008, REQ-006.013 |
+| Non-functional | NFR-003.002, NFR-004.001, NFR-004.002, NFR-004.004, NFR-005.001, NFR-006.001, NFR-006.002 |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only), ADR-0004 (single crate), ADR-0005 (embedded server, no new dependency), ADR-0006 (atomic writes and version tokens), ADR-0010 (native layout and single ID space), ADR-0011 (one-way import), ADR-0012 (Papyrus-owned front matter), ADR-0013 (stage 8 verification gate) |
 | Feature specification | `docs/specifications/release-1.0-native-layout-verification-and-packaging.md` (this file) |
 | Related specifications | `papyrus-native-record-layout-and-single-id-space.md`, `import-backlog-md-records.md`, `remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md`, `shared-record-envelope-and-front-matter-patcher.md`, `migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write.md`, `render-one-metadata-projection-in-cli-and-browser-views.md`, `search-complete-unified.md`, `browser-tasks-milestones-and-releases.md`, `browser-spec-revisions-task-101.md`, `browser-spec-revisions-task-102.md`, `project-initialization-and-configuration.md`, `rust-cli-and-debian-package-baseline.md` |

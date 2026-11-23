@@ -5,10 +5,10 @@ created_date: '2026-11-19T11:02:52Z'
 updated_date: '2026-11-19T18:44:36Z'
 labels: []
 references:
-  - REQ-06.020
-  - REQ-06.021
-  - REQ-06.022
-  - REQ-06.013
+  - REQ-006.020
+  - REQ-006.021
+  - REQ-006.022
+  - REQ-006.013
   - RE-008
   - TECH-011
   - TECH-062
@@ -76,7 +76,7 @@ type: refinement
 ## Description
 Outcome: confirm all information needed to implement lowest-ordinal milestone ordering, lifecycle markers, and cleanup controls in the browser Backlog board is available, and complete the refinement fields for TASK-209.
 
-Scope: refine TASK-209 so it is self-contained and implementation-ready. The implementation covers REQ-06.020 (ordering milestones and releases by the lowest ordinal of their non-archived tasks, ascending), REQ-06.021 (open and closed lifecycle markers before titles), and REQ-06.022 (browser-only cleanup controls with confirmation and partial-failure handling) in the combined Backlog board only. The ascending lowest-ordinal rule supersedes the earlier highest-ordinal descending rule.
+Scope: refine TASK-209 so it is self-contained and implementation-ready. The implementation covers REQ-006.020 (ordering milestones and releases by the lowest ordinal of their non-archived tasks, ascending), REQ-006.021 (open and closed lifecycle markers before titles), and REQ-006.022 (browser-only cleanup controls with confirmation and partial-failure handling) in the combined Backlog board only. The ascending lowest-ordinal rule supersedes the earlier highest-ordinal descending rule.
 
 Prerequisites verified:
 - Architecture impact assessed and user-verified: TASK-205 Done; TECH-011 and TECH-062 revised to draft and conformance recorded as conformant by the architect; no new ADR.
@@ -105,7 +105,7 @@ Definition of done: TASK-209 has a self-contained description, testable acceptan
 - [ ] #4 Dependency TASK-207 is Done.
 - [ ] #5 TASK-209 has a self-contained description stating scope, implementation surface, out-of-scope items, assumptions, and definition of done.
 - [ ] #6 TASK-209 has testable acceptance criteria covering ordering, markers, cleanup, browser-only constraints, and verification.
-- [ ] #7 TASK-209 references REQ-06.020, REQ-06.021, REQ-06.022, REQ-06.013, RE-008, TECH-011, TECH-062, UI-002, MOCK-022, BR-004, and TC-066 through TC-097.
+- [ ] #7 TASK-209 references REQ-006.020, REQ-006.021, REQ-006.022, REQ-006.013, RE-008, TECH-011, TECH-062, UI-002, MOCK-022, BR-004, and TC-066 through TC-097.
 - [ ] #8 TASK-209 documentation lists the implementation and test files it will touch.
 - [ ] #9 No open material questions remain.
 - [ ] #10 Refinement evidence is recorded as a comment on TASK-208.

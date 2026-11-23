@@ -17,11 +17,11 @@ Superseded by ADR-036
 
 ## Context
 
-REQ-07.004 requires a document type that exists only because it was declared in `document_types` to be usable immediately: records use the same generic content model as technical specifications — required `title`, optional `description` forming the body, and the general front-matter fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, `status` (REQ-05.010). Labels and references are repeatable (`--label`, `--reference`). IDs come from the entry's `prefix` and `id_padding` (REQ-01.005), files live under `doc_directory` plus the entry's `directory`, archives under that folder's `archived/` (REQ-05.007). The requirement explicitly excludes a per-type field schema and a template file, and states that default document types keep their existing type-specific content (REQ-05.001–REQ-05.014).
+REQ-007.004 requires a document type that exists only because it was declared in `document_types` to be usable immediately: records use the same generic content model as technical specifications — required `title`, optional `description` forming the body, and the general front-matter fields `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, `status` (REQ-005.010). Labels and references are repeatable (`--label`, `--reference`). IDs come from the entry's `prefix` and `id_padding` (REQ-001.005), files live under `doc_directory` plus the entry's `directory`, archives under that folder's `archived/` (REQ-005.007). The requirement explicitly excludes a per-type field schema and a template file, and states that default document types keep their existing type-specific content (REQ-005.001–REQ-005.014).
 
 Current code shape: there is no generic writer. Every document type has its own module with its own sections, required fields, and create path (`src/tech_spec.rs` writes `## Description`; `src/glossary.rs` writes `## Definition`; `src/rule.rs` writes four sections; `src/requirement.rs` writes `## User Story`, `## Group`, `## Description`, and dotted IDs). `src/nfreq.rs` exists only as an alias module for the `nfreq` command name. The shared envelope (`record::document`, `record::patch`, `record::store`) already supports arbitrary bodies and is the only writer (ADR-0013), and front matter is the single metadata source with a key registry (ADR-0012), so a generic type needs no new parser.
 
-Forces: a config-defined type must not require a code change (REQ-07.002/REQ-07.003); front matter and the patch contract must stay the single metadata mechanism; no new dependency and no templating (ADR-0005); the body must survive edits byte-identically outside the fields being changed (REQ-05.011); built-in types must not be re-shaped by the generic path (REQ-07.004); and the same model must serve the CLI and the browser edit view (REQ-06.014).
+Forces: a config-defined type must not require a code change (REQ-007.002/REQ-007.003); front matter and the patch contract must stay the single metadata mechanism; no new dependency and no templating (ADR-0005); the body must survive edits byte-identically outside the fields being changed (REQ-005.011); built-in types must not be re-shaped by the generic path (REQ-007.004); and the same model must serve the CLI and the browser edit view (REQ-006.014).
 
 ## Decision
 
@@ -34,13 +34,13 @@ Forces: a config-defined type must not require a code change (REQ-07.002/REQ-07.
 
 2. **`status` semantics: main status plus the type's declared custom statuses, and never a create or edit option.** For a config-defined type the front-matter `status` value is either
    - `active` or `archived` — the **main status**, the only values that affect storage location: `archived` implies the file lives in the type's `archived/` subfolder, `active` implies the type's configured folder; or
-   - one of the **custom statuses** declared for that type in `document_types.<slug>.statuses` (REQ-07.001, REQ-07.002) — a front-matter value only, with no folder per status and no file move when it changes.
+   - one of the **custom statuses** declared for that type in `document_types.<slug>.statuses` (REQ-007.001, REQ-007.002) — a front-matter value only, with no folder per status and no file move when it changes.
 
-   A new record starts at the type's `default_status` when one is configured, otherwise at `active`; `archived` is never a valid `default_status` (ADR-0019). `status` is therefore **not** a `create` or `edit` option (REQ-05.011 exempts it): it is lifecycle- and configuration-owned. It changes only through
+   A new record starts at the type's `default_status` when one is configured, otherwise at `active`; `archived` is never a valid `default_status` (ADR-0019). `status` is therefore **not** a `create` or `edit` option (REQ-005.011 exempts it): it is lifecycle- and configuration-owned. It changes only through
    - `papyrus <slug> status <id> <value>`, which accepts `active` or a declared custom status, changes only the front-matter value, refreshes `updated_date`, moves no file, rejects the value `archived` with a validation error naming `archive`, and rejects any record that is already archived; and
    - `papyrus <slug> archive <id>`, which sets `archived` and moves the file (ADR-0022).
 
-   Because the status list comes from configuration, the generic handler validates `status` values against the registry's validated list (ADR-0019) and never against a hard-coded set. UI mockups have no front-matter status, no custom statuses, and no `status` verb (REQ-05.008).
+   Because the status list comes from configuration, the generic handler validates `status` values against the registry's validated list (ADR-0019) and never against a hard-coded set. UI mockups have no front-matter status, no custom statuses, and no `status` verb (REQ-005.008).
 
 3. **One implementation, `src/document.rs`, parameterized by descriptor.** `document::run(ctx, registry, invocation)` is the single entry for every document type, and the `create | list | view | edit | archive | delete | status` handlers take a `TypeDescriptor` from the registry (ADR-0017). There is no `if slug == …` in this module. The delivered delegation split is:
    - `ContentModel::Generic` — the handler performs every verb itself;
@@ -51,7 +51,7 @@ Forces: a config-defined type must not require a code change (REQ-07.002/REQ-07.
 
    *Revision (2026-11-15, owner decision): this decision previously stated that a typed descriptor delegates only its extension verbs and that the baseline verbs are handled here. The delivered split is broader on both sides — typed modules also own the content verbs `create`/`list`/`view`/`edit` and their extensions, and the mockup module owns `archive` and `delete` as well — so the per-verb ownership above replaces the earlier sentence.*
 
-4. **All file access goes through the shared record layer.** Reads use `record::document`; writes use `record::patch` and `record::store::write_atomic`; the path is `record::store::resolve_directory` with `Context::ensure_within` (NFR-04.002). `src/document.rs` may not format a `---` block, re-render a body, or call `fs::write`.
+4. **All file access goes through the shared record layer.** Reads use `record::document`; writes use `record::patch` and `record::store::write_atomic`; the path is `record::store::resolve_directory` with `Context::ensure_within` (NFR-004.002). `src/document.rs` may not format a `---` block, re-render a body, or call `fs::write`.
 
 5. **Identity is plain and allocated per type.** IDs are `<PREFIX>-<zero-padded sequence>` with `id_padding` from configuration, allocated by `record::identity` over the type's active **and** archived locations (ADR-0010 decision 5). The generic model has no dotted or grouped shape; `Dotted`/`Grouped` remain properties of the `req`/`nfr` descriptors only. The prefix comes from the entry and is validated for non-emptiness by ADR-0019.
 
@@ -59,17 +59,17 @@ Forces: a config-defined type must not require a code change (REQ-07.002/REQ-07.
 
 7. **The body is created once and then patched.** `create` writes the front matter plus a single `## Description` section when a description is supplied. `edit` patches `title` in front matter and the heading line together, patches `description` in its section, and appends labels/references; it accepts no `status` option and never writes `status`. `--editor` edits the description section text only. A write that changes nothing performs no write (ADR-0013 decision 4).
 
-8. **Adoption is inherited, not special-cased.** Existing files in the type's directory whose stem matches `<PREFIX>-<digits>` are claimable records and are adopted per record on first read/write exactly as any managed Markdown record (REQ-05.011, ADR-0012 decision 9). Because the claim rule is prefix-based, a directory with unrelated similarly prefixed files (a user-declared `deploy` type over a `DEP-…` folder, for example) becomes managed as soon as the entry exists; this is the intended effect of declaring the type and is documented as such.
+8. **Adoption is inherited, not special-cased.** Existing files in the type's directory whose stem matches `<PREFIX>-<digits>` are claimable records and are adopted per record on first read/write exactly as any managed Markdown record (REQ-005.011, ADR-0012 decision 9). Because the claim rule is prefix-based, a directory with unrelated similarly prefixed files (a user-declared `deploy` type over a `DEP-…` folder, for example) becomes managed as soon as the entry exists; this is the intended effect of declaring the type and is documented as such.
 
 9. **No template file and no per-type schema, now or by indirection.** No file under a `templates/` directory, no front-matter key declaring a schema, no JSON/YAML schema entry, and no "scaffold" option. If either is wanted later it requires a new ADR and a requirement change, because both change what "adding a type" means.
 
-10. **Built-in types are untouched.** Each default slug that has a static typed descriptor keeps its own sections, required fields, id shape, and additional verbs (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`). The generic model applies only where no typed descriptor exists — any slug added by configuration, including a user-added `deploy` (REQ-07.002 no longer ships it as a default).
+10. **Built-in types are untouched.** Each default slug that has a static typed descriptor keeps its own sections, required fields, id shape, and additional verbs (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`). The generic model applies only where no typed descriptor exists — any slug added by configuration, including a user-added `deploy` (REQ-007.002 no longer ships it as a default).
 
 ## Consequences
 
 **Positive:**
 
-- REQ-07.004 is satisfied by data and one handler: a new entry is usable for create/list/view/edit/archive/delete/status and for browser list/detail/edit with no code.
+- REQ-007.004 is satisfied by data and one handler: a new entry is usable for create/list/view/edit/archive/delete/status and for browser list/detail/edit with no code.
 - The model reuses the envelope and the writer that already carry the byte-identity and preservation guarantees, so there is no second writer to test.
 - The generic surface is small enough to test exhaustively (baseline verbs plus `status`, across declared and undeclared status lists).
 - Custom statuses need no code: declaring `statuses` on an entry gives the type its allowed values, and the generic handler enforces them.
@@ -94,37 +94,37 @@ Forces: a config-defined type must not require a code change (REQ-07.002/REQ-07.
 
 | Option | Outcome | Reason |
 |---|---|---|
-| One generic model (general keys + title + description, plus the type's configured status vocabulary) with a single handler (this ADR) | Selected | Exactly what REQ-07.004 states; no schema language, no template lifecycle, no per-type code. |
-| Reuse the technical-specification module as the generic handler | Rejected | Couples a config-defined type to one built-in type's code and makes REQ-07.004's "no built-in schema reuse" clause false in practice. |
-| Per-entry schema declared in `papyrus.config.yml` | Rejected by REQ-07.004 | Needs a schema language, validation, migration, and UI generation; explicitly excluded. |
-| Template file per type under the type directory | Rejected by REQ-07.004 | Adds a file lifecycle (create, edit, version) and a second source of body shape. |
-| Hard-code `active`/`archived` as the only document statuses | Rejected by REQ-07.001 | The owner added per-type custom statuses; a hard-coded set would reject a valid configuration and require code per new status. |
-| Free-form `--field key=value` metadata | Rejected | Unvalidated keys defeat the key registry (ADR-0012 decision 6) and the option rule (REQ-05.011). |
-| Store config-defined documents as HTML like UI mockups | Rejected | REQ-05.010 requires front matter for every managed Markdown record; mockups are the documented exception. |
+| One generic model (general keys + title + description, plus the type's configured status vocabulary) with a single handler (this ADR) | Selected | Exactly what REQ-007.004 states; no schema language, no template lifecycle, no per-type code. |
+| Reuse the technical-specification module as the generic handler | Rejected | Couples a config-defined type to one built-in type's code and makes REQ-007.004's "no built-in schema reuse" clause false in practice. |
+| Per-entry schema declared in `papyrus.config.yml` | Rejected by REQ-007.004 | Needs a schema language, validation, migration, and UI generation; explicitly excluded. |
+| Template file per type under the type directory | Rejected by REQ-007.004 | Adds a file lifecycle (create, edit, version) and a second source of body shape. |
+| Hard-code `active`/`archived` as the only document statuses | Rejected by REQ-007.001 | The owner added per-type custom statuses; a hard-coded set would reject a valid configuration and require code per new status. |
+| Free-form `--field key=value` metadata | Rejected | Unvalidated keys defeat the key registry (ADR-0012 decision 6) and the option rule (REQ-005.011). |
+| Store config-defined documents as HTML like UI mockups | Rejected | REQ-005.010 requires front matter for every managed Markdown record; mockups are the documented exception. |
 
 ## Open Questions
 
-- Should a config-defined type be allowed to declare a *display name* (separate from the slug) for the browser and help text? REQ-06.014 leaves this open; current decision: no, the slug is the name.
+- Should a config-defined type be allowed to declare a *display name* (separate from the slug) for the browser and help text? REQ-006.014 leaves this open; current decision: no, the slug is the name.
 - Should `description` be required instead of optional for the generic model? Current requirement: optional.
-- Should the generic list command gain a status filter to match the browser filter of REQ-06.014? Current requirement defines no document-list filters.
+- Should the generic list command gain a status filter to match the browser filter of REQ-006.014? Current requirement defines no document-list filters.
 
 ## Downstream constraints
 
 1. `src/document.rs` is the only generic handler; it must not contain slug literals.
 2. The generic model writes exactly the seven front-matter keys of decision 1; adding a key is a registry change under ADR-0012 decision 6.
-3. `status` is never accepted as a `create`/`edit` option and is never written by those paths; only `status` and `archive` write it (REQ-05.011, REQ-07.001).
+3. `status` is never accepted as a `create`/`edit` option and is never written by those paths; only `status` and `archive` write it (REQ-005.011, REQ-007.001).
 4. A status value written by `status` must be `active` or a declared custom status of that type; `archived` is rejected there and produced only by `archive`.
 5. No template directory, schema key, or `--field` option may be introduced without a new ADR.
-6. Default typed types must keep their current sections, required fields, and additional verbs; REQ-07.004 forbids the generic model from changing them.
+6. Default typed types must keep their current sections, required fields, and additional verbs; REQ-007.004 forbids the generic model from changing them.
 
 ## References
 
-- `docs/requirements/business/REQ-07.004.md` — generic content model.
-- `docs/requirements/business/REQ-07.001.md` — main status, custom statuses, `status` command.
-- `docs/requirements/business/REQ-07.002.md`, `REQ-07.003.md` — slug commands and the baseline verbs.
-- `docs/requirements/business/REQ-05.007.md` — archive state and location.
-- `docs/requirements/business/REQ-05.010.md`, `REQ-05.011.md` — front matter, `status` exemption, adoption.
-- `docs/requirements/business/REQ-01.005.md` — ID format and stability.
+- `docs/requirements/business/REQ-007.004.md` — generic content model.
+- `docs/requirements/business/REQ-007.001.md` — main status, custom statuses, `status` command.
+- `docs/requirements/business/REQ-007.002.md`, `REQ-007.003.md` — slug commands and the baseline verbs.
+- `docs/requirements/business/REQ-005.007.md` — archive state and location.
+- `docs/requirements/business/REQ-005.010.md`, `REQ-005.011.md` — front matter, `status` exemption, adoption.
+- `docs/requirements/business/REQ-001.005.md` — ID format and stability.
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md` — key registry and patch contract.
 - `docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md` — envelope and single writer.
 - `docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md` — descriptor source for the handler.

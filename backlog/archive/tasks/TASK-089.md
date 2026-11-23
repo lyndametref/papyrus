@@ -15,16 +15,14 @@ dependencies:
   - TASK-082
   - TASK-085
 references:
-  - docs/requirements/business/REQ-06.008.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-01.003.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-006.008.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-001.003.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/specifications/browser-requirements.md
   - >-
     docs/specifications/browser-configuration-view-single-record-layout-and-lifecycle-configuration.md
-  - >-
     docs/specifications/ui/browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0014-browser-configuration-view-single-record-layout-and-lifecycle-configuration-review.html
   - docs/specifications/project-initialization-and-configuration.md
   - docs/specifications/browser-spec-revisions-task-86.md
@@ -35,13 +33,13 @@ ordinal: 39110
 
 
 ## Description
-REQ-06.008 asks for configuration editing in the browser, while REQ-01.002 requires a folder change to move folders atomically and NFR-04.002 restricts access to the project directory. A browser writer that touched papyrus.config.yml directly would bypass relocation and containment, so the view must go through the same command path as the CLI. This task delivers that view on top of the relocation routine.
+REQ-006.008 asks for configuration editing in the browser, while REQ-001.002 requires a folder change to move folders atomically and NFR-004.002 restricts access to the project directory. A browser writer that touched papyrus.config.yml directly would bypass relocation and containment, so the view must go through the same command path as the CLI. This task delivers that view on top of the relocation routine.
 
 Scope (in scope):
 - Serve a configuration view for the current project at /config (alias /?type=config), with a sidebar entry labelled Configuration placed after the document types, following MOCK-0014.
 - List every effective configuration key (including built-in defaults) with its effective value and a source badge: explicit when the key is set in papyrus.config.yml, otherwise default.
 - Offer edit controls only for keys papyrus config set accepts (scalar leaves of Config; array-valued keys such as statuses are shown read-only). The view applies the same keys, validation, and precedence as the CLI and cannot persist a key or value the CLI rejects.
-- Delegate every save to commands::config_set (and commands::config_unset for clearing), so folder-key changes perform the full atomic relocation of REQ-01.002 and conflicts are reported without persisting a value.
+- Delegate every save to commands::config_set (and commands::config_unset for clearing), so folder-key changes perform the full atomic relocation of REQ-001.002 and conflicts are reported without persisting a value.
 - Reject any path that does not pass the project-directory boundary check before a write.
 - Never read or display environment-variable values (PAPYRUS_DIR, PAPYRUS_CONFIG, PAPYRUS_BROWSER_*, NO_COLOR) as editable configuration, and treat no configuration key as secret (no masking).
 - Link to /lifecycle for per-artifact read-only configuration; do not duplicate editing there.

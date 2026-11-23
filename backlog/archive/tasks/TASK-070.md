@@ -12,11 +12,11 @@ milestone: MS-013
 dependencies:
   - TASK-069
 references:
-  - docs/requirements/business/REQ-01.006.md
-  - docs/requirements/business/REQ-01.001.md
-  - docs/requirements/business/REQ-01.002.md
+  - docs/requirements/business/REQ-001.006.md
+  - docs/requirements/business/REQ-001.001.md
+  - docs/requirements/business/REQ-001.002.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
-  - docs/requirements/business/REQ-01.007.md
+  - docs/requirements/business/REQ-001.007.md
   - docs/business-rules/BR-002-init-command-behavior.md
 documentation:
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
@@ -27,7 +27,7 @@ ordinal: 30006
 
 
 ## Description
-Deliver the interactive walkthrough at `papyrus init <project_name>` per REQ-01.006, REQ-01.001, REQ-01.002, REQ-01.007, and BR-016. Before writing `papyrus.config.yml`, present all available artifacts (task, milestone, release, decision types, document types), let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use default selections and defaults without prompting. The generated configuration must validate, including the `id_padding` range.
+Deliver the interactive walkthrough at `papyrus init <project_name>` per REQ-001.006, REQ-001.001, REQ-001.002, REQ-001.007, and BR-016. Before writing `papyrus.config.yml`, present all available artifacts (task, milestone, release, decision types, document types), let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use default selections and defaults without prompting. The generated configuration must validate, including the `id_padding` range.
 
 In scope:
 - TTY detection; interactive prompts for activation, prefix, and storage folder.
@@ -53,8 +53,8 @@ See docs/specifications/interactive-init-walkthrough-for-artifact-activation.md 
 - [ ] Only activated artifacts are enabled in the generated configuration; inactive decision/document types are written with `enabled: false`.
 - [ ] Invalid prefix or folder choices are rejected and re-prompted with hints naming equivalent default values.
 - [ ] Non-interactive or CI environments (no TTY) use default selections and defaults without prompting or reading stdin.
-- [ ] The `--force` and `--no-git` options continue to behave as documented (REQ-01.001).
-- [ ] The generated configuration validates successfully, including the `id_padding` range (REQ-01.007).
+- [ ] The `--force` and `--no-git` options continue to behave as documented (REQ-001.001).
+- [ ] The generated configuration validates successfully, including the `id_padding` range (REQ-001.007).
 - [ ] Directories are created only for activated artifacts (core artifacts always).
 
 ## Definition of Done

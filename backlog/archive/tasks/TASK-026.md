@@ -14,15 +14,15 @@ dependencies:
   - TASK-048
 references:
   - README.md
-  - docs/requirements/business/REQ-05.006.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.006.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-014-audit-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -82,7 +82,7 @@ Persistence:
 - ID, directory, deprecation state never change on save.
 - Symlink escapes rejected (404); no temp file left behind; save-then-reread.
 
-Deprecated visibility decision (resolved): hide deprecated audit records from browser lists and make them unreachable, consistent with the other document types (REQ-05.007 leaves audit visibility unstated; this ticket adopts hide).
+Deprecated visibility decision (resolved): hide deprecated audit records from browser lists and make them unreachable, consistent with the other document types (REQ-005.007 leaves audit visibility unstated; this ticket adopts hide).
 
 Security/offline/a11y: baseline sections 6, 9, 10 of browser-requirements.md apply unchanged (embedded assets, escaping, CSP/headers, Host/Origin validation, request limits, timeouts, Firefox/Edge/Safari 100+, accessibility basics, no external resources, no inline scripts/styles).
 
@@ -94,7 +94,7 @@ Assumptions:
 - Assumption: content may be cleared on edit, removing the `## Content` section.
 - Assumption: native `<select>` is operable without JavaScript; no tag-field progressive enhancement needed.
 - Assumption: JSON API exposes the three editable fields; no status/task/supersession metadata and no requirement references.
-- Assumption: real-browser verification (NFR-05.001) is a deferred follow-up.
+- Assumption: real-browser verification (NFR-005.001) is a deferred follow-up.
 - Assumption: no new dependencies, crates, or ADRs.
 
 Open questions:
@@ -133,6 +133,6 @@ created: 2026-11-07T10:13:00Z
 
 ---
 
-Validated 2026-11-07 (UTC): quality-gatekeeper Pass with findings (14/14 AC, 5/5 DoD); cargo test 101 browser_cli passed; auto-closed under no-validation mode. Non-blocking: unused pub(crate) widenings in audit.rs/rule.rs (carried from m-8), NFR-05.001 deferred.
+Validated 2026-11-07 (UTC): quality-gatekeeper Pass with findings (14/14 AC, 5/5 DoD); cargo test 101 browser_cli passed; auto-closed under no-validation mode. Non-blocking: unused pub(crate) widenings in audit.rs/rule.rs (carried from m-8), NFR-005.001 deferred.
 
 ---

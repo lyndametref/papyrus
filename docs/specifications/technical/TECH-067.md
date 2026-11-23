@@ -13,13 +13,13 @@ references:
   - ADR-0036
   - ADR-0037
   - BR-015
-  - REQ-05.007
-  - REQ-06.001
-  - REQ-06.004
-  - REQ-06.014
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-005.007
+  - REQ-006.001
+  - REQ-006.004
+  - REQ-006.014
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
 status: verified
 ---
 # TECH-067 Search Config-Defined Document Types

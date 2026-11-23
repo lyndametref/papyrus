@@ -13,12 +13,12 @@ references:
   - MOCK-0002
   - MOCK-0009
   - MOCK-0010
-  - REQ-01.005
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.004
+  - REQ-001.005
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.004
   - TASK-19
   - TASK-63
   - TASK-64
@@ -31,19 +31,19 @@ references:
   - TASK-72
   - TASK-98
   - ADR-035
-  - REQ-06.019
+  - REQ-006.019
   - RE-006
   - TASK-178
 status: draft
 ---
 # TECH-045 Render One Metadata Projection in CLI and Browser Views
 
-> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. The `RecordView` projection, single-document view, CLI list and view, JSON API, and front matter are unchanged.
+> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-006.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. The `RecordView` projection, single-document view, CLI list and view, JSON API, and front matter are unchanged.
 
 ## Description
 ## Purpose
 
-Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. REQ-06.019 qualifies only the browser list presentation for `ContentModel::Generic` families: `RecordView` still carries references, and the shared list renderer omits them (ADR-035). This ticket implements REQ-06.004 (CLI and browser read front matter), REQ-05.010 (front-matter field map), REQ-05.011 (metadata maintained through all commands), and REQ-01.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
+Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projection that is the only source for record metadata in every read surface, so that CLI list/view text and `--json`, browser list/detail JSON, and browser HTML present identical metadata values for the same record. REQ-006.019 qualifies only the browser list presentation for `ContentModel::Generic` families: `RecordView` still carries references, and the shared list renderer omits them (ADR-035). This ticket implements REQ-006.004 (CLI and browser read front matter), REQ-005.010 (front-matter field map), REQ-005.011 (metadata maintained through all commands), and REQ-001.005 (single Papyrus ID space), on top of the shared envelope and Papyrus identity delivered by TASK-63 and TASK-64 and the option exposure delivered by TASK-65. It does not migrate the corpus (TASK-68, TASK-69), remove legacy serializers (TASK-70), or add the lifecycle page (TASK-72).
 
 ## Scope
 
@@ -94,7 +94,7 @@ Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projec
 ### 3. Browser rendering
 
 1. Browser list and detail JSON (`GET /api/...`) for every managed record type is rendered from `RecordView`. The JSON contains the same `metadata` object as the CLI `--json` output for the same record, plus the existing browser-specific fields (path, version, and the typed fields the browser form already uses).
-2. Browser HTML list and detail pages render metadata from `RecordView`. Detail pages show a metadata block (`dl`) with Record ID, Title, Created date, Updated date, Labels, References, plus type-specific keys (per MOCK-0010 section 4), and the single-document References disclosure is unchanged (REQ-06.012). List rows show at least id, title, created_date, updated_date, labels, and the type-specific keys beneath the primary link, with references shown only for `ContentModel::Typed` and `ContentModel::HtmlMockup` families. A `ContentModel::Generic` (config-defined document type) list row renders no reference block, omitted rather than emptied (ADR-035, REQ-06.019); `RecordView`, the JSON API, the CLI list and view, and front matter still carry the references.
+2. Browser HTML list and detail pages render metadata from `RecordView`. Detail pages show a metadata block (`dl`) with Record ID, Title, Created date, Updated date, Labels, References, plus type-specific keys (per MOCK-0010 section 4), and the single-document References disclosure is unchanged (REQ-006.012). List rows show at least id, title, created_date, updated_date, labels, and the type-specific keys beneath the primary link, with references shown only for `ContentModel::Typed` and `ContentModel::HtmlMockup` families. A `ContentModel::Generic` (config-defined document type) list row renders no reference block, omitted rather than emptied (ADR-035, REQ-006.019); `RecordView`, the JSON API, the CLI list and view, and front matter still carry the references.
 3. The browser editable field set is unchanged from the existing per-type edit forms. `created_date` and `updated_date` are rendered read-only (disabled inputs, clearly marked "(read-only)") in the edit form and are never accepted from the request.
 4. Timestamps are rendered as the quoted ISO-8601 UTC strings stored in front matter, without reformatting, unless a human-readable secondary is added (MOCK-0010 OQ-4 default: as stored).
 5. Labels and references are rendered as tags in view and as a tag add/remove interaction in edit, reusing the existing interaction (MOCK-0002/MOCK-0010).
@@ -110,7 +110,7 @@ Deliver ADR-0013 decision 5 (superseding ADR-0009): a single `RecordView` projec
 6. A no-op save (no field changed) performs no write and does not refresh `updated_date`.
 7. A save never copies metadata back into the document core (no retired metadata section is created or updated).
 8. Optimistic concurrency (ADR-0006) is unchanged: missing/malformed `version` → 400, stale token → 409 with "record changed on disk; reload the form", matching token proceeds. After a successful write the server keeps no cached copy and the redirect target re-reads the file (save-then-reread).
-9. `created_date` and `updated_date` are never accepted from the request; a submitted value for either is ignored (not an error), matching the exemption in REQ-05.011.
+9. `created_date` and `updated_date` are never accepted from the request; a submitted value for either is ignored (not an error), matching the exemption in REQ-005.011.
 
 ### 5. Papyrus ID handling
 1. The top-level identity on every surface is the Papyrus ID. It appears in CLI text, CLI `--json` top-level fields, browser JSON top-level fields, and browser HTML headings/primary links.
@@ -178,7 +178,7 @@ Correction is owned by `business-analyst`/`tech-writer` and is a prerequisite fo
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-67 |
-| Requirements | REQ-06.004 (browser list parity, qualified for Generic list rows by REQ-06.019), REQ-06.019 (per-family reference visibility; source RE-006), REQ-05.010, REQ-05.011, REQ-01.005, REQ-06.002, REQ-06.003, REQ-06.012 (single-document view keeps references) |
+| Requirements | REQ-006.004 (browser list parity, qualified for Generic list rows by REQ-006.019), REQ-006.019 (per-family reference visibility; source RE-006), REQ-005.010, REQ-005.011, REQ-001.005, REQ-006.002, REQ-006.003, REQ-006.012 (single-document view keeps references) |
 | ADRs | ADR-0006, ADR-0012, ADR-0013 (decision 5), ADR-035 (per-family reference visibility; projection unchanged), ADR-033 (collapsible detail sections) |
 | Related tickets | TASK-63, TASK-64, TASK-65, TASK-66, TASK-68, TASK-69, TASK-70, TASK-72, TASK-19, TASK-178 (revision) |
 | Source | `src/record/` (`frontmatter`, `document`, `patch`, `store`, `identity`), `src/browser/records.rs`, per-type CLI modules, `src/browser/mod.rs` |

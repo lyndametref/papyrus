@@ -12,18 +12,16 @@ labels:
 milestone: MS-013
 dependencies: []
 references:
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
-  - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
-  - docs/requirements/non-functional/NFR-04.003.md
+  - docs/requirements/non-functional/NFR-004.003.md
 documentation:
   - docs/specifications/shared-record-envelope-and-front-matter-patcher.md
 priority: high

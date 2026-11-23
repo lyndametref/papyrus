@@ -13,23 +13,21 @@ milestone: MS-009
 dependencies:
   - TASK-042
 references:
-  - docs/requirements/business/REQ-05.005.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.005.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-013-rule-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/specifications/ui/mockups/MOCK-0007-business-rules-review.html
   - docs/specifications/ui/browser-business-rules-ui.md
 documentation:
-  - docs/specifications/ui/browser-business-rules-ui.md
-  - docs/specifications/ui/mockups/MOCK-0007-business-rules-review.html
   - docs/specifications/business-rules-management.md
   - docs/specifications/browser-requirements.md
 priority: medium
@@ -41,7 +39,7 @@ ordinal: 26200
 ## Description
 Design review for the business-rules browser UI (TASK-25 depends on this ticket). The UI designer produces and obtains explicit user approval for the business-rules browser mockup package before browser implementation. Deliverable is a single clickable mockup package plus a UI description document under docs/specifications/ui/; no source code.
 
-Record model (from docs/specifications/business-rules-management.md, TASK-43): id (e.g. RUL-001), title, description, rationale, applicability, and zero or more references to business requirements (requirement IDs). Lifecycle active -> deprecated; deprecated rules are hidden from list, search, and browser (REQ-05.005, REQ-05.007, BR-013).
+Record model (from docs/specifications/business-rules-management.md, TASK-43): id (e.g. RUL-001), title, description, rationale, applicability, and zero or more references to business requirements (requirement IDs). Lifecycle active -> deprecated; deprecated rules are hidden from list, search, and browser (REQ-005.005, REQ-005.007, BR-013).
 
 Mockup package: MOCK-0007 (docs/specifications/ui/mockups/MOCK-0007-business-rules-review.html), status draft pending explicit user approval. UI description: docs/specifications/ui/browser-business-rules-ui.md.
 

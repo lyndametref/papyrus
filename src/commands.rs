@@ -341,7 +341,7 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
 
     // Materialize only the target entry when the file declares no
     // `document_types` map. The entry carries its seed prefix and directory,
-    // which are never filled (REQ-07.002, TC-114).
+    // which are never filled (REQ-007.002, TC-114).
     if key.starts_with("document_types.") {
         let slug = key.split('.').nth(1).unwrap_or_default();
         let entry_key = format!("document_types.{}", slug);

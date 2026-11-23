@@ -9,8 +9,8 @@ references:
   - ADR-0028
   - ADR-0033
   - ADR-0035
-  - REQ-06.014
-  - REQ-06.019
+  - REQ-006.014
+  - REQ-006.019
   - TECH-066
   - TECH-067
   - TECH-068

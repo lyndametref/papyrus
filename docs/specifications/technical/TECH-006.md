@@ -8,14 +8,14 @@ references:
   - ADR-0001
   - ADR-0004
   - BR-015
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-05.001
-  - REQ-05.002
-  - REQ-05.007
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-005.001
+  - REQ-005.002
+  - REQ-005.007
+  - REQ-006
+  - REQ-006.001
   - TASK-10
   - TASK-14
   - TASK-18
@@ -31,14 +31,14 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the first increment of `papyrus search`: one read-only, project-local free-text search over the records implemented so far — business requirements, non-functional requirements, and their requirement group documents — with the full documented type vocabulary and option shape already in place for later increments. The command contract is REQ-06.001 and BR-015 (`papyrus(1)` → COMMANDS → search); where the man page is silent, this specification fixes explicit, testable defaults (see Assumptions and Open questions).
+Deliver the first increment of `papyrus search`: one read-only, project-local free-text search over the records implemented so far — business requirements, non-functional requirements, and their requirement group documents — with the full documented type vocabulary and option shape already in place for later increments. The command contract is REQ-006.001 and BR-015 (`papyrus(1)` → COMMANDS → search); where the man page is silent, this specification fixes explicit, testable defaults (see Assumptions and Open questions).
 
 ## Scope
 
 ### In scope
 
 - `papyrus search <query> [--type <type>]... [--limit <n>]` exactly as documented in `papyrus(1)`.
-- Repeatable `--type` accepting exactly the documented values `task`, `milestone`, `release`, `decision`, and `doc`; default is all types (REQ-06.001).
+- Repeatable `--type` accepting exactly the documented values `task`, `milestone`, `release`, `decision`, and `doc`; default is all types (REQ-006.001).
 - Searching active business-requirement and non-functional-requirement records, including requirement group documents, from the configured document directories.
 - Accepting the documented-but-not-yet-implemented types `task`, `milestone`, `release`, and `decision` with zero matches and no error.
 - Case-insensitive substring matching, quoted-phrase handling, deterministic ordering by record ID, text output, and `--json` output.
@@ -204,8 +204,8 @@ None of these block implementation: each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-05.001, REQ-05.002, REQ-05.007 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary) |
+| Requirement | REQ-006, REQ-006.001, REQ-005.001, REQ-005.002, REQ-005.007 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary) |
 | Business rule | BR-015 (search command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-5 |

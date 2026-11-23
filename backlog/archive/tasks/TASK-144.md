@@ -24,7 +24,6 @@ references:
     docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md
   - docs/architecture/adr/ADR-0026-mermaid-only-offline-diagram-rendering.md
   - docs/architecture/adr/ADR-0025-bundled-katex-client-side-math-rendering.md
-  - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - docs/architecture/adr/ADR-0003-supported-debian-release-target-forky-only.md
   - docs/packaging.md
@@ -42,13 +41,13 @@ references:
   - tests/browser_diagram_cli.rs
   - tests/browser_shell_cli.rs
   - tests/check_cli.rs
-  - docs/requirements/business/REQ-06.017.md
-  - docs/requirements/business/REQ-06.015.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-03.001.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/business/REQ-006.017.md
+  - docs/requirements/business/REQ-006.015.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-003.001.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
 priority: high
 ordinal: 41610
 ---
@@ -74,7 +73,7 @@ ordinal: 41610
 
 *A. Environment and baseline*
 
-1. Record the environment: `date -Is` (timezone included), `cat /etc/debian_version`, `ldd --version | head -1`, `rustc --version`, `cargo --version`, `clippy-driver --version`, `dpkg-deb --version`, `fakeroot --version`, `command -v unshare ip curl`. Confirm `amd64` and Debian Forky; any other release or architecture is recorded as an unsupported deviation, not a pass (ADR-0003, NFR-03.002).
+1. Record the environment: `date -Is` (timezone included), `cat /etc/debian_version`, `ldd --version | head -1`, `rustc --version`, `cargo --version`, `clippy-driver --version`, `dpkg-deb --version`, `fakeroot --version`, `command -v unshare ip curl`. Confirm `amd64` and Debian Forky; any other release or architecture is recorded as an unsupported deviation, not a pass (ADR-0003, NFR-003.002).
 2. Record the baseline package state so "host untouched" is provable: `dpkg-query -W -f='${Status}' papyrus` before the run (record the exact value; on this host prior milestones report `papyrus 0.1.0` already installed from earlier work, in which case the requirement is that it is identical before and after the run, not that it is absent), `stat -c '%s %y' papyrus_0.1.0_amd64.deb`, `sha256sum` of it, and `dpkg-deb -c papyrus_0.1.0_amd64.deb`. Expected and to be recorded: a 2026-11-14 package with a 4,197,544 B binary and an 865 B copyright. This is the stale artifact; it is not evidence for this ticket.
 3. Record the pre-run repository identity: `git rev-parse HEAD`, `git status --porcelain`, `grep -c '^\[\[package\]\]' Cargo.lock` (36 at refinement), and the `[dependencies]` block of `Cargo.toml` (exactly `clap`, `serde`, `serde_json`, `yaml_serde`).
 
@@ -139,7 +138,7 @@ ordinal: 41610
 *H. Negative-claim proofs from the packaged artifact*
 
 35. No runtime asset directory and no configuration file: item 9 (package listing), item 27 (installed tree), plus a run whose working directory is empty and whose project contains no asset files — `env -i PATH="$TMP/inst/usr/bin:/usr/bin:/bin" HOME="$TMP/home" "$TMP/inst/usr/bin/papyrus" --dir <project> browser --no-open --port <port>` — after which the item-28 font fetches and the representative `/assets/` paths still return `200` with the manifest digests; and `test ! -e "$TMP/inst/usr/share/papyrus"`. Record each result. This is the proof that only `/usr/bin/papyrus` plus the project directory is needed.
-36. No man page: items 9 and 27 assert the absence; record it as expected (NFR-03.003 is unclaimed and ADR-0021 is `Proposed`), explicitly as an expected absence rather than a defect.
+36. No man page: items 9 and 27 assert the absence; record it as expected (NFR-003.003 is unclaimed and ADR-0021 is `Proposed`), explicitly as an expected absence rather than a defect.
 37. No network access: inside `unshare -rn` with `ip link set lo up`, prove an outbound TCP connection fails (`curl --max-time 3 http://1.1.1.1:80` fails, or the documented equivalent), then repeat over `127.0.0.1` the math page, the Mermaid page, the list, the board, the 26 asset paths, and `check`; all pass. Also run `cargo build --release --offline` to prove the build needs no network. If `unshare -rn` is unavailable, record that as a limitation and support the claim with loopback-only binding, the offline reference scans of item 18, and the absence of any outbound-connection code path — do not record it as a pass.
 38. No new crate and no new build step: `Cargo.toml` `[dependencies]` is still exactly `clap`, `serde`, `serde_json`, `yaml_serde`; no `build.rs` exists; `grep -c '^\[\[package\]\]' Cargo.lock` equals the item-3 baseline (36); `git diff --stat -- Cargo.toml Cargo.lock scripts packaging` introduces no dependency; `grep -rnE '\b(npm|npx|node|yarn|pnpm)\b' scripts/ packaging/` prints nothing; `git ls-files src/browser/vendor` lists the committed vendor files, proving the assets are committed rather than fetched at build time. Record each.
 39. No `deprecated/` asset access: no manifest path and no `ASSETS[].path` contains `deprecated`; `find src/browser/vendor -type d -name deprecated` prints nothing; and item 20's filesystem-free proof means the browser cannot reach any directory at all. Record the results.

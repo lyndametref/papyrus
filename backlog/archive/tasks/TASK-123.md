@@ -18,12 +18,11 @@ references:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
-  - REQ-05.007
-  - REQ-07.001
+  - REQ-005.007
+  - REQ-007.001
 documentation:
   - docs/domain-model/object-model/business-object-model.md
 modified_files:
-  - docs/domain-model/object-model/business-object-model.md
   - docs/domain-model/business-glossary/index.html
 priority: medium
 ordinal: 41330
@@ -50,7 +49,7 @@ ordinal: 41330
 
 
 ## Notes
-Lifecycles aligned with ADR-0022/0023 and REQ-03.001/03.002/05.007.
+Lifecycles aligned with ADR-0022/0023 and REQ-003.001/03.002/05.007.
 
 Changed:
 - docs/domain-model/object-model/business-object-model.md: documents active -> archived (no restore); new Lifecycles table covers UI mockups pending -> approved -> archived, milestones open -> closed via papyrus milestone close, releases planned -> released via papyrus release close (never archived), tasks (configurable + archive/restore), decisions (five Nygard statuses, unchanged).

@@ -16,14 +16,14 @@ dependencies:
 documentation:
   - >-
     docs/architecture/adr/ADR-0020-registry-derived-browser-views-for-document-types.md
-  - docs/requirements/business/REQ-06.014.md
+  - docs/requirements/business/REQ-006.014.md
   - docs/specifications/browser-config-defined-document-types.md
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-005.007.md
 modified_files:
   - src/browser/routes.rs
   - src/browser/mod.rs
@@ -52,7 +52,7 @@ Out of scope: CLI/command changes, registry model changes, record storage/patch 
 
 Assumptions: the route table is a startup snapshot, so document_types changes need a browser restart (ADR-0020 decision 2); the sidebar is grouped by the three artifact categories, with built-in document entries in their existing relative order and config-defined entries under Documents after UI Mockups (2026-11-14 owner decision, replacing the earlier flat-sidebar assumption); the shared list column order Status, ID, Title, Created, Updated applies to every document list view, while the task board and milestone/release/decision list layouts are unchanged; the filter resting state is a `Show all` reset that omits `status` and lists every active-directory record so custom statuses never hide records; the select offers only the allowed status values (no `All records`/empty option), while an explicit empty `status=` remains 400; UI mockups filter by pending/approved; canonical API output equals the legacy body; browser label/reference editing saves the edited lists; a missing stored status shows `(none)` and is never rewritten; MOCK-0015's revised layout is approved (2026-11-14) and the specification remains authoritative on disagreement; the approved mockup's fourth `Project` utility heading is presentational only, and utilities follow the three category groups.
 
-Open questions: OQ-2 (API `?status=` filter) is deferred to a future release, owner `@planner` for triage; OQ-3 (invalid filter 400 vs 404) is owned by `@architect` for confirmation, with current behavior 400 per NFR-02.002.
+Open questions: OQ-2 (API `?status=` filter) is deferred to a future release, owner `@planner` for triage; OQ-3 (invalid filter 400 vs 404) is owned by `@architect` for confirmation, with current behavior 400 per NFR-002.002.
 
 ## Acceptance Criteria
 - [x] One ArtifactRegistry and one BrowserRoutes table are built once at browser startup and stored in ServerState; document route/navigation entries, inventory cards, ?type list values, and /api/docs/<slug> endpoints derive from registry.enabled(Document); sidebar entries are grouped by the three artifact categories in the order Backlog, Decisions, Documents, with config-defined types under Documents and no entry for a disabled type; group membership comes from the descriptor category, not from the presentation table; src/browser/ keeps no second document-type registry and no Category or Form dispatch, and list/detail/edit/dispatch logic branches only on descriptor fields (ArtifactCategory, ContentModel, TypedHandler, IdShape, StatusModel), never on a slug literal; slug literals appear only in the static presentation table, which maps legacy ?type values and API path aliases, labels, nav order, and curated text and never decides type existence or which list/detail/edit behavior runs.
@@ -61,7 +61,7 @@ Open questions: OQ-2 (API `?status=` filter) is deferred to a future release, ow
 - [x] Every built-in document type keeps its existing detail/edit field sets, sections, and actions, selected by ContentModel and TypedHandler rather than by slug or Category; its list view adopts only the shared row-field order Status, ID, Title, Created, Updated and the additive status filter (grouped requirement lists keep their grouping), and the task board and milestone/release/decision list layouts are unchanged.
 - [x] List and detail views render the stored status read-only for every document type (front-matter value, or HTML metadata for ui-mockup), with the list Status field immediately left of ID; no edit form renders a status or status_change control; a generic document POST carrying either field returns 422 and writes nothing.
 - [x] Every document list view offers exactly active plus the type's declared custom statuses in configured order (HtmlMetadata types offer pending/approved), never archived; a type with no custom statuses offers only active; the no-filter state lists every record in the active directory so custom-status records stay visible; selecting a value lists only records whose stored value matches it exactly.
-- [x] A status value outside the offered set (including archived, an undeclared value, a wrong-case value, an explicit empty `status=` parameter, or duplicate status parameters) returns 400 with an error page and no listing (NFR-02.002); the no-filter state is an absent `status` parameter reached with `Show all`, and the filter select offers only the allowed values with no empty/`All records` option.
+- [x] A status value outside the offered set (including archived, an undeclared value, a wrong-case value, an explicit empty `status=` parameter, or duplicate status parameters) returns 400 with an error page and no listing (NFR-002.002); the no-filter state is an absent `status` parameter reached with `Show all`, and the filter select offers only the allowed values with no empty/`All records` option.
 - [x] Archived records never appear: archived/ is never indexed or resolvable; a record in the active folder whose stored status is archived is auto-relocated and omitted; archived records are excluded from every document list and from /api/docs/<slug> and its aliases; an archived ID and an unknown ID of the same type return an identical 404 body for detail, edit, and /api/doc/<ID>; a disabled type has no sidebar entry in any group, no inventory card, no list, detail, edit, or canonical/legacy API response, while the lifecycle page still lists it with enabled: false.
 - [x] The lifecycle page renders three category groups (Backlog, Decisions, Documents) and one registry-derived section per descriptor, including disabled document types; each document section shows active -> archived, declared custom statuses, enabled, prefix, folder, and curated or shared description; values are read-only with a /config link and no fixed section count remains.
 - [x] Every enabled document type has GET|HEAD /api/docs/<slug> returning the same JSON body as its legacy endpoint (generic: id, kind, title, status, labels, references, version, path, metadata in an ID-sorted array); legacy paths remain aliases; an unknown or disabled slug returns 404; other methods return 405 with Allow; /api/doc/<ID> resolves a generic record and returns 404 for an archived or unknown ID.
@@ -97,11 +97,11 @@ created: 2026-11-14T15:19:00Z
 
 ---
 
-Refinement 2026-11-14: made the ticket self-contained and execution-ready against ADR-0020/0017/0022 and REQ-06.014/06.003. Added the behavior contract at docs/specifications/browser-config-defined-document-types.md with the startup route table, nav/inventory rules, typed-versus-generic dispatch, status filter semantics, API alias table, visibility rules, lifecycle page contract, and test plan T-114-01..14.
+Refinement 2026-11-14: made the ticket self-contained and execution-ready against ADR-0020/0017/0022 and REQ-006.014/06.003. Added the behavior contract at docs/specifications/browser-config-defined-document-types.md with the startup route table, nav/inventory rules, typed-versus-generic dispatch, status filter semantics, API alias table, visibility rules, lifecycle page contract, and test plan T-114-01..14.
 
 Resolved: unknown/disabled ?type is 404 (was 400, deliberate per ADR-0020 decision 3); the status filter resting state is an All reset (custom statuses never hide records per ADR-0022 decision 10); generated built-in links keep the approved ?type=business-rule / ?type=audit-record values; the flat approved sidebar is preserved and config entries append after UI Mockups; UI mockups filter by pending/approved; canonical /api/docs/<slug> returns the legacy body for the same type.
 
-Non-blocking: OQ-1 sidebar category grouping (ADR open question; flat preserved), OQ-2 API status filter (deferred, not required by REQ-06.014), OQ-3 invalid filter returns 400 (confirm at review). Assumption A1: document_types changes require a browser restart because the route table is a startup snapshot; /config will state this.
+Non-blocking: OQ-1 sidebar category grouping (ADR open question; flat preserved), OQ-2 API status filter (deferred, not required by REQ-006.014), OQ-3 invalid filter returns 400 (confirm at review). Assumption A1: document_types changes require a browser restart because the route table is a startup snapshot; /config will state this.
 
 Dependencies TASK-105/109/110/113 are complete. UI design delegated; MOCK id to be added to the spec and ticket when returned.
 
@@ -139,7 +139,7 @@ created: 2026-11-14T17:26:00Z
 
 ---
 
-Bookkeeping 2026-11-14 (UTC): MOCK-0015 is approved (2026-11-14) per docs/specifications/ui/browser-config-defined-document-types-ui.md and ui/mockups/README.md; the pending re-approval wording in comments #2 and #3, the description, DoD 8, and plan step 9 is superseded by this comment and the updated sections. OQ-2 (API `?status=` filter) is deferred to a future release, owner @planner (triage). OQ-3 (invalid filter 400 vs 404) is owned by @architect for confirmation; current behavior is 400 per NFR-02.002. Filter form: the select has no `All records`/empty option; `Show all` is the no-filter reset (absent `status` parameter), while an explicit empty `status=` remains 400 (AC7, spec 3.2). The approved mockup's fourth `Project` utility heading is presentational only; utilities follow the three category groups.
+Bookkeeping 2026-11-14 (UTC): MOCK-0015 is approved (2026-11-14) per docs/specifications/ui/browser-config-defined-document-types-ui.md and ui/mockups/README.md; the pending re-approval wording in comments #2 and #3, the description, DoD 8, and plan step 9 is superseded by this comment and the updated sections. OQ-2 (API `?status=` filter) is deferred to a future release, owner @planner (triage). OQ-3 (invalid filter 400 vs 404) is owned by @architect for confirmation; current behavior is 400 per NFR-002.002. Filter form: the select has no `All records`/empty option; `Show all` is the no-filter reset (absent `status` parameter), while an explicit empty `status=` remains 400 (AC7, spec 3.2). The approved mockup's fourth `Project` utility heading is presentational only; utilities follow the three category groups.
 
 ---
 

@@ -15,7 +15,7 @@ dependencies:
   - TASK-138
   - TASK-140
 references:
-  - docs/requirements/business/REQ-06.017.md
+  - docs/requirements/business/REQ-006.017.md
   - docs/architecture/adr/ADR-0026-mermaid-only-offline-diagram-rendering.md
   - >-
     docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md
@@ -34,7 +34,7 @@ ordinal: 41590
 ## Description
 **Gate — cleared 2026-11-16.** ADR-0026 completed acceptance as a delegated architecture decision and every open question is resolved (version, type set, `mmd`, caps, CSP scope, iframe fallback). This ticket is execution-ready and must not re-open those decisions. Owner acknowledgement is tracked by the orchestrator, not here.
 
-**Why.** REQ-06.017 requires a fenced `mermaid` block in the curated prose fields of a record view to render as a diagram, fully offline, with bundled assets, without arbitrary script execution, with the source kept as the fallback, and with full-width diagram content; a `plantuml` block is shown as source with a note and never rendered. TASK-145 delivered the shared pre-pass, the page-asset slot, and the per-element failure marker for math. This ticket adds diagrams to that same path.
+**Why.** REQ-006.017 requires a fenced `mermaid` block in the curated prose fields of a record view to render as a diagram, fully offline, with bundled assets, without arbitrary script execution, with the source kept as the fallback, and with full-width diagram content; a `plantuml` block is shown as source with a note and never rendered. TASK-145 delivered the shared pre-pass, the page-asset slot, and the per-element failure marker for math. This ticket adds diagrams to that same path.
 
 **What.** A Mermaid-only diagram segment on the existing `src/browser/math.rs` pre-pass, a server-rendered figure whose `<pre>` is both fallback and client input, two hard input caps, a conditional vendored bundle link with a second CSP literal for diagram pages only, and one client block in `app.js` with strict security and per-figure isolation. PlantUML becomes a static source block with a note.
 
@@ -145,7 +145,7 @@ created: 2026-11-16T08:17:00Z
 
 ---
 
-Blocker cleared: ADR-0026 completed acceptance 2026-11-16 as a delegated architecture decision (owner acknowledgement pending). Resolved: Mermaid pinned to 11.17.2 (dist/mermaid.min.js, 3,572,661 B, sha256 581ed7d7...); supported types flowchart/graph, sequence, class, state, ER, gantt, pie, journey, gitGraph with other parseable types best-effort and unsupported types taking the failure path; the mmd alias is dropped (REQ-06.017 names only mermaid); style-src 'self' 'unsafe-inline' is granted only on HTML responses that link the diagram bundle, all other HTML including math-only pages keeps style-src 'self' and script-src stays 'self' everywhere; caps are 100,000 UTF-8 bytes and 1,000 lines in the server pre-pass plus maxEdges 500 client-side, with over-limit input shown as source plus a limit note; the sandboxed-iframe fallback is rejected (opaque-origin cannot load /assets/mermaid.min.js without CORS, allow-same-origin defeats isolation); failure contract is source preserved in pre, data-render-error=diagram, one figcaption render-note, per-figure try/catch isolation. Budget: projected 7.92 MiB against the 12 MiB ceiling, so TASK-149 needs no adjustment.
+Blocker cleared: ADR-0026 completed acceptance 2026-11-16 as a delegated architecture decision (owner acknowledgement pending). Resolved: Mermaid pinned to 11.17.2 (dist/mermaid.min.js, 3,572,661 B, sha256 581ed7d7...); supported types flowchart/graph, sequence, class, state, ER, gantt, pie, journey, gitGraph with other parseable types best-effort and unsupported types taking the failure path; the mmd alias is dropped (REQ-006.017 names only mermaid); style-src 'self' 'unsafe-inline' is granted only on HTML responses that link the diagram bundle, all other HTML including math-only pages keeps style-src 'self' and script-src stays 'self' everywhere; caps are 100,000 UTF-8 bytes and 1,000 lines in the server pre-pass plus maxEdges 500 client-side, with over-limit input shown as source plus a limit note; the sandboxed-iframe fallback is rejected (opaque-origin cannot load /assets/mermaid.min.js without CORS, allow-same-origin defeats isolation); failure contract is source preserved in pre, data-render-error=diagram, one figcaption render-note, per-figure try/catch isolation. Budget: projected 7.92 MiB against the 12 MiB ceiling, so TASK-149 needs no adjustment.
 
 ---
 
@@ -181,7 +181,7 @@ created: 2026-11-16T11:12:00Z
 
 ---
 
-DEF-1 (reported by TASK-150, severity High, no fix made): Firefox 100.0 cannot render any Mermaid diagram, so NFR-05.001's Firefox 100 floor is not met.
+DEF-1 (reported by TASK-150, severity High, no fix made): Firefox 100.0 cannot render any Mermaid diagram, so NFR-005.001's Firefox 100 floor is not met.
 
 Expected: on `/doc/REQ-001.001` in Firefox 100.0 at 1440 CSS px (DPR 1), all 10 promised Mermaid figures become `<svg>` inside `.diagram-scroll`, with no `data-render-error`.
 Observed: 0/10 SVG; all 10 figures keep `<pre>`, carry `data-render-error="diagram"`, and show `Diagram not rendered: Mermaid rejected the source.` `mermaid.render('probe','flowchart TD\n A --> B')` rejects with `TypeError: Illegal constructor` at `http://127.0.0.1:6431/assets/mermaid/mermaid.min.js:3582:1657` (stack also frames 3584:664 and 3586:1427). Firefox 102.0esr renders 10/10 with the same page and bundle.
@@ -191,7 +191,7 @@ Browser: Firefox 100.0 (`firefox-bin` SHA-256 `7cabcabf4ae5092dd2ec802bacc8b9730
 Command: `geckodriver --port <p>`; POST `/session` with `moz:firefoxOptions.binary` = Firefox 100 tarball; POST `/url` `http://127.0.0.1:6431/doc/REQ-001.001`; wait 5 s; evaluate the DOM; POST `/execute/async` calling `window.mermaid.render(...)`.
 Reproduction: 1) build the TASK-150 S3 corpus and serve the installed binary; 2) launch the Firefox 100 tarball under geckodriver; 3) open `/doc/REQ-001.001` at 1440 px; 4) inspect `figure[data-diagram]` and the render promise rejection.
 Evidence: `./.tmp/task150/evidence/def_ff100_diagram.json` during the run (scratch removed; excerpts above and in TASK-150 notes).
-Impact: the browser floor in NFR-05.001 (Firefox 100+) is not satisfied for diagram rendering. Possible causes are a Mermaid 11.17.2 API requiring a newer Gecko (the rejection is consistent with a missing/illegal platform constructor) or a floor/requirement mismatch; the owning task decides whether to raise the floor or change the bundle/fallback.
+Impact: the browser floor in NFR-005.001 (Firefox 100+) is not satisfied for diagram rendering. Possible causes are a Mermaid 11.17.2 API requiring a newer Gecko (the rejection is consistent with a missing/illegal platform constructor) or a floor/requirement mismatch; the owning task decides whether to raise the floor or change the bundle/fallback.
 
 ---
 

@@ -5,11 +5,11 @@ created_date: '2026-11-20T17:42:17Z'
 updated_date: '2026-11-22T16:44:40Z'
 labels: []
 references:
-  - REQ-07.003
-  - REQ-05.001
+  - REQ-007.003
+  - REQ-005.001
   - ADR-0016
   - ADR-036
-  - REQ-05.008
+  - REQ-005.008
   - TECH-070
   - AUD-140
   - ADR-042
@@ -54,7 +54,7 @@ Fixing a defect, changing a requirement, ADR, specification, test case, golden, 
 Verification does not start while a material decision from TASK-255, TASK-256, TASK-258, or TASK-259 is unresolved. ADR-042 resolves the TASK-255, TASK-256, TASK-258, and TASK-259 decisions; TASK-259's ops-builder deletion is deferred to MS-035. A blocked dependency is a finding, not a pass.
 
 ## Grounding
-MS-034 AC-1 to AC-7; ADR-036; ADR-042; TECH-070; TECH-024; REQ-07.003; REQ-05.001; REQ-05.008; AUD-140; TC-119, TC-120, TC-121, TC-125, TC-126, TC-185.
+MS-034 AC-1 to AC-7; ADR-036; ADR-042; TECH-070; TECH-024; REQ-007.003; REQ-005.001; REQ-005.008; AUD-140; TC-119, TC-120, TC-121, TC-125, TC-126, TC-185.
 
 ## Definition of done
 Every criterion has a pass or a recorded finding with evidence; the suite and quality gates are green or their failures are recorded; the internal-checkpoint rule and packaging waiver are recorded; the AUD-140 follow-ups are recorded; no product code or managed artifact is changed by this task.
@@ -71,11 +71,11 @@ Every criterion has a pass or a recorded finding with evidence; the suite and qu
 - [ ] #9 AC-6 verified: field-derived options appear exactly where the seed allows, in sequence order and only on the field verbs; create-group, --group, and supersede appear exactly where the DocumentModel allows. (MS-034 AC-6)
 - [ ] #10 AC-7 verified: the MS-032 CLI fixture replay passes with the two glossary --term usage-error cases and the four migrated glossary cases, plus any other documented deltas; every other record file and exit code matches. (MS-034 AC-7)
 - [ ] #11 The full test suite is green, cargo clippy --all-targets -- -D warnings and cargo fmt --check are clean, and the verification evidence records the suite counts and commands run. (DoD)
-- [ ] #12 AUD-140 follow-ups are recorded with status and owner: L-1 field string type-error diagnostics (TASK-258), L-3 TECH-077 section 6 step 4 wording (architect with the MS-034 spec pass, recorded with TASK-257), and L-4 REQ-07.002 and TC-114 seed-materialization wording (requirements-engineer, Phase 2). (AUD-140)
+- [ ] #12 AUD-140 follow-ups are recorded with status and owner: L-1 field string type-error diagnostics (TASK-258), L-3 TECH-077 section 6 step 4 wording (architect with the MS-034 spec pass, recorded with TASK-257), and L-4 REQ-007.002 and TC-114 seed-materialization wording (requirements-engineer, Phase 2). (AUD-140)
 - [ ] #13 Every finding is recorded with expected and observed values, the owning surface, and a disposition; this task fixes no defect and adds no product behavior. (DoD)
 ## Comments
 - **task-refiner**: Evidence to record: the exact commands, the test counts, the help diff report location, the fixture replay result with the four glossary --term cases, the module and ops-builder absence checks, and the backlog and decision no-change check. Use project-local .tmp for scratch and remove it before finishing; do not retain a verification package.
-- **task-refiner**: AUD-140 mapping: L-1 is the field string type-error diagnostic work in TASK-258; L-3 is the TECH-077 section 6 step 4 merge_yaml wording fix owned by architect with the MS-034 spec pass and recorded with TASK-257; L-4 is the REQ-07.002 and TC-114 seed-materialization wording owned by requirements-engineer in Phase 2. L-2 (NFR-007.001) is owned by MS-036 and is out of scope here.
+- **task-refiner**: AUD-140 mapping: L-1 is the field string type-error diagnostic work in TASK-258; L-3 is the TECH-077 section 6 step 4 merge_yaml wording fix owned by architect with the MS-034 spec pass and recorded with TASK-257; L-4 is the REQ-007.002 and TC-114 seed-materialization wording owned by requirements-engineer in Phase 2. L-2 (NFR-007.001) is owned by MS-036 and is out of scope here.
 - **planner**: ADR-042 rulings and planner alignments applied to MS-034: AC-3 is narrowed to the read write split and statuses-only comma syntax; AC-4 is corrected to eight document ops builders with ops-builder and TypedHandler deletion deferred to MS-035; TASK-255 carries the audit field_defaults; TASK-256 keeps the CLI mockup edit --status; TASK-258 implements the narrowed read write contract; TASK-259 is narrowed; TASK-260 attributes generated verb about lines and keeps configuration map order. Verification may start once the execution tasks are Done.
 - **planner**: ADR-042 item 7 applied: AC #1-#3 are replaced by the internal-checkpoint rule and the packaging waiver wording used by MS-032 (AUD-138) and MS-033 (AUD-140); no RC version or RC package is required. MS-034 AC-8 and TASK-307 still state the old RC-gate premise; they were not changed by this planner pass and are reported as an open decision to the orchestrator.
 - **planner**: Planner: TASK-307 archived as premise invalid (build-deb.sh is the single build script per the TASK-235 architect ruling; MS-037 AC-6 corrected) and removed from this task's dependencies; MS-034 AC-8 corrected to the internal-checkpoint rule. Verification scope remains MS-034 AC-1 to AC-7.

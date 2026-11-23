@@ -12,11 +12,11 @@ milestone: MS-005
 dependencies:
   - TASK-013
 references:
-  - docs/requirements/business/REQ-05.008.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.008.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
   - docs/specifications/ui-mockups-management.md
@@ -30,19 +30,19 @@ ordinal: 17200
 Implement the `ui-mockup` commands so contributors can create, list, view, edit, deprecate, restore, and supersede UI mockups (numbered MOCK-xxxx HTML review packages), with stable IDs and text-file persistence inside the project directory.
 
 Scope (in):
-- `papyrus ui-mockup create <title> --task <task> --spec <spec-id>... [--ref <doc>...]` (REQ-05.008).
-- `papyrus ui-mockup list` (REQ-05.008).
-- `papyrus ui-mockup view <id>` (REQ-05.008).
-- `papyrus ui-mockup edit <id> [--title] [--task] [--spec...] [--ref...] [--status] [--superseded-by] [--editor]` (REQ-05.008).
-- `papyrus ui-mockup deprecate <id>` and `restore <id>` (REQ-05.007, REQ-05.008).
-- Supersession via `--superseded-by` (REQ-05.008).
-- Stable IDs MOCK-<number> using configured document_types.ui-mockup prefix/id_padding; no reuse (REQ-05.008, BR-016).
-- Fields: title, associated task, references, UI spec ids (REQ-05.008).
-- Status vocabulary pending/approved/deprecated; transitions per spec (REQ-05.008).
-- Deprecation moves files to deprecated/ and hides from lists/search/web UI (REQ-05.007, REQ-05.008).
-- Restoration preserves ID and updates status field in HTML (REQ-05.008).
-- UTF-8 HTML persistence inside project directory; sanitization (NFR-02.002, NFR-04.001, NFR-04.002).
-- Common CLI controls/outcomes inherited from TASK-2 (REQ-01.004).
+- `papyrus ui-mockup create <title> --task <task> --spec <spec-id>... [--ref <doc>...]` (REQ-005.008).
+- `papyrus ui-mockup list` (REQ-005.008).
+- `papyrus ui-mockup view <id>` (REQ-005.008).
+- `papyrus ui-mockup edit <id> [--title] [--task] [--spec...] [--ref...] [--status] [--superseded-by] [--editor]` (REQ-005.008).
+- `papyrus ui-mockup deprecate <id>` and `restore <id>` (REQ-005.007, REQ-005.008).
+- Supersession via `--superseded-by` (REQ-005.008).
+- Stable IDs MOCK-<number> using configured document_types.ui-mockup prefix/id_padding; no reuse (REQ-005.008, BR-016).
+- Fields: title, associated task, references, UI spec ids (REQ-005.008).
+- Status vocabulary pending/approved/deprecated; transitions per spec (REQ-005.008).
+- Deprecation moves files to deprecated/ and hides from lists/search/web UI (REQ-005.007, REQ-005.008).
+- Restoration preserves ID and updates status field in HTML (REQ-005.008).
+- UTF-8 HTML persistence inside project directory; sanitization (NFR-002.002, NFR-004.001, NFR-004.002).
+- Common CLI controls/outcomes inherited from TASK-2 (REQ-001.004).
 
 Scope (out):
 - Search and browser access for mockups (TASK-39, TASK-40).

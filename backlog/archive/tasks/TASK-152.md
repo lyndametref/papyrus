@@ -7,10 +7,10 @@ labels:
   - bug
 references:
   - RE-001
-  - NFR-04.003
-  - REQ-05.010
-  - REQ-05.011
-  - NFR-04.004
+  - NFR-004.003
+  - REQ-005.010
+  - REQ-005.011
+  - NFR-004.004
 status: Done
 assignee:
   - task-refiner
@@ -30,8 +30,8 @@ Outcome: confirm all information for implementing the import metadata fix is ava
 - [ ] The defect and required code locations are identified: record frontmatter format_scalar and import write_one assignee handling.
 - [ ] The repair set is identified: task files TASK-144 and TASK-145.
 - [ ] The change preserves existing behavior for non-at scalars and empty lists.
-- [ ] Traceability to TC-001 through TC-006, REQ-05.010, REQ-05.011, NFR-04.004, and request RE-001 is recorded.
+- [ ] Traceability to TC-001 through TC-006, REQ-005.010, REQ-005.011, NFR-004.004, and request RE-001 is recorded.
 - [ ] No open material questions remain.
 ## Comments
 - **task-refiner**: Line one. Line two with slash? no.
-- **task-refiner**: Refinement complete. Root cause: format_scalar does not quote at-prefixed scalars, so import write_one emits invalid YAML for assignee entries. Required fix: quote at-prefixed scalars as single-quoted values in record frontmatter format_scalar, preserving import handling and empty lists. Repair affected task files TASK-144 and TASK-145. Traceability: TC-001 to TC-006, REQ-05.010, REQ-05.011, NFR-04.004, RE-001. No open material questions.
+- **task-refiner**: Refinement complete. Root cause: format_scalar does not quote at-prefixed scalars, so import write_one emits invalid YAML for assignee entries. Required fix: quote at-prefixed scalars as single-quoted values in record frontmatter format_scalar, preserving import handling and empty lists. Repair affected task files TASK-144 and TASK-145. Traceability: TC-001 to TC-006, REQ-005.010, REQ-005.011, NFR-004.004, RE-001. No open material questions.

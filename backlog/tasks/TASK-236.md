@@ -6,9 +6,9 @@ updated_date: '2026-11-21T16:31:09Z'
 labels: []
 references:
   - ADR-036
-  - REQ-07.004
-  - REQ-07.002
-  - REQ-07.001
+  - REQ-007.004
+  - REQ-007.002
+  - REQ-007.001
 status: Done
 assignee:
   - tech-writer
@@ -38,7 +38,7 @@ Do not add planning or delivery language.
 - `docs/domain-model/business-object-model.md` — `Business object model`, `Object descriptions`, `Lifecycles`, `Documented relationships`, `Open questions`.
 - `docs/domain-model/context-map.md` — `Context Descriptions` and its four bounded contexts; update only if the new object changes an aggregate boundary.
 - `docs/domain-model/glossary/` — managed GLO records; add the terms listed in the scope as new GLO records, do not edit files directly.
-- Read-only inputs: ADR-036 (`decisions/ADR-036-config-declared-document-field-schema.md`), REQ-07.002, REQ-07.004.
+- Read-only inputs: ADR-036 (`decisions/ADR-036-config-declared-document-field-schema.md`), REQ-007.002, REQ-007.004.
 
 ### Refinement assumptions / definition of done
 Document Type is a new first-class object; existing object descriptions and context boundaries stay unless the new object demonstrably changes them. Done means all acceptance criteria pass, the user has verified the model, and no source or test file changes (MS-031 AC-7, AC-10).

@@ -17,17 +17,17 @@ accepted
 
 ## Context
 
-REQ-07.002 makes the `document_types` map key the document slug, and REQ-07.003 makes that slug the CLI command name: every enabled entry must expose `papyrus <document-slug>` with the baseline verb family `create`, `list`, `view`, `edit`, `archive`, `delete`. Front-matter-backed document types add `status <id> <value>` (REQ-07.001), a built-in typed type may add verbs of its own (`create-group`, `--group`, `supersede`), and UI mockups have no `status` verb. `papyrus --help` must list every enabled slug, `papyrus <slug> --help` must document that type's verbs, an unknown or disabled slug must be a usage error (exit code 2) with no fallback, and a configured slug can never shadow a built-in command.
+REQ-007.002 makes the `document_types` map key the document slug, and REQ-007.003 makes that slug the CLI command name: every enabled entry must expose `papyrus <document-slug>` with the baseline verb family `create`, `list`, `view`, `edit`, `archive`, `delete`. Front-matter-backed document types add `status <id> <value>` (REQ-007.001), a built-in typed type may add verbs of its own (`create-group`, `--group`, `supersede`), and UI mockups have no `status` verb. `papyrus --help` must list every enabled slug, `papyrus <slug> --help` must document that type's verbs, an unknown or disabled slug must be a usage error (exit code 2) with no fallback, and a configured slug can never shadow a built-in command.
 
 Current code shape:
 
-- `src/lib.rs` declares `Cli` and `Commands` with `clap` **derive** macros and dispatches with one `match` arm per variant. Twenty subcommands are compiled in, including eleven document-type variants (`Req`, `Nfreq`, `Glossary`, `UiSpec`, `TechSpec`, `Rule`, `UiMockup`, `Audit`, `UseCase`, `TestCase`, `TestReport`) that REQ-07.003 removes as static commands.
-- `Cli::parse()` calls clap's exiting parser, so parse errors bypass `AppError`, the project's exit-code mapping (0/1/2/3/4, REQ-01.004) and the `--json` error object.
+- `src/lib.rs` declares `Cli` and `Commands` with `clap` **derive** macros and dispatches with one `match` arm per variant. Twenty subcommands are compiled in, including eleven document-type variants (`Req`, `Nfreq`, `Glossary`, `UiSpec`, `TechSpec`, `Rule`, `UiMockup`, `Audit`, `UseCase`, `TestCase`, `TestReport`) that REQ-007.003 removes as static commands.
+- `Cli::parse()` calls clap's exiting parser, so parse errors bypass `AppError`, the project's exit-code mapping (0/1/2/3/4, REQ-001.004) and the `--json` error object.
 - Each document module owns its own `clap::Subcommand` enum (`ReqCmd`, `TechSpecCmd`, …) with type-specific verbs (`CreateGroup`, `Deprecate`, `Restore`, `Supersede`).
 - `--json`, `--dir`, `--config`, `--no-color` are `global = true` derive arguments. They are needed to *find* the configuration, yet the configuration is needed to *build* the command tree — a circular dependency that derive cannot express.
 - clap derive can only declare subcommands the compiler can see. A runtime entry set is not expressible; the only derive escape hatch is `allow_external_subcommands`, which disables per-subcommand `--help`, typed parsing, and help/usage listing.
 
-Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exactly as documented in REQ-01.004; help must stay accurate for a set that changes per project; a failed configuration must fail closed (REQ-07.002); the built-in command surface must not regress; and the same built-in table must be reusable for validation (ADR-0019) and documentation (ADR-0021) so the three cannot drift.
+Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exactly as documented in REQ-001.004; help must stay accurate for a set that changes per project; a failed configuration must fail closed (REQ-007.002); the built-in command surface must not regress; and the same built-in table must be reusable for validation (ADR-0019) and documentation (ADR-0021) so the three cannot drift.
 
 ## Decision
 1. **One command tree is built at startup from the artifact registry** (`cli::tree(&ArtifactRegistry) -> clap::Command`, builder API). It is the single source of parsing, usage, and help. The builder and the derive macros are **split by surface**: `cli::tree` builds the root command and the global arguments (`--json`, `--dir`, `--config`, `--no-color`) with the builder API; `cli::tree::document_command` and `cli::tree::verb_command` build the entire document surface with the builder API; the built-in trees remain `clap` **derive** in `src/cli/builtin.rs` (`BuiltinCmd`, `ConfigCmd`, `InitArgs`) plus one `#[derive(Subcommand)]` enum per family in `src/task.rs`, `src/milestone.rs`, `src/release.rs`, `src/decision.rs`, `src/import.rs`, grafted onto the root with `BuiltinCmd::augment_subcommands(cmd)` and parsed with `BuiltinCmd::from_arg_matches`. `clap` remains the only parser and the only dependency.
@@ -40,37 +40,37 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 
 3. **Two-phase startup, in fixed order.**
 
-   - **Phase 1 — context pre-scan.** A lexical scan of `argv` (not a parser) extracts only `--dir <path>`, `--dir=<path>`, `--config <path>`, `--config=<path>` and the corresponding `PAPYRUS_DIR`/`PAPYRUS_CONFIG` environment variables, and resolves the project directory and configuration path exactly per REQ-01.003. The scan stops at `--`. It never interprets subcommands, verbs, or any other option.
+   - **Phase 1 — context pre-scan.** A lexical scan of `argv` (not a parser) extracts only `--dir <path>`, `--dir=<path>`, `--config <path>`, `--config=<path>` and the corresponding `PAPYRUS_DIR`/`PAPYRUS_CONFIG` environment variables, and resolves the project directory and configuration path exactly per REQ-001.003. The scan stops at `--`. It never interprets subcommands, verbs, or any other option.
    - **Phase 2 — configuration.** For every command except `init`, the selected configuration is loaded **and fully validated** (ADR-0019), then the registry is built (ADR-0017). A missing or invalid configuration aborts here with the documented outcome (exit 1 for not found, exit 4 for validation); no command tree is built from a partial type set.
    - **Phase 3 — single parse.** `cli::tree` is built from the registry and `try_get_matches_from(argv)` parses the real invocation exactly once. Phase 1's result is discarded except for selecting the file.
    - **Phase 4 — dispatch.** `match` on the resolved command: a built-in handler, or `Command::Document { slug, verb }`.
 
-   `papyrus init` skips phases 2–3's configuration load, because REQ-01.001 requires it to run without a configuration file.
+   `papyrus init` skips phases 2–3's configuration load, because REQ-001.001 requires it to run without a configuration file.
 
    *Revision (2026-11-20, amended by ADR-037): phases 1–4 and their order are unchanged. The validate-then-build sequence of phase 2 is also the reload path for the browser's serving snapshot: a configuration change is loaded and fully validated (ADR-0019), then the registry is built (ADR-0017), and only then is the route table derived, so a reload passes the same gates as startup. A reload failure after startup does not abort the process and does not produce a tree or snapshot from a partial type set; it keeps the last known good snapshot serving (ADR-037). The startup outcomes stated in phase 2 are unchanged.*
 
-4. **Document commands are built by one function, not one type.** `cli::document_command(descriptor)` produces a `clap::Command` whose about line is `Manage <slug> documents.` and whose subcommands are the baseline verbs of REQ-07.003 (`create`, `list`, `view`, `edit`, `archive`, `delete`), plus `status <id> <value>` when the descriptor is front-matter-backed, plus any verb the descriptor declares as an extension. Every verb parses into one `DocumentInvocation { slug, verb: DocumentVerb, args: DocumentArgs }` value; `document::run(ctx, registry, invocation)` is the only handler. Type-specific verbs (REQ-05.001 `create-group`, REQ-05.002 `--group`, REQ-05.008 `supersede`) and the `status` presence rule are descriptor data, not a second handler (ADR-0017).
+4. **Document commands are built by one function, not one type.** `cli::document_command(descriptor)` produces a `clap::Command` whose about line is `Manage <slug> documents.` and whose subcommands are the baseline verbs of REQ-007.003 (`create`, `list`, `view`, `edit`, `archive`, `delete`), plus `status <id> <value>` when the descriptor is front-matter-backed, plus any verb the descriptor declares as an extension. Every verb parses into one `DocumentInvocation { slug, verb: DocumentVerb, args: DocumentArgs }` value; `document::run(ctx, registry, invocation)` is the only handler. Type-specific verbs (REQ-005.001 `create-group`, REQ-005.002 `--group`, REQ-005.008 `supersede`) and the `status` presence rule are descriptor data, not a second handler (ADR-0017).
 
    *Revision (2026-11-15, owner decision): this decision previously left the runtime-name mechanism unstated. The `clap` `string` feature (enabled together with `derive` in `Cargo.toml`) is what lets a builder-built document command own a runtime slug — `Command::new(descriptor.slug.clone())` takes an owned `String`, so no `'static` leak is needed — while `derive` stays enabled for the built-in family trees of decision 1.*
 
 5. **No dynamic escape hatch.** `allow_external_subcommands`, `ignore_errors`, `infer_subcommands`, `allow_missing_positional`, and trailing-argument passthrough are **not** used. A name that is not in the tree is not a command: clap emits `unrecognized subcommand` with the enabled command list and exits 2. A disabled entry is absent from the tree, so its slug behaves exactly like an unknown slug. There is no alias, abbreviation, case folding, or fuzzy match, and no path in the code may map an unknown slug onto a different command.
 
-6. **Built-in names cannot be shadowed, by construction and by validation.** `cli::tree` never inserts a document command whose slug equals a built-in name; ADR-0019 rejects such a configuration first, so the runtime check is a defensive assertion, not the control. This keeps REQ-07.002's guarantee independent of insertion order.
+6. **Built-in names cannot be shadowed, by construction and by validation.** `cli::tree` never inserts a document command whose slug equals a built-in name; ADR-0019 rejects such a configuration first, so the runtime check is a defensive assertion, not the control. This keeps REQ-007.002's guarantee independent of insertion order.
 
 7. **Help and error text are generated from the tree.**
    - `papyrus --help` lists built-ins and one line per enabled document type, derived from the registry in slug order.
    - `papyrus <slug> --help` lists the baseline verbs, `status` where the type has it, and any declared extension for a built-in type.
-   - Unknown-slug, missing-verb, and malformed-option errors keep clap's plain-text stderr output and exit code 2 (REQ-01.004), unchanged from today.
+   - Unknown-slug, missing-verb, and malformed-option errors keep clap's plain-text stderr output and exit code 2 (REQ-001.004), unchanged from today.
    - Application errors (`AppError`) keep the existing mapping (1/3/4) and the existing `--json` error object.
    - `--json` from a document command behaves as for any other command because the flag is a global argument of the same tree.
 
-8. **`--version` and `--help` do not require a configuration file.** If no configuration is found, `papyrus --version` prints the version and exits 0; `papyrus --help` lists the built-in commands plus the default document-type set, annotated that no configuration was found, and exits 0. Rationale: these are global options, not command executions, and REQ-01.003's fail-closed rule governs commands. Without this exception a missing or broken configuration would leave the user unable to see which commands exist. Command execution remains fail-closed.
+8. **`--version` and `--help` do not require a configuration file.** If no configuration is found, `papyrus --version` prints the version and exits 0; `papyrus --help` lists the built-in commands plus the default document-type set, annotated that no configuration was found, and exits 0. Rationale: these are global options, not command executions, and REQ-001.003's fail-closed rule governs commands. Without this exception a missing or broken configuration would leave the user unable to see which commands exist. Command execution remains fail-closed.
 
 9. **Startup work is bounded and observable.** The tree is built once per process in `O(built-ins + enabled types)`; no completion scripts, no per-request rebuilding, and no caching across processes. Building the tree is not allowed to perform I/O beyond the already-loaded configuration.
 
    *Revision (2026-11-20, amended by ADR-037): this decision bounds the CLI command tree, which is still built once per process with no I/O beyond the already-loaded configuration; it no longer describes the browser's serving metadata. The browser keeps one configuration, registry, and route snapshot and rebuilds it only when an input fingerprint changes, so a request that changes nothing performs no rebuild. No caching crosses process boundaries (ADR-037).*
 
-10. **Removals are part of this decision.** The static document-type variants of `Commands`, their `clap::Subcommand` enums, and the `nfreq` command name are deleted, not retained as hidden aliases (REQ-07.002 and REQ-07.003 both forbid the alias). `req` and `nfr` keep working only because they are default `document_types` entries.
+10. **Removals are part of this decision.** The static document-type variants of `Commands`, their `clap::Subcommand` enums, and the `nfreq` command name are deleted, not retained as hidden aliases (REQ-007.002 and REQ-007.003 both forbid the alias). `req` and `nfr` keep working only because they are default `document_types` entries.
 
 ### Amendment (2026-11-20) — descriptor model cross-check
 
@@ -88,10 +88,10 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 
 **Positive:**
 
-- REQ-07.003 becomes structural: adding an entry adds a command, a help line, and `--help` output with no code change.
+- REQ-007.003 becomes structural: adding an entry adds a command, a help line, and `--help` output with no code change.
 - Parsing, usage text, help, and validation all read the same sources — the derive declarations for the built-ins, `BUILTIN_COMMANDS` for reserved names, and the registry for the document surface — so the reserved-name list cannot drift from the real command set.
 - The circular dependency between global options and the command tree is resolved once, in one documented place, instead of being worked around per command.
-- Deleting eleven static document-type variants (the ten per-type modules plus the `nfreq` alias) removes a large block of near-duplicate code that REQ-07.003 makes obsolete anyway; the built-in family trees of decision 1 are derive-built and stay unchanged.
+- Deleting eleven static document-type variants (the ten per-type modules plus the `nfreq` alias) removes a large block of near-duplicate code that REQ-007.003 makes obsolete anyway; the built-in family trees of decision 1 are derive-built and stay unchanged.
 - A `status` verb that exists only for front-matter-backed types makes the descriptor's status model (ADR-0017) visible in help without a second command builder.
 
 **Negative:**
@@ -104,7 +104,7 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 **Risks and mitigations:**
 
 - *Pre-scan diverges from clap*: the scan recognizes only the four documented forms and stops at `--`; a matrix test compares phase-1 resolution with the final parsed global values for `--dir`, `--dir=`, `--config`, `--config=`, env-only, and mixed forms.
-- *Behaviour change for existing scripts*: `papyrus nfreq …` now exits 2. This is required by REQ-07.002 and must appear in the release upgrade notes.
+- *Behaviour change for existing scripts*: `papyrus nfreq …` now exits 2. This is required by REQ-007.002 and must appear in the release upgrade notes.
 - *Argument-name drift in command construction*: one table-driven test per built-in asserts that every documented option parses, one run of each document verb covers the builder-built document surface, and one test asserts the full help output per command.
 - *Config-before-parse hides usage errors*: documented in `papyrus(1)`; `papyrus --help` remains available when no configuration file exists.
 
@@ -124,7 +124,7 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 ## Open Questions
 
 - Should `papyrus --help` with an **invalid** configuration also fall back to the built-ins-only rendering (decision 8 covers only "no configuration file")? Current decision: fail closed with exit 4, so the user is told what to fix.
-- Should `papyrus <slug> <id>` be accepted as a shorthand for `view <id>` (REQ-07.003 leaves this open)? Current decision: no shorthand.
+- Should `papyrus <slug> <id>` be accepted as a shorthand for `view <id>` (REQ-007.003 leaves this open)? Current decision: no shorthand.
 - Should a top-level `papyrus help <slug>` be required in addition to `--help`? Current decision: only the clap-provided `help` subcommand and the `--help` flag.
 
 ## Downstream constraints
@@ -142,11 +142,11 @@ Forces: no new dependency (ADR-0005); exit codes and JSON errors must stay exact
 
 ## References
 
-- `docs/requirements/business/REQ-07.001.md` — document main status, custom statuses, and the `status` command.
-- `docs/requirements/business/REQ-07.002.md` — document slugs and reserved built-in names.
-- `docs/requirements/business/REQ-07.003.md` — dynamic command family, help listing, unknown/disabled slug.
-- `docs/requirements/business/REQ-01.003.md` — project and configuration selection, fail-closed.
-- `docs/requirements/business/REQ-01.004.md` — global options and exit codes.
+- `docs/requirements/business/REQ-007.001.md` — document main status, custom statuses, and the `status` command.
+- `docs/requirements/business/REQ-007.002.md` — document slugs and reserved built-in names.
+- `docs/requirements/business/REQ-007.003.md` — dynamic command family, help listing, unknown/disabled slug.
+- `docs/requirements/business/REQ-001.003.md` — project and configuration selection, fail-closed.
+- `docs/requirements/business/REQ-001.004.md` — global options and exit codes.
 - `docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md` — single crate.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — no new dependency.
 - `docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md` — the registry the tree is built from.

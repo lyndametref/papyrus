@@ -7,8 +7,8 @@ labels: []
 references:
   - ADR-039
   - ADR-036
-  - REQ-06.014
-  - REQ-06.004
+  - REQ-006.014
+  - REQ-006.004
   - TECH-040
   - TECH-068
   - TC-184
@@ -40,7 +40,7 @@ type: implementation
 - Preserve the Backlog and Decision surfaces in `render.rs`/`mod.rs` byte-compatibly. No document slug name match in the field-map/list/view path. Do not add a dependency, asset, template, client script, or route.
 
 ## Grounding
-ADR-039 decisions 14-21 and 24-25; ADR-0033 (as amended by ADR-039 decisions 6-7); TECH-040 sections 2-3 and 7; TECH-068 sections 3.1 and 4.1; REQ-06.014 and REQ-06.004. Symbols: `src/browser/{records,render,list,shell,assets}.rs`, `src/record/{view,document,frontmatter}.rs`, `TypeDescriptor` fields `fields`/`group`/`member`/`document_model` in `src/registry.rs`, `src/browser/templates/{view,list}.html`, and `browser::assets::ASSETS`.
+ADR-039 decisions 14-21 and 24-25; ADR-0033 (as amended by ADR-039 decisions 6-7); TECH-040 sections 2-3 and 7; TECH-068 sections 3.1 and 4.1; REQ-006.014 and REQ-006.004. Symbols: `src/browser/{records,render,list,shell,assets}.rs`, `src/record/{view,document,frontmatter}.rs`, `TypeDescriptor` fields `fields`/`group`/`member`/`document_model` in `src/registry.rs`, `src/browser/templates/{view,list}.html`, and `browser::assets::ASSETS`.
 
 ## Definition of done
 The field map is the only document content projection for list and view; group, member, and mockup rendering is role-aware; the document detail template is gone; Backlog and Decision output is unchanged; tests, clippy -D warnings, and fmt are clean.

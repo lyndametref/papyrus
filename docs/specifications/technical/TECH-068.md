@@ -21,19 +21,19 @@ references:
   - ADR-0038
   - ADR-0039
   - MOCK-0015
-  - NFR-01.003
-  - NFR-02.002
-  - REQ-05.007
-  - REQ-05.011
-  - REQ-06.004
-  - REQ-06.012
-  - REQ-06.014
-  - REQ-06.016
-  - REQ-06.018
-  - REQ-06.019
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.004
+  - NFR-001.003
+  - NFR-002.002
+  - REQ-005.007
+  - REQ-005.011
+  - REQ-006.004
+  - REQ-006.012
+  - REQ-006.014
+  - REQ-006.016
+  - REQ-006.018
+  - REQ-006.019
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.004
 status: verified
 ---
 # TECH-068 Descriptor-Driven Document Browser Surface

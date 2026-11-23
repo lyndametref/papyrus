@@ -15,14 +15,14 @@ labels:
 milestone: MS-017
 dependencies: []
 references:
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.006.md
-  - docs/requirements/business/REQ-06.007.md
-  - docs/requirements/business/REQ-06.008.md
-  - docs/requirements/business/REQ-06.009.md
-  - docs/requirements/business/REQ-06.010.md
-  - docs/requirements/business/REQ-06.011.md
-  - docs/requirements/business/REQ-06.012.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-006.006.md
+  - docs/requirements/business/REQ-006.007.md
+  - docs/requirements/business/REQ-006.008.md
+  - docs/requirements/business/REQ-006.009.md
+  - docs/requirements/business/REQ-006.010.md
+  - docs/requirements/business/REQ-006.011.md
+  - docs/requirements/business/REQ-006.012.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - docs/specifications/browser-glossary-terms.md
@@ -34,7 +34,7 @@ ordinal: 39030
 
 
 ## Description
-Revise the browser specification corpus for the Release 1.0 contract changes introduced by REQ-06.003 (extended) and REQ-06.006 through REQ-06.012: NFR grouping under owning groups; error-only console with a browser-only --debug flag; editable configuration view; shared-header branding; record references as links; concise glossary landing page; shared single record view layout; curated per-artifact descriptions and read-only configuration on the lifecycle page; Papyrus IDs only in routes, links, form values, and JSON. Specification work only; no code, requirements, or business rules change. Implementation is delivered by TASK-93, TASK-94, and TASK-95; UI approval by TASK-87. Feature spec: docs/specifications/browser-spec-revisions-task-86.md.
+Revise the browser specification corpus for the Release 1.0 contract changes introduced by REQ-006.003 (extended) and REQ-006.006 through REQ-006.012: NFR grouping under owning groups; error-only console with a browser-only --debug flag; editable configuration view; shared-header branding; record references as links; concise glossary landing page; shared single record view layout; curated per-artifact descriptions and read-only configuration on the lifecycle page; Papyrus IDs only in routes, links, form values, and JSON. Specification work only; no code, requirements, or business rules change. Implementation is delivered by TASK-93, TASK-94, and TASK-95; UI approval by TASK-87. Feature spec: docs/specifications/browser-spec-revisions-task-86.md.
 
 ## Acceptance Criteria
 - [ ] The requirements browser specification places non-functional atomic requirements under their owning group derived from the ID prefix, shows the group record title, falls back to the group number when the group record is missing, renders empty groups as entries with no children, and has no Other requirements catch-all.
@@ -52,7 +52,7 @@ Revise the browser specification corpus for the Release 1.0 contract changes int
 - [ ] #2 Shared single record view layout and reference-link rule are defined once in browser-requirements.md and referenced by per-type specs.
 - [ ] #3 NFR grouping, console verbosity, configuration view, branding, links, glossary landing, and per-artifact config are stated in the relevant specs.
 - [ ] #4 No Backlog.md storage-ID wording remains in revised browser specs.
-- [ ] #5 Traceability sections cite REQ-06.003, REQ-06.006 through REQ-06.012, ADR-0010, ADR-0012, and ADR-0013.
+- [ ] #5 Traceability sections cite REQ-006.003, REQ-006.006 through REQ-006.012, ADR-0010, ADR-0012, and ADR-0013.
 - [ ] #6 Mockup impact (revisions and new package under TASK-87) is recorded.
 - [ ] #7 Requirements and business rules files are unchanged.
 

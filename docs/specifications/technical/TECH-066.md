@@ -11,16 +11,16 @@ references:
   - ADR-0023
   - ADR-0036
   - ADR-0039
-  - REQ-05.007
-  - REQ-05.008
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-005.007
+  - REQ-005.008
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
   - ADR-032
-  - REQ-03.001
+  - REQ-003.001
 status: verified
 ---
 # TECH-066 Refactor the Record Layer for Document Archive and Status

@@ -6,8 +6,8 @@ and the post-refactor behaviour. Any other difference is a regression.
 1. **Uniform title contract.** Every document type migrates to the same title
    input: a positional `TITLE` on create and a uniform title form on edit,
    including the glossary. Bytes: `*/create`, `*/edit`, `glossary/create`,
-   `glossary/edit`, and `verb-*/create|edit` help goldens. Source: REQ-07.003,
-   REQ-05.001, REQ-05.003, BR-011.
+   `glossary/edit`, and `verb-*/create|edit` help goldens. Source: REQ-007.003,
+   REQ-005.001, REQ-005.003, BR-011.
 2. **`--term` removed, `--definition` kept, and answered as a usage error.**
    `glossary create` no longer takes `--term`; the term is the positional
    `TITLE` and `--definition` remains the definition option. `glossary edit`
@@ -19,14 +19,14 @@ and the post-refactor behaviour. Any other difference is a regression.
    (uniform `--title`, exit 0), and the captured usage-error cases
    `glossary/create-term-removed` and `glossary/edit-term-removed` (exit 2, no
    record). Bytes: those six cases plus `verb-glossary-create`,
-   `verb-glossary-edit`. Source: REQ-05.003, BR-011.
+   `verb-glossary-edit`. Source: REQ-005.003, BR-011.
 3. **Help prose and derived field options.** Every verb about line is generated
    by the engine from the document model and field sequence; per-type about
    text is not preserved (ADR-042 item 2). Option prose is derived from the
    seed `label`/`help`/kind, field options follow the seed field sequence, and
    the `-d` short on `--description` disappears because `FieldSpec` has no
    short-name equivalent. Bytes: `tests/golden/cli-help/*` and the `* create`
-   and `* edit` fixture stdout. Source: REQ-07.003, ADR-042 item 2,
+   and `* edit` fixture stdout. Source: REQ-007.003, ADR-042 item 2,
    ADR-036 decision 29.
 4. **Asset cache headers and versioned vendor URLs.** Static assets gain cache
    headers and the vendor URLs become version-qualified. Bytes:
@@ -44,8 +44,8 @@ and the post-refactor behaviour. Any other difference is a regression.
    engine-owned group link in the reserved front-matter `group` key instead of
    the legacy `## Group` body section. Existing records are not migrated and
    keep their stored section. Bytes: `req/create`, `req/create-json`,
-   `nfr/create`, `nfr/create-json`. Source: REQ-05.001, REQ-05.002,
-   REQ-05.010, ADR-036 decision 9.
+   `nfr/create`, `nfr/create-json`. Source: REQ-005.001, REQ-005.002,
+   REQ-005.010, ADR-036 decision 9.
 
 8. **Seeded status on create.** Every Markdown document `create` and
    `create-group` now writes `status` into front matter: the type's configured
@@ -56,13 +56,13 @@ and the post-refactor behaviour. Any other difference is a regression.
    records without `status` are not migrated, and no create option sets the
    value. Bytes: `*/create`, `*/create-json`, `req/create-group`,
    `nfr/create-group` for every Markdown type except `ui-mockup`. Source:
-   REQ-05.011, TECH-042 7.4, TC-138.
+   REQ-005.011, TECH-042 7.4, TC-138.
 
 Corrected behaviour without a byte delta: `nfr create` and `nfr create-group`
 now write the `## User Story` section when `--story` is supplied. The seed
-declares `story` for both nfr roles (REQ-05.002) and the pre-refactor module
+declares `story` for both nfr roles (REQ-005.002) and the pre-refactor module
 ignored it; no corpus case supplies `--story` to nfr, so the snapshot is
-unchanged. Source: REQ-05.002, ADR-036 decisions 26-29.
+unchanged. Source: REQ-005.002, ADR-036 decisions 26-29.
 
 Recorded engine exception without a byte delta: the ui-spec editor
 front-matter re-adoption quirk is expressed as one descriptor-keyed engine rule
@@ -155,7 +155,7 @@ this regeneration is one of the following semantic deltas.
    the marker. The glossary title label becomes the uniform `Title` (was
    `Term`). Every form gains the read-only status row, labels/references, and
    the `hidden-field version-note` annotation; `data-form-note` returns.
-   Source: ADR-039 decisions 22 and 26-28, TECH-068 section 4.2, REQ-07.003.
+   Source: ADR-039 decisions 22 and 26-28, TECH-068 section 4.2, REQ-007.003.
 
 10. **Create-only fields are read-only.** A field whose verbs exclude `edit`
     is rendered as a label and read-only value and is never writable. The
@@ -188,7 +188,7 @@ this regeneration is one of the following semantic deltas.
     page (`Not found`, "The requested record was not found.", back to
     requirements), identical for an archived, unknown, or disabled ID and
     never echoing the ID. The status stays `404`; only the page body and its
-    `Content-Length` change. Source: ADR-039 decision 24, REQ-05.007.
+    `Content-Length` change. Source: ADR-039 decision 24, REQ-005.007.
 
 15. **Validation follows the field map.** `http/form-post-validation` now
     re-renders the generic edit page with the submitted values and the

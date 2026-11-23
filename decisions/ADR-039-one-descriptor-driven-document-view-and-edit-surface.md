@@ -17,13 +17,13 @@ references:
   - ADR-0006
   - ADR-0013
   - ADR-0034
-  - REQ-06.004
-  - REQ-06.012
-  - REQ-06.014
-  - REQ-06.019
-  - REQ-05.007
-  - REQ-07.004
-  - NFR-01.003
+  - REQ-006.004
+  - REQ-006.012
+  - REQ-006.014
+  - REQ-006.019
+  - REQ-005.007
+  - REQ-007.004
+  - NFR-001.003
   - TECH-066
   - TECH-067
   - TECH-068
@@ -103,7 +103,7 @@ accepted
 
 17. No browser document code reads a typed content field. The content-model fields that `Record` carries today (`story`, `description`, `rationale`, `applicability`, `requirements`, `audit_type`, `definition`, `view`, `specs`, `mockup_task`, and the equivalent) are not consulted for a document record; the field map is the only content projection. Backlog and decision records keep the fields their bespoke surfaces use.
 
-18. `labels`, `references`, `created_date`, and `updated_date` are general record metadata, not fields. `title` is fixed and is not a field. `status` is reserved and read-only. These exclusions are the same for every document model (ADR-0036 decisions 23 and 24). Undeclared front-matter keys that already exist on disk are rendered read-only in `extra_metadata`, so a hand-added key is not hidden and CLI/browser metadata parity (REQ-06.004) is not lost.
+18. `labels`, `references`, `created_date`, and `updated_date` are general record metadata, not fields. `title` is fixed and is not a field. `status` is reserved and read-only. These exclusions are the same for every document model (ADR-0036 decisions 23 and 24). Undeclared front-matter keys that already exist on disk are rendered read-only in `extra_metadata`, so a hand-added key is not hidden and CLI/browser metadata parity (REQ-006.004) is not lost.
 
 ### Rendering rules
 
@@ -117,7 +117,7 @@ accepted
 
 23. **Conflict.** One conflict builder renders the same edit form with the submitted values, the current version token, and a conflict notice, and returns `409`. Nothing is written. Submitting the form again is a deliberate user action against the current token, exactly as today. The conflict page is not a route.
 
-24. **Not found.** One not-found builder returns `404` for every document type, never echoes the requested ID, and is the same page for an unknown ID, an archived record, and a disabled type (ADR-0020 decision 8, REQ-05.007). Backlog and decision not-found pages are unchanged.
+24. **Not found.** One not-found builder returns `404` for every document type, never echoes the requested ID, and is the same page for an unknown ID, an archived record, and a disabled type (ADR-0020 decision 8, REQ-005.007). Backlog and decision not-found pages are unchanged.
 
 25. **List.** The list is the shared layout of ADR-0028 with its structural columns and declared slots. A document descriptor's slots come from its seed entry (currently none), the heading, count noun, empty state, and inventory note come from the descriptor's seed presentation facts, and the status filter is the validated projection of ADR-0020 decision 6. Grouped document types render the group row plus member rows in merged order. A row's reference list is rendered when its resolved `reference_visibility` is `Visible`.
 
@@ -150,7 +150,7 @@ accepted
 
 32. Reference visibility is resolved from the descriptor: one `Visible` or `Hidden` value for `SingleMarkdown` and `SingleHtmlMockup`, and one value for each of the group and member roles for `GroupedMarkdown`. The seed values of ADR-036 decision 29 apply: `req` and `nfr` are `Hidden` for both roles; every other seed type is `Visible`. A user-defined type defaults to `Visible`. The list renderer reads the resolved value for the row's type and role; no other surface does.
 
-33. Reference visibility affects list rows only. The single-document view keeps its References disclosure (ADR-0033), and the CLI list, CLI view, JSON list, JSON view, and stored front matter are unchanged (REQ-06.004, REQ-06.019, ADR-0035). Labels are unaffected and render in the Title cell for every family.
+33. Reference visibility affects list rows only. The single-document view keeps its References disclosure (ADR-0033), and the CLI list, CLI view, JSON list, JSON view, and stored front matter are unchanged (REQ-006.004, REQ-006.019, ADR-0035). Labels are unaffected and render in the Title cell for every family.
 
 ### What does not change
 
@@ -205,13 +205,13 @@ The result is the class of defect the refactor exists to remove: a new field, a 
 
 Forces:
 
-- One browser surface for every document model, including user-defined types, with no per-type code (RE-010 D4, D5, D10; REQ-06.014, REQ-07.004).
+- One browser surface for every document model, including user-defined types, with no per-type code (RE-010 D4, D5, D10; REQ-006.014, REQ-007.004).
 - Presentation facts in the config seed, so a label, heading, help text, or order change is a file edit (RE-010 D10).
 - A model-neutral read projection: view and edit must not know whether a field lives in a body section or in front matter, and must not know the type (RE-010 D9, ADR-0013).
-- Role awareness for `GroupedMarkdown`: group and member field sets differ, membership is engine-owned, and the merged list order is fixed (REQ-07.004, ADR-0036 decisions 9 and 27).
-- `SingleHtmlMockup` has no field sequence and fixed metadata; its view and edit must fit the same chrome without a second template (ADR-0033, REQ-05.009).
+- Role awareness for `GroupedMarkdown`: group and member field sets differ, membership is engine-owned, and the merged list order is fixed (REQ-007.004, ADR-0036 decisions 9 and 27).
+- `SingleHtmlMockup` has no field sequence and fixed metadata; its view and edit must fit the same chrome without a second template (ADR-0033, REQ-005.009).
 - Reference visibility is seed data per type and role, not a content-model rule (RE-010 D8, ADR-0035).
-- Optimistic concurrency, the atomic single write, and the existing error surface must not regress (ADR-0006, ADR-0013, REQ-05.007).
+- Optimistic concurrency, the atomic single write, and the existing error surface must not regress (ADR-0006, ADR-0013, REQ-005.007).
 - Backlog and decision surfaces stay bespoke and byte-compatible (RE-010 D4).
 - No new dependency, template engine, asset, client script, or JavaScript requirement (ADR-0005, ADR-0027, ADR-0038).
 - No source, test, requirement, specification, or packaging change in this milestone (MS-031 AC-10).
@@ -223,7 +223,7 @@ Alternatives considered:
 | One descriptor-driven document surface with a model-neutral field map, seed presentation facts, one conflict and one not-found renderer, and one `form_post` (this ADR) | Selected | Satisfies RE-010 D4, D5, D8, D9, and D10 with one rendering path and no per-type code, while keeping ADR-0005 and ADR-0006 intact. |
 | Keep typed view/edit forms per built-in type and add the descriptor path only for user-defined types | Rejected | Exactly ADR-0020 decision 5 as superseded: built-ins would still need per-type modules, so the nine conflict renderers, five not-found pages, and ten edit renderers would survive, and a seed field change would still be a code edit. |
 | Render a generic page from front matter only, ignoring body sections | Rejected | `heading` fields are body sections and required by the seed; ignoring them would drop `## User Story`, `## Definition`, and every other section from the browser. |
-| Render from the body only, ignoring `frontmatter_key` fields | Rejected | Metadata-only fields (`audit_type` stored as `type`) and list fields have no section, and CLI/browser parity (REQ-06.004) would be lost. |
+| Render from the body only, ignoring `frontmatter_key` fields | Rejected | Metadata-only fields (`audit_type` stored as `type`) and list fields have no section, and CLI/browser parity (REQ-006.004) would be lost. |
 | Branch the renderer on `DocumentModel` | Rejected | It moves per-model code into the browser and leaves the browser responsible for role selection; the record layer can resolve model and role once and hand the renderer one field map. |
 | Keep `PRESENTATION` as the label and heading source | Rejected | A second presentation source per document type contradicts RE-010 D10 and reintroduces the drift the refactor removes; presentation must come from the descriptor. |
 | Keep the per-type not-found and conflict pages and merge only edit | Rejected | The task's equivalence goal and AC require one conflict page and one not-found page; leaving the variants keeps the per-type branches alive. |

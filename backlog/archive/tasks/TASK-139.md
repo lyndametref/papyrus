@@ -15,7 +15,7 @@ dependencies:
   - TASK-136
   - TASK-138
 references:
-  - docs/requirements/business/REQ-06.015.md
+  - docs/requirements/business/REQ-006.015.md
   - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - src/browser/app.css
@@ -30,7 +30,6 @@ references:
   - src/browser/vendor/MANIFEST.md
   - src/browser/http.rs
   - tests/browser_shell_cli.rs
-  - >-
     docs/specifications/ui/mockups/MOCK-0018-browser-navigation-toggle-and-collapsed-layout-review.html
 priority: high
 ordinal: 41570
@@ -38,9 +37,9 @@ ordinal: 41570
 
 
 ## Description
-**Why.** REQ-06.015 requires a control on every page that collapses the left navigation and reclaims its width, with the state persisted in `localStorage` and defaulting to expanded, and it requires the 1040 px cap to stay everywhere except the backlog board and full-width regions. ADR-0028 decisions 3-8 fix the mechanics. TASK-141 shipped the shell, `PageWidth { Capped, Full }`, and `BrowserRoutes::page_width`, but no route returns `Full`, no toggle exists in the shell header, and `app.js` still carries a sub-480 px sidebar toggle that is unpersisted and hidden at wider widths.
+**Why.** REQ-006.015 requires a control on every page that collapses the left navigation and reclaims its width, with the state persisted in `localStorage` and defaulting to expanded, and it requires the 1040 px cap to stay everywhere except the backlog board and full-width regions. ADR-0028 decisions 3-8 fix the mechanics. TASK-141 shipped the shell, `PageWidth { Capped, Full }`, and `BrowserRoutes::page_width`, but no route returns `Full`, no toggle exists in the shell header, and `app.js` still carries a sub-480 px sidebar toggle that is unpersisted and hidden at wider widths.
 
-**Authority.** REQ-06.015; ADR-0028 decisions 3-8 and downstream constraints 4-9 and 15; feature specification `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` §3.4 (toggle, assets, CSS), §4.2-§4.5 (board width, `.app--full`, `.bleed`, heading overflow), §7.4 (UI gate). The specification carries the full rationale; this ticket carries the instructions needed to implement it.
+**Authority.** REQ-006.015; ADR-0028 decisions 3-8 and downstream constraints 4-9 and 15; feature specification `docs/specifications/browser-shell-shared-list-layout-and-page-width.md` §3.4 (toggle, assets, CSS), §4.2-§4.5 (board width, `.app--full`, `.bleed`, heading overflow), §7.4 (UI gate). The specification carries the full rationale; this ticket carries the instructions needed to implement it.
 
 ## Current state (verified 2026-11-16)
 

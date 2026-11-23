@@ -19,26 +19,26 @@ references:
   - MOCK-0001
   - MOCK-0009
   - MOCK-0010
-  - NFR-01.002
-  - NFR-01.003
-  - REQ-01.002
-  - REQ-01.003
-  - REQ-03.001
-  - REQ-03.002
-  - REQ-04.001
-  - REQ-05.006
-  - REQ-05.007
-  - REQ-05.008
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
-  - REQ-06.013
-  - REQ-07.001
+  - NFR-001.002
+  - NFR-001.003
+  - REQ-001.002
+  - REQ-001.003
+  - REQ-003.001
+  - REQ-003.002
+  - REQ-004.001
+  - REQ-005.006
+  - REQ-005.007
+  - REQ-005.008
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
+  - REQ-006.013
+  - REQ-007.001
   - TASK-114
   - TASK-127
   - TASK-147
@@ -49,7 +49,7 @@ references:
   - TASK-86
   - TASK-95
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
@@ -58,14 +58,14 @@ status: draft
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
 ## Description
-> **Superseded in part (TASK-114):** the fixed twelve-section set and the "covered set does not change with `document_types`" rule are replaced by the registry-derived three-category page in [`browser-config-defined-document-types.md`](browser-config-defined-document-types.md) (REQ-06.003 revision of 2026-11-13). The page route, shell, and read-only configuration rules in this document remain in force.
+> **Superseded in part (TASK-114):** the fixed twelve-section set and the "covered set does not change with `document_types`" rule are replaced by the registry-derived three-category page in [`browser-config-defined-document-types.md`](browser-config-defined-document-types.md) (REQ-006.003 revision of 2026-11-13). The page route, shell, and read-only configuration rules in this document remain in force.
 
-> **Revised (TASK-127):** the section 4 lifecycle wording now follows the settled archive lifecycles: documents `active -> archived` with no restore (plus configured custom statuses, front-matter only), UI mockups `pending -> approved -> archived` (supersede, no restore), milestones `open -> closed` via `papyrus milestone close`, releases `planned -> released` with no archive, decisions unchanged (Nygard status `deprecated`). Sources: ADR-0022, ADR-0023, REQ-03.001, REQ-03.002, REQ-05.007, REQ-07.001.
+> **Revised (TASK-127):** the section 4 lifecycle wording now follows the settled archive lifecycles: documents `active -> archived` with no restore (plus configured custom statuses, front-matter only), UI mockups `pending -> approved -> archived` (supersede, no restore), milestones `open -> closed` via `papyrus milestone close`, releases `planned -> released` with no archive, decisions unchanged (Nygard status `deprecated`). Sources: ADR-0022, ADR-0023, REQ-003.001, REQ-003.002, REQ-005.007, REQ-007.001.
 
-> **Revised (TASK-147, 2026-11-15):** the scope bullet and section 3 clause 3 no longer assert that every record lifecycle operation is CLI-only, because the 2026-11-15 revision of REQ-06.013 gives the Backlog board task status change and the per-milestone `Clean up all` archive action. This page still offers no lifecycle operation, and creating, restoring, and deleting records remain CLI-only.
+> **Revised (TASK-147, 2026-11-15):** the scope bullet and section 3 clause 3 no longer assert that every record lifecycle operation is CLI-only, because the 2026-11-15 revision of REQ-006.013 gives the Backlog board task status change and the per-milestone `Clean up all` archive action. This page still offers no lifecycle operation, and creating, restoring, and deleting records remain CLI-only.
 ## Purpose
 
-Add a read-only page to the offline, project-local web interface that describes every managed artifact/document type and its lifecycle, per REQ-06.003. The page is a single static view with one section per fixed record type; task states are derived from the configured task statuses (REQ-01.002); every other type uses the lifecycle documented for that type. It advances NFR-01.002 (display all Papyrus content) by giving contributors a single place to learn what each record type is and how it moves through its states.
+Add a read-only page to the offline, project-local web interface that describes every managed artifact/document type and its lifecycle, per REQ-006.003. The page is a single static view with one section per fixed record type; task states are derived from the configured task statuses (REQ-001.002); every other type uses the lifecycle documented for that type. It advances NFR-001.002 (display all Papyrus content) by giving contributors a single place to learn what each record type is and how it moves through its states.
 
 ## Scope
 
@@ -74,16 +74,16 @@ Add a read-only page to the offline, project-local web interface that describes 
 - A new page route that serves the lifecycle page, reusing the shared shell, sidebar, header, footer, CSP, escaping, and responsive rules of the baseline (TASK-6, ADR-0005/ADR-0006).
 - A persistent sidebar entry labelled `Managed artifacts & lifecycles`, placed at the end of the document-type list, that links to the page and carries `aria-current="page"` when active.
 - A page body with one section (`h2`) for each of the twelve fixed record types, in this order: Tasks, Milestones, Releases, Decisions, Business requirements, Non-functional requirements, Glossary terms, UI specifications, Technical specifications, UI mockups, Business rules, Audit records.
-- A task section whose state list and transitions are derived from the configured task statuses (REQ-01.002).
+- A task section whose state list and transitions are derived from the configured task statuses (REQ-001.002).
 - A lifecycle sentence for every other section that uses the documented lifecycle for that type (see section 4).
 - An explicit statement on the page that Backlog.md `docs`, `drafts`, and project configuration files are not covered.
 - Unit/integration tests extending `tests/browser_cli.rs` (or a sibling file) for the new page.
 
 ### Out of scope
 
-- Listing, viewing, editing, creating, archiving, deleting, or searching any record from this page; no lifecycle operation is offered here, and the browser's task lifecycle operations (status change and the board's `Clean up all` action of REQ-06.013) live on the Backlog board. Creating, restoring, and deleting records remain CLI-only.
+- Listing, viewing, editing, creating, archiving, deleting, or searching any record from this page; no lifecycle operation is offered here, and the browser's task lifecycle operations (status change and the board's `Clean up all` action of REQ-006.013) live on the Backlog board. Creating, restoring, and deleting records remain CLI-only.
 - Any API endpoint for the page; the page is HTML only.
-- Adding a new record type, changing configured `document_types`, or deriving the covered set from configuration. The covered set is fixed by REQ-06.003 and does not change with `document_types`.
+- Adding a new record type, changing configured `document_types`, or deriving the covered set from configuration. The covered set is fixed by REQ-006.003 and does not change with `document_types`.
 - Describing Backlog.md `docs`, `drafts`, or project configuration files.
 - Changes to MOCK-0001..MOCK-0009, to MOCK-0010, or to any UI description document.
 - New dependencies, a web framework, an async runtime, a templating engine, a second crate, or a new ADR. ADR-0005/ADR-0006 remain the baseline.
@@ -110,7 +110,7 @@ Add a read-only page to the offline, project-local web interface that describes 
 
 1. The task section heading is `Tasks`.
 2. The lifecycle paragraph states the configured task statuses in their configured order, joined by ` → `, for example `States: ToDo → Initiated → Refined → Implemented → Validated → Done.` with default configuration.
-3. The paragraph also states that the states and transitions are derived from the configured task statuses (REQ-01.002). It does not claim that task lifecycle operations are CLI-only, because the Backlog board offers status change and the per-milestone `Clean up all` archive action (REQ-06.013); creating, restoring, and deleting tasks remain CLI-only and are not described as browser operations on this page.
+3. The paragraph also states that the states and transitions are derived from the configured task statuses (REQ-001.002). It does not claim that task lifecycle operations are CLI-only, because the Backlog board offers status change and the per-milestone `Clean up all` archive action (REQ-006.013); creating, restoring, and deleting tasks remain CLI-only and are not described as browser operations on this page.
 4. Only the configured status names are rendered. No per-state description is required for custom statuses; the configured order is the transition order.
 5. When the configured status list is empty or invalid, the server falls back to its configured/default status handling rather than rendering an empty task section; the task section never renders an empty state list.
 
@@ -132,13 +132,13 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 | Business rules | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
 | Audit records | `Lifecycle: active → archived. Archiving sets status to archived and moves the file to archived/; there is no restore. Plus any configured custom statuses, which are front-matter values only.` |
 
-1. The wording above is normative for this page and is taken from REQ-03.001, REQ-03.002, REQ-04.001, REQ-05.006, REQ-05.007, REQ-05.008, and REQ-07.001, with the lifecycle operations of ADR-0022 and the layout contract of ADR-0023. It intentionally differs from the shorthand sentences in MOCK-0010 where those conflict with the documented lifecycles.
+1. The wording above is normative for this page and is taken from REQ-003.001, REQ-003.002, REQ-004.001, REQ-005.006, REQ-005.007, REQ-005.008, and REQ-007.001, with the lifecycle operations of ADR-0022 and the layout contract of ADR-0023. It intentionally differs from the shorthand sentences in MOCK-0010 where those conflict with the documented lifecycles.
 2. The page does not state that a release becomes released when its milestone set is complete, that a milestone closes when its tasks are complete, that documents move through a Draft → Approved phase, or that audit records are immutable; none of those is documented.
 3. All lifecycle sentences are static text; they are not derived from project data.
 
 ### 4a. Per-artifact descriptions and read-only configuration (TASK-86)
 
-1. Description text is curated content shipped with the browser binary, written for the page, available offline (NFR-01.003), and not derived from requirement files, record content, or configuration.
+1. Description text is curated content shipped with the browser binary, written for the page, available offline (NFR-001.003), and not derived from requirement files, record content, or configuration.
 2. Each of the twelve fixed sections includes a good description of its artifact on top of its lifecycle and existing status.
 3. Each section shows read-only effective configuration: the artifact's `enabled` state, its ID prefix, and its storage folder. The task section additionally shows the configured statuses.
 4. Configuration values on this page are display-only. Changes are made only through the configuration view (section 4d of `browser-requirements.md`).
@@ -187,11 +187,11 @@ Each section's lifecycle paragraph uses the documented lifecycle for that type:
 
 ## Open questions
 
-- None. Material behavior (covered set, task-status derivation, lifecycle wording, route, exclusions) is resolved by REQ-06.003, the approved MOCK-0010 layout, and the user's selection of documented lifecycle wording during refinement.
+- None. Material behavior (covered set, task-status derivation, lifecycle wording, route, exclusions) is resolved by REQ-006.003, the approved MOCK-0010 layout, and the user's selection of documented lifecycle wording during refinement.
 
 ## Related artifacts
 
-- Requirement: `docs/requirements/business/REQ-06.003.md` (primary); `docs/requirements/business/REQ-06.006.md`; `docs/requirements/business/REQ-06.007.md`; `docs/requirements/business/REQ-06.008.md`; `docs/requirements/business/REQ-06.009.md`; `docs/requirements/business/REQ-06.010.md`; `docs/requirements/business/REQ-06.011.md`; `docs/requirements/business/REQ-06.012.md`; `docs/requirements/business/REQ-01.002.md`; `docs/requirements/business/REQ-01.003.md`; `docs/requirements/business/REQ-03.001.md`; `docs/requirements/business/REQ-03.002.md`; `docs/requirements/business/REQ-04.001.md`; `docs/requirements/business/REQ-05.006.md`; `docs/requirements/business/REQ-05.007.md`; `docs/requirements/business/REQ-05.008.md`; `docs/requirements/business/REQ-07.001.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
+- Requirement: `docs/requirements/business/REQ-006.003.md` (primary); `docs/requirements/business/REQ-006.006.md`; `docs/requirements/business/REQ-006.007.md`; `docs/requirements/business/REQ-006.008.md`; `docs/requirements/business/REQ-006.009.md`; `docs/requirements/business/REQ-006.010.md`; `docs/requirements/business/REQ-006.011.md`; `docs/requirements/business/REQ-006.012.md`; `docs/requirements/business/REQ-001.002.md`; `docs/requirements/business/REQ-001.003.md`; `docs/requirements/business/REQ-003.001.md`; `docs/requirements/business/REQ-003.002.md`; `docs/requirements/business/REQ-004.001.md`; `docs/requirements/business/REQ-005.006.md`; `docs/requirements/business/REQ-005.007.md`; `docs/requirements/business/REQ-005.008.md`; `docs/requirements/business/REQ-007.001.md`; `docs/requirements/non-functional/NFR-001.002.md`; `docs/requirements/non-functional/NFR-001.003.md`
 - UI description: `docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md`
 - UI mockup: `docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html` (approved)
 - Baseline browser spec: `docs/specifications/browser-requirements.md`

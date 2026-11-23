@@ -14,7 +14,7 @@ dependencies:
   - TASK-080
   - TASK-083
 references:
-  - docs/requirements/business/REQ-01.002.md
+  - docs/requirements/business/REQ-001.002.md
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
@@ -66,12 +66,12 @@ Out of scope: browser UI implementation (TASK-94/TASK-95), Backlog.md import (TA
 
 
 ## Notes
-Refinement only: ticket scope, acceptance criteria, assumptions, dependencies, and DoD aligned with REQ-01.002, ADR-0010 decision 8, and ADR-0013 stage 5. Implementation not performed in this pass.
+Refinement only: ticket scope, acceptance criteria, assumptions, dependencies, and DoD aligned with REQ-001.002, ADR-0010 decision 8, and ADR-0013 stage 5. Implementation not performed in this pass.
 
 Assumptions:
 - Rust 1.99.1/Cargo available (ADR-0001).
 - record::relocate lives in src/record/ and is the only folder-move implementation (ADR-0013).
-- Config file values for folders are relative to the project directory; absolute/traversal values are rejected (NFR-04.002).
+- Config file values for folders are relative to the project directory; absolute/traversal values are rejected (NFR-004.002).
 - Cross-device detection uses OS rename failure EXDEV and falls back to copy-then-remove.
 - Browser configuration view (TASK-94) delegates to config set and performs no folder move.
 

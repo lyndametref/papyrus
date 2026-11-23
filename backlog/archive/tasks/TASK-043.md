@@ -12,12 +12,12 @@ milestone: MS-009
 dependencies:
   - TASK-042
 references:
-  - docs/requirements/business/REQ-05.005.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.005.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-013-rule-command-behavior.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md

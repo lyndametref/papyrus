@@ -14,11 +14,11 @@ dependencies:
   - TASK-067
   - TASK-062
 references:
-  - docs/requirements/business/REQ-06.005.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
+  - docs/requirements/business/REQ-006.005.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
   - docs/specifications/browser-agent-skills-and-workflows.md
@@ -31,9 +31,9 @@ ordinal: 41623
 
 
 ## Description
-Add a read-only browser page listing agent skills and workflows for configuring and operating Papyrus, per REQ-06.005 and approved MOCK-0011. The page is agent-facing reference material; its values are parameterized by the effective papyrus.conf.yaml (prefixes, id_padding, statuses, enabled document/decision types, directories, paths, date format). Route: /skills (alias /?type=skills). Sidebar entry 'Agent skills & workflows' is placed after 'Managed artifacts & lifecycles' and is always present. The page renders eight fixed skill groups, a 'Configuration in effect' block, and copyable snippet blocks. It reuses the shared shell/CSP/escaping/responsive rules; no records are listed, viewed, edited, or mutated.
+Add a read-only browser page listing agent skills and workflows for configuring and operating Papyrus, per REQ-006.005 and approved MOCK-0011. The page is agent-facing reference material; its values are parameterized by the effective papyrus.conf.yaml (prefixes, id_padding, statuses, enabled document/decision types, directories, paths, date format). Route: /skills (alias /?type=skills). Sidebar entry 'Agent skills & workflows' is placed after 'Managed artifacts & lifecycles' and is always present. The page renders eight fixed skill groups, a 'Configuration in effect' block, and copyable snippet blocks. It reuses the shared shell/CSP/escaping/responsive rules; no records are listed, viewed, edited, or mutated.
 
-Scope and behavior are fully specified in docs/specifications/browser-agent-skills-and-workflows.md. Open questions OQ-1..OQ-5 (UI description) and REQ-06.005 open questions are resolved to their recommended defaults (user confirmation 2026-11-10).
+Scope and behavior are fully specified in docs/specifications/browser-agent-skills-and-workflows.md. Open questions OQ-1..OQ-5 (UI description) and REQ-006.005 open questions are resolved to their recommended defaults (user confirmation 2026-11-10).
 
 Assumptions:
 - Assumption: The page is read-only and renders no project records.

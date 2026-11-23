@@ -5,10 +5,10 @@ created_date: '2026-11-20T17:39:46Z'
 updated_date: '2026-11-21T00:05:05Z'
 labels: []
 references:
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
   - NFR-007.001
   - NFR-007.002
   - NFR-007.003
@@ -53,30 +53,30 @@ Scope: author Gherkin test cases for every changed requirement and business rule
 
 ### Coverage map — changed requirements and rules (one TC each)
 Changed requirements:
-- REQ-07.001 (§7.1) — docs/requirements/business/REQ-07.001.md — Organize Artifacts into Three Categories
-- REQ-07.002 (§7.2) — docs/requirements/business/REQ-07.002.md — Configure Document Types and Slugs
-- REQ-07.003 (§7.3) — docs/requirements/business/REQ-07.003.md — Dispatch Config-Defined Document Commands
-- REQ-07.004 (§7.4) — docs/requirements/business/REQ-07.004.md — Provide a Generic Content Model for Config-Defined Document Types
-- REQ-05.001 (§5.1) — docs/requirements/business/REQ-05.001.md — Manage Business Requirements
-- REQ-05.002 (§5.2) — docs/requirements/business/REQ-05.002.md — Manage Non-Functional Requirements
-- REQ-05.003 (§5.3) — docs/requirements/business/REQ-05.003.md — Manage Glossary Terms
-- REQ-05.004 (§5.4) — docs/requirements/business/REQ-05.004.md — Manage UI Specifications
-- REQ-05.005 (§5.5) — docs/requirements/business/REQ-05.005.md — Manage Business Rules
-- REQ-05.006 (§5.6) — docs/requirements/business/REQ-05.006.md — Manage Audit Records
-- REQ-05.007 (§5.7) — docs/requirements/business/REQ-05.007.md — Manage Document Archive State and Deletion
-- REQ-05.008 (§5.8) — docs/requirements/business/REQ-05.008.md — Manage UI Mockups
-- REQ-05.009 (§5.9) — docs/requirements/business/REQ-05.009.md — Manage Technical Specifications
-- REQ-05.010 (§5.10) — docs/requirements/business/REQ-05.010.md — Record Metadata in YAML Front Matter
-- REQ-05.011 (§5.11) — docs/requirements/business/REQ-05.011.md — Maintain Record Metadata Through All Commands
-- REQ-05.012 (§5.12) — docs/requirements/business/REQ-05.012.md — Manage Use Cases
-- REQ-05.013 (§5.13) — docs/requirements/business/REQ-05.013.md — Manage Test Cases
-- REQ-05.014 (§5.14) — docs/requirements/business/REQ-05.014.md — Manage Test Reports
-- REQ-06.004 (§6.4) — docs/requirements/business/REQ-06.004.md — Use Front-Matter Metadata in CLI and Browser Views
-- REQ-06.014 (§6.14) — docs/requirements/business/REQ-06.014.md — Display Config-Defined Document Types in the Browser
-- REQ-06.019 (§6.19) — docs/requirements/business/REQ-06.019.md — Do not Show the Reference List in Document-Type Browser List Views
-- REQ-01.002 (§1.2) — docs/requirements/business/REQ-01.002.md — Read and Edit Project Configuration
-- REQ-01.005 (§1.5) — docs/requirements/business/REQ-01.005.md — Assign Stable Record IDs
-- REQ-01.008 (§1.8) — docs/requirements/business/REQ-01.008.md — Run Project Diagnostics (`papyrus check`)
+- REQ-007.001 (§7.1) — docs/requirements/business/REQ-007.001.md — Organize Artifacts into Three Categories
+- REQ-007.002 (§7.2) — docs/requirements/business/REQ-007.002.md — Configure Document Types and Slugs
+- REQ-007.003 (§7.3) — docs/requirements/business/REQ-007.003.md — Dispatch Config-Defined Document Commands
+- REQ-007.004 (§7.4) — docs/requirements/business/REQ-007.004.md — Provide a Generic Content Model for Config-Defined Document Types
+- REQ-005.001 (§5.1) — docs/requirements/business/REQ-005.001.md — Manage Business Requirements
+- REQ-005.002 (§5.2) — docs/requirements/business/REQ-005.002.md — Manage Non-Functional Requirements
+- REQ-005.003 (§5.3) — docs/requirements/business/REQ-005.003.md — Manage Glossary Terms
+- REQ-005.004 (§5.4) — docs/requirements/business/REQ-005.004.md — Manage UI Specifications
+- REQ-005.005 (§5.5) — docs/requirements/business/REQ-005.005.md — Manage Business Rules
+- REQ-005.006 (§5.6) — docs/requirements/business/REQ-005.006.md — Manage Audit Records
+- REQ-005.007 (§5.7) — docs/requirements/business/REQ-005.007.md — Manage Document Archive State and Deletion
+- REQ-005.008 (§5.8) — docs/requirements/business/REQ-005.008.md — Manage UI Mockups
+- REQ-005.009 (§5.9) — docs/requirements/business/REQ-005.009.md — Manage Technical Specifications
+- REQ-005.010 (§5.10) — docs/requirements/business/REQ-005.010.md — Record Metadata in YAML Front Matter
+- REQ-005.011 (§5.11) — docs/requirements/business/REQ-005.011.md — Maintain Record Metadata Through All Commands
+- REQ-005.012 (§5.12) — docs/requirements/business/REQ-005.012.md — Manage Use Cases
+- REQ-005.013 (§5.13) — docs/requirements/business/REQ-005.013.md — Manage Test Cases
+- REQ-005.014 (§5.14) — docs/requirements/business/REQ-005.014.md — Manage Test Reports
+- REQ-006.004 (§6.4) — docs/requirements/business/REQ-006.004.md — Use Front-Matter Metadata in CLI and Browser Views
+- REQ-006.014 (§6.14) — docs/requirements/business/REQ-006.014.md — Display Config-Defined Document Types in the Browser
+- REQ-006.019 (§6.19) — docs/requirements/business/REQ-006.019.md — Do not Show the Reference List in Document-Type Browser List Views
+- REQ-001.002 (§1.2) — docs/requirements/business/REQ-001.002.md — Read and Edit Project Configuration
+- REQ-001.005 (§1.5) — docs/requirements/business/REQ-001.005.md — Assign Stable Record IDs
+- REQ-001.008 (§1.8) — docs/requirements/business/REQ-001.008.md — Run Project Diagnostics (`papyrus check`)
 Changed NFRs:
 - NFR-007.001 (NFR §7.1) — docs/requirements/non-functional/NFR-007.001.md — Inventory latency at 1,000 records (p95 under 250 ms)
 - NFR-007.002 (NFR §7.2) — docs/requirements/non-functional/NFR-007.002.md — View and edit latency at 1,000 records (p95 under 100 ms)

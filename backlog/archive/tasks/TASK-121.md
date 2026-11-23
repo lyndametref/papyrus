@@ -19,20 +19,13 @@ references:
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
   - docs/architecture/adr/ADR-0018-generic-document-content-model.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
-  - >-
     docs/architecture/adr/ADR-0019-fail-closed-document-type-configuration-validation.md
-  - >-
     docs/architecture/adr/ADR-0021-man-page-strategy-for-a-dynamic-command-surface.md
 documentation:
   - docs/architecture/adr/index.html
-  - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
 modified_files:
-  - docs/architecture/adr/ADR-0016-runtime-config-derived-command-dispatch.md
-  - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
-  - docs/architecture/adr/ADR-0018-generic-document-content-model.md
-  - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
 priority: high
 ordinal: 41310
 ---
@@ -70,7 +63,7 @@ ordinal: 41310
 **B. ADR-0017 — `docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md`.**
 
 1. `## Status`: append the `amended 2026-11-15` clause naming the decision 2 `verbs` row, decision 3, and downstream constraint 3.
-2. Decision 2 `verbs` row: state that the field exists on every descriptor in every category and list the delivered sets — task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/archive/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete` plus `status` where the type stores front-matter status plus declared extensions. Widen the source-of-truth column to REQ-02.001–004, REQ-03.001–002, REQ-04.001, REQ-07.003, REQ-05.001/002/008.
+2. Decision 2 `verbs` row: state that the field exists on every descriptor in every category and list the delivered sets — task `create/list/view/edit/archive/restore/delete`; milestone `create/list/view/edit/archive/delete`; release `create/list/view/edit/close`; decision `create/list/view/edit`; document `create/list/view/edit/archive/delete` plus `status` where the type stores front-matter status plus declared extensions. Widen the source-of-truth column to REQ-002.001–004, REQ-003.001–002, REQ-004.001, REQ-007.003, REQ-005.001/002/008.
 3. Decision 3: state that `verbs` is not a document-only field; the document baseline family stays a **lower bound** with `status` conditional and extensions declared by a built-in descriptor. Keep the owner D1 rationale sentence unchanged.
 4. Downstream constraint 3: record that decisions **and releases** have no archive policy (`ArchivePolicy::None`); every other descriptor uses `ArchivedFolder`. Revision note.
 
@@ -154,8 +147,8 @@ Status line (verbatim): Accepted (2026-11-13) — accepted by explicit user deci
 
 Amended clauses and revision notes (verbatim):
 
-- Clause context: | `archive_policy` | `ArchivedFolder { state_field }` or `None` | REQ-05.007, REQ-04.002 |
-  Note: *Revision (2026-11-15, owner decision): the `verbs` row previously described the field as the document baseline plus `status` plus extensions, which read as a document-only field. `verbs` exists on every descriptor in every category, and the delivered sets are the ones listed above (backlog and decision sets from REQ-02.001–004, REQ-03.001–002, and REQ-04.001). The same correction applies to decision 1's assembly sentence, which no longer refers to `cli::BUILTIN_COMMANDS` handlers because that table carries names only (ADR-0016 decision 2).*
+- Clause context: | `archive_policy` | `ArchivedFolder { state_field }` or `None` | REQ-005.007, REQ-004.002 |
+  Note: *Revision (2026-11-15, owner decision): the `verbs` row previously described the field as the document baseline plus `status` plus extensions, which read as a document-only field. `verbs` exists on every descriptor in every category, and the delivered sets are the ones listed above (backlog and decision sets from REQ-002.001–004, REQ-003.001–002, and REQ-004.001). The same correction applies to decision 1's assembly sentence, which no longer refers to `cli::BUILTIN_COMMANDS` handlers because that table carries names only (ADR-0016 decision 2).*
 
 - Clause context: 3. **The baseline verbs are a lower bound; `verbs` is a field of every descriptor, and document extensions are declared on a built-in descriptor.** `verbs` is *
   Note: *Revision (2026-11-15, owner decision): this decision previously presented the baseline verbs without stating that `verbs` is carried by every descriptor in every category; the field's scope and the conditional `status` rule are now explicit and the D1 rationale sentence is unchanged.*
@@ -163,7 +156,7 @@ Amended clauses and revision notes (verbatim):
 - Clause context: 4. **One dispatch point per category, driven by the descriptor.**
   Note: *Revision (2026-11-15, owner decision): this decision previously said that `cli::tree` inserts "the descriptor's verbs", which is true only for the `Document` category. `src/cli/tree.rs` skips every non-document descriptor, so backlog and decision verbs come from their `clap` derive enums and `BUILTIN_COMMANDS` supplies only their names; the document surface is the only descriptor-driven one.*
 
-- Clause context: 3. Every descriptor's `archive_policy` follows REQ-05.007 and ADR-0022; decisions **and releases** have no archive policy (`ArchivePolicy::None`), and every oth
+- Clause context: 3. Every descriptor's `archive_policy` follows REQ-005.007 and ADR-0022; decisions **and releases** have no archive policy (`ArchivePolicy::None`), and every oth
   Note: *Revision (2026-11-15, owner decision): this constraint previously named only decisions as having no archive policy. Releases are the second family that never moves: their descriptor carries `ArchivePolicy::None` and `release close` rewrites `status` in place (ADR-0023 decision 2).*
 
 ### ADR-0018
@@ -187,7 +180,7 @@ Amended clauses and revision notes (verbatim):
 ### Additional in-place edits without a standalone revision note
 
 - ADR-0016 downstream constraint 1: wording narrowed to "command-tree construction and parse dispatch live in `src/cli/`" so it no longer forbids the derive declarations permitted by constraint 2; covered by the constraint 2 revision note.
-- ADR-0017 decision 1: assembly sentence no longer references `BUILTIN_COMMANDS` handlers (the registry has its own templates), and a REQ-02/03/04 reference bullet was added; the correction is recorded in the decision 2 revision note.
+- ADR-0017 decision 1: assembly sentence no longer references `BUILTIN_COMMANDS` handlers (the registry has its own templates), and a REQ-002/03/04 reference bullet was added; the correction is recorded in the decision 2 revision note.
 
 ### Index
 

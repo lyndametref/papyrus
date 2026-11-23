@@ -16,7 +16,7 @@ accepted
 
 ## Context
 
-Papyrus is a single Rust command-line tool and the repository is the project itself; it is not a multi-application monorepo. **NFR-03.001** requires that Papyrus be implemented in Rust, and **ADR-0001** selects Rust with Cargo as the implementation language and build system. The **TASK-1 specification** (`docs/specifications/rust-cli-and-debian-package-baseline.md`) requires a minimal single-crate layout (`src/main.rs` + `src/lib.rs`), explicitly excludes a multi-crate workspace, and assumes any move to a workspace or to module boundaries beyond that minimal split requires a new ADR.
+Papyrus is a single Rust command-line tool and the repository is the project itself; it is not a multi-application monorepo. **NFR-003.001** requires that Papyrus be implemented in Rust, and **ADR-0001** selects Rust with Cargo as the implementation language and build system. The **TASK-1 specification** (`docs/specifications/rust-cli-and-debian-package-baseline.md`) requires a minimal single-crate layout (`src/main.rs` + `src/lib.rs`), explicitly excludes a multi-crate workspace, and assumes any move to a workspace or to module boundaries beyond that minimal split requires a new ADR.
 
 `AGENTS.md` lists generic default write scopes such as `apps/rust/**`, `apps/backend/**`, and `apps/webFrontend/**` for multi-application projects. No requirement, specification, or ADR mandates an `apps/` subdirectory for Papyrus, and Papyrus has no other application components that would justify one. The current repository already places `Cargo.toml`, `src/`, `tests/`, `rust-toolchain.toml`, `scripts/`, and `packaging/` at the repository root, and both `build-deb.sh` and `docs/packaging.md` reference a root-level build producing `target/release/papyrus`.
 
@@ -59,7 +59,7 @@ This ADR formalizes that the root-level single-crate placement is deliberate rat
 
 - `docs/architecture/adr/ADR-0001-implementation-language-rust.md` — Rust + Cargo implementation language.
 - `docs/specifications/rust-cli-and-debian-package-baseline.md` — TASK-1 spec (minimal single-crate layout, no workspace).
-- `docs/requirements/non-functional/NFR-03.001.md` — Implement Papyrus in Rust.
+- `docs/requirements/non-functional/NFR-003.001.md` — Implement Papyrus in Rust.
 - `AGENTS.md` — generic default write scopes (`apps/rust/**`, etc.), not binding for Papyrus.
 - `build-deb.sh`, `docs/packaging.md` — root-level build references (`target/release/papyrus`).
 - Approval note: accepted per explicit user request on 2026-11-02; index regeneration left to the caller.

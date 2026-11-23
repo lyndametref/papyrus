@@ -10,15 +10,13 @@ references:
   - ADR-0016
   - ADR-0017
   - ADR-0020
-  - NFR-07.001
-  - NFR-07.002
+  - NFR-007.001
+  - NFR-007.002
   - TECH-068
   - TECH-071
   - TECH-070
   - TECH-077
-  - REQ-07.002
-  - NFR-007.001
-  - NFR-007.002
+  - REQ-007.002
 status: Done
 assignee:
   - architect

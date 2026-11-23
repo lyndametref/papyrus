@@ -8,7 +8,7 @@ references:
   - AUD-110
   - ADR-034
   - TC-036
-  - REQ-06.018
+  - REQ-006.018
 status: Done
 assignee:
   - architect

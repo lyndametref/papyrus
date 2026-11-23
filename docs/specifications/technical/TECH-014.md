@@ -13,14 +13,14 @@ references:
   - BDR-001
   - BR-008
   - BR-016
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-04
-  - REQ-04.001
-  - REQ-04.002
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-004
+  - REQ-004.001
+  - REQ-004.002
   - TASK-13
   - TASK-14
   - TASK-15
@@ -37,27 +37,27 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the `decision` commands so a project contributor can create, list, view, edit, supersede, and archive decision records, with stable IDs, documented Nygard fields, fixed status vocabulary and transitions, and text-file persistence inside the project directory. This ticket implements REQ-04, REQ-04.001, and REQ-04.002, together with the documented command contract in BR-008. It provides the decision records that later tickets search (TASK-14) and expose in the browser (TASK-15).
+Deliver the `decision` commands so a project contributor can create, list, view, edit, supersede, and archive decision records, with stable IDs, documented Nygard fields, fixed status vocabulary and transitions, and text-file persistence inside the project directory. This ticket implements REQ-004, REQ-004.001, and REQ-004.002, together with the documented command contract in BR-008. It provides the decision records that later tickets search (TASK-14) and expose in the browser (TASK-15).
 
 ## Scope
 
 ### In scope
 
-- `papyrus decision create <title> [-t, --decision-type <type>] [-d <decision>] [--context <text>] [--consequences <text>]` (BR-008, REQ-04.001).
-- `papyrus decision list [-t, --decision-type <type>]` (BR-008, REQ-04.001).
-- `papyrus decision view <id>` (BR-008, REQ-04.001).
-- `papyrus decision edit <id> [--title <title>] [-d <decision>] [--status <status>] [--context <text>] [--consequences <text>] [--superseded-by <id>]` (BR-008, REQ-04.002).
-- `papyrus decision archive <id>` (BR-008, REQ-04.002).
-- Decision identity: stable IDs of the form `<prefix>-<number>` (for example `ADR-001`, `BDR-001`), using the configured `decision_types` prefix for the chosen type and `id_padding` (REQ-04.001, BR-008, BR-016).
-- Built-in types `adr` (default) and `bdr`; additional types may be configured in `decision_types` (REQ-04.001, BR-008, BR-016).
-- Decision fields: title, status, decision, context, consequences (Nygard template) (REQ-04.001, BR-008).
-- Status vocabulary: proposed, accepted, rejected, deprecated, superseded, with documented transitions (REQ-04.001, BR-008, README STATUSES).
+- `papyrus decision create <title> [-t, --decision-type <type>] [-d <decision>] [--context <text>] [--consequences <text>]` (BR-008, REQ-004.001).
+- `papyrus decision list [-t, --decision-type <type>]` (BR-008, REQ-004.001).
+- `papyrus decision view <id>` (BR-008, REQ-004.001).
+- `papyrus decision edit <id> [--title <title>] [-d <decision>] [--status <status>] [--context <text>] [--consequences <text>] [--superseded-by <id>]` (BR-008, REQ-004.002).
+- `papyrus decision archive <id>` (BR-008, REQ-004.002).
+- Decision identity: stable IDs of the form `<prefix>-<number>` (for example `ADR-001`, `BDR-001`), using the configured `decision_types` prefix for the chosen type and `id_padding` (REQ-004.001, BR-008, BR-016).
+- Built-in types `adr` (default) and `bdr`; additional types may be configured in `decision_types` (REQ-004.001, BR-008, BR-016).
+- Decision fields: title, status, decision, context, consequences (Nygard template) (REQ-004.001, BR-008).
+- Status vocabulary: proposed, accepted, rejected, deprecated, superseded, with documented transitions (REQ-004.001, BR-008, README STATUSES).
 - Type filtering on list (BR-008).
-- Supersession by at most one decision of the same type; `--superseded-by` cannot be combined with `--status` (REQ-04.002, BR-008).
-- Archival of decisions (REQ-04.002, BR-008).
-- Persistence as UTF-8 text only inside the project directory (NFR-04.001, NFR-04.002).
-- Input sanitization by normalization/escaping before use (NFR-02.002).
-- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-01.004).
+- Supersession by at most one decision of the same type; `--superseded-by` cannot be combined with `--status` (REQ-004.002, BR-008).
+- Archival of decisions (REQ-004.002, BR-008).
+- Persistence as UTF-8 text only inside the project directory (NFR-004.001, NFR-004.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
+- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-001.004).
 
 ### Out of scope
 
@@ -74,8 +74,8 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 
 ### 1. Project and configuration context
 
-1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
-2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
+1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-001.003, NFR-004.002).
+2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-004.002).
 3. The effective configuration supplies `decision_directory` (default `decisions/`) and `decision_types` (default `adr` → `ADR`, `bdr` → `BDR`, both enabled), plus `id_padding`.
 4. Disabled decision types are rejected by `create` and hidden from `list` and search (BR-016).
 
@@ -143,14 +143,14 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 
 1. Decisions are stored as UTF-8 Markdown text files under the configured `decision_directory` (active) or its `archived/` subfolder (archived). New decisions are named `<ID>-<kebab-slug>.md`, where the slug is derived once from the creation title; an existing `<ID>.md` decision created before this convention is read, edited, and archived under its existing name and is never renamed. Resolution and listing use the canonical `<ID>`, never the slugged stem (ADR-0010, `papyrus-native-record-layout-and-single-id-space.md`). The `archived/` subfolder is created on first archive if absent.
 2. File content follows the Nygard template: a top-level heading `# <ID> <title>`, then `## Status`, `## Decision`, `## Context`, and `## Consequences` sections. Empty optional fields are omitted. When a decision has been superseded, the `## Status` section reads `Superseded by <id>`.
-3. All user-controlled input (title, decision, context, consequences, type, ID) is sanitized by normalization/escaping before use (NFR-02.002).
-4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
-5. No reads or writes occur outside the canonicalized project directory (NFR-04.002).
-6. No binary data is written (NFR-04.001).
+3. All user-controlled input (title, decision, context, consequences, type, ID) is sanitized by normalization/escaping before use (NFR-002.002).
+4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-002.002).
+5. No reads or writes occur outside the canonicalized project directory (NFR-004.002).
+6. No binary data is written (NFR-004.001).
 
 ### 9. Common CLI controls and outcomes
 
-1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-01.004).
+1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-001.004).
 2. Missing or invalid usage (including `--superseded-by` combined with `--status`) exits 2 when it is a usage error, or 4 when it is a validation error, following clap's classification for mutually exclusive flags.
 3. Unknown decision ID exits 3.
 4. Filesystem/IO failure or project-directory boundary violation exits 1.
@@ -197,8 +197,8 @@ Deliver the `decision` commands so a project contributor can create, list, view,
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-04, REQ-04.001, REQ-04.002 |
-| Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
+| Requirement | REQ-004, REQ-004.001, REQ-004.002 |
+| Non-functional | NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-008 |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-13 |

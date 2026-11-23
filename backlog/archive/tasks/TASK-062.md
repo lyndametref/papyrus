@@ -17,19 +17,17 @@ dependencies:
   - TASK-060
   - TASK-061
 references:
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-01.005.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-001.005.md
   - >-
     docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
   - docs/specifications/browser-tasks-milestones-and-releases.md
-  - >-
     docs/specifications/render-one-metadata-projection-in-cli-and-browser-views.md
   - docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md
-  - docs/requirements/business/REQ-06.003.md
+  - docs/requirements/business/REQ-006.003.md
 priority: high
 type: feature
 ordinal: 30050

@@ -12,14 +12,14 @@ references:
   - ADR-0025
   - ADR-0027
   - BR-001
-  - NFR-01.001
-  - NFR-01.003
-  - NFR-03.001
-  - NFR-03.002
-  - NFR-05.001
-  - NFR-06.001
-  - NFR-06.002
-  - REQ-06.017
+  - NFR-001.001
+  - NFR-001.003
+  - NFR-003.001
+  - NFR-003.002
+  - NFR-005.001
+  - NFR-006.001
+  - NFR-006.002
+  - REQ-006.017
   - TASK-1
   - TASK-143
   - TASK-146
@@ -52,7 +52,7 @@ Establish the installable executable foundation for Papyrus: a Rust command-line
 - Global option runtime behavior beyond help/version rendering (e.g. `--dir`, `--json`, `--config`, `--no-color` semantics) — TASK-2.
 - Multi-crate workspace or internal module architecture beyond a minimal `src/main.rs` + `src/lib.rs` split.
 - Additional architectures (arm64, …) or non-Debian distribution formats — ADR-0002.
-- Advertising support for Debian releases beyond Trixie and Forky — open question NFR-03.002 / ADR-0002 remains unresolved.
+- Advertising support for Debian releases beyond Trixie and Forky — open question NFR-003.002 / ADR-0002 remains unresolved.
 
 ## Behavior
 
@@ -70,7 +70,7 @@ Establish the installable executable foundation for Papyrus: a Rust command-line
 
 - Package name: `papyrus`.
 - Architecture: `amd64`.
-- Supported suites declared: Debian Trixie and Forky only. Later Debian releases are not advertised until the NFR-03.002 open question is resolved (ADR-0002).
+- Supported suites declared: Debian Trixie and Forky only. Later Debian releases are not advertised until the NFR-003.002 open question is resolved (ADR-0002).
 - Forward compatibility: the binary is built against a conservative glibc baseline so it is expected to run on later Debian releases, but this is not a supported/advertised claim.
 - Control fields follow Debian policy; maintainer and homepage values are recorded in packaging metadata.
 
@@ -93,14 +93,14 @@ Establish the installable executable foundation for Papyrus: a Rust command-line
 
 ## Open questions
 
-- OQ-1: The "later Debian releases" boundary (NFR-03.002) is unresolved; this task advertises only Trixie and Forky. Resolution is tracked against NFR-03.002 and ADR-0002.
-- OQ-2: The exact interpretation of "open source" and "linking" for dev/build-time dependencies (NFR-06.002) remains unresolved; this task audits runtime dependencies only.
+- OQ-1: The "later Debian releases" boundary (NFR-003.002) is unresolved; this task advertises only Trixie and Forky. Resolution is tracked against NFR-003.002 and ADR-0002.
+- OQ-2: The exact interpretation of "open source" and "linking" for dev/build-time dependencies (NFR-006.002) remains unresolved; this task audits runtime dependencies only.
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
-| NFR | NFR-01.001, NFR-03.001, NFR-03.002, NFR-06.001, NFR-06.002 |
+| NFR | NFR-001.001, NFR-003.001, NFR-003.002, NFR-006.001, NFR-006.002 |
 | Business rule | BR-001 (papyrus command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-1 |
@@ -132,7 +132,7 @@ Contract source: ADR-0027 (Accepted) for the asset model and the notices, ADR-00
 | `/assets/katex/fonts/<name>.woff2` (20 files) | 259,792 total | `font/woff2` |
 | `/assets/mermaid/mermaid.min.js` | 3,572,661 | `text/javascript; charset=utf-8` |
 
-The 20 WOFF2 files are `KaTeX_AMS-Regular`, `KaTeX_Caligraphic-Bold`, `KaTeX_Caligraphic-Regular`, `KaTeX_Fraktur-Bold`, `KaTeX_Fraktur-Regular`, `KaTeX_Main-Bold`, `KaTeX_Main-BoldItalic`, `KaTeX_Main-Italic`, `KaTeX_Main-Regular`, `KaTeX_Math-BoldItalic`, `KaTeX_Math-Italic`, `KaTeX_SansSerif-Bold`, `KaTeX_SansSerif-Italic`, `KaTeX_SansSerif-Regular`, `KaTeX_Script-Regular`, `KaTeX_Size1-Regular`, `KaTeX_Size2-Regular`, `KaTeX_Size3-Regular`, `KaTeX_Size4-Regular`, `KaTeX_Typewriter-Regular`, each with the `.woff2` extension. The `.woff` and `.ttf` forms of the same families are not vendored and are not served: the supported browsers (NFR-05.001) always select the `woff2` source, so the other two sources in each `@font-face` block are inert.
+The 20 WOFF2 files are `KaTeX_AMS-Regular`, `KaTeX_Caligraphic-Bold`, `KaTeX_Caligraphic-Regular`, `KaTeX_Fraktur-Bold`, `KaTeX_Fraktur-Regular`, `KaTeX_Main-Bold`, `KaTeX_Main-BoldItalic`, `KaTeX_Main-Italic`, `KaTeX_Main-Regular`, `KaTeX_Math-BoldItalic`, `KaTeX_Math-Italic`, `KaTeX_SansSerif-Bold`, `KaTeX_SansSerif-Italic`, `KaTeX_SansSerif-Regular`, `KaTeX_Script-Regular`, `KaTeX_Size1-Regular`, `KaTeX_Size2-Regular`, `KaTeX_Size3-Regular`, `KaTeX_Size4-Regular`, `KaTeX_Typewriter-Regular`, each with the `.woff2` extension. The `.woff` and `.ttf` forms of the same families are not vendored and are not served: the supported browsers (NFR-005.001) always select the `woff2` source, so the other two sources in each `@font-face` block are inert.
 
 The Mermaid row is Mermaid 11.17.2, MIT, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`, landed by TASK-146. The served KaTeX total is 558,541 B (CSS 23,335 + JS 275,414 + 20 WOFF2 259,792).
 
@@ -171,7 +171,7 @@ The copyright file stays the only documentation file in the package.
 
 First-party assets (`app.css`, `app.js`, templates) stay covered by the existing `Files: *` GPL-3.0-or-later block and get no extra section. A later bundled package adds its own section when it lands. `scripts/build-deb.sh` is not modified: it still copies exactly one copyright file, so its shape and the two-entry package content are preserved.
 
-The licence inventory is a release gate (NFR-06.002): an asset whose licence cannot be shown compatible with GPL-3.0-or-later does not ship, and an incomplete notice blocks the release rather than being deferred.
+The licence inventory is a release gate (NFR-006.002): an asset whose licence cannot be shown compatible with GPL-3.0-or-later does not ship, and an incomplete notice blocks the release rather than being deferred.
 
 ### 6. Specification port (TASK-148)
 
@@ -182,5 +182,5 @@ The browser-UI and packaging-verification pages that once described an asset-fre
 | Artifact | Reference |
 |---|---|
 | ADR | ADR-0027 (asset table, vendor layout, manifest, notices), ADR-0025 (KaTeX file set and font serving), ADR-0005 (as amended, header and CSP baseline) |
-| Requirement | NFR-01.003, NFR-03.001, NFR-05.001, NFR-06.001, NFR-06.002, REQ-06.017 |
+| Requirement | NFR-001.003, NFR-003.001, NFR-005.001, NFR-006.001, NFR-006.002, REQ-006.017 |
 | Ticket | TASK-143 |

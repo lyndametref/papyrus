@@ -12,11 +12,11 @@ milestone: MS-005
 dependencies:
   - TASK-013
 references:
-  - docs/requirements/business/REQ-05.006.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.006.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-014-audit-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
@@ -30,7 +30,7 @@ ordinal: 17400
 ## Description
 Deliver the `audit` commands so a project contributor can create, list, view, edit, deprecate, and restore audit records (AUD-xxx), with stable IDs and text-file persistence inside the project directory.
 
-Implements REQ-05.006, REQ-05.007 (lifecycle), NFR-02.002, NFR-04.001, NFR-04.002, BR-014, BR-016. Full behavior, scope, validation, and acceptance details: docs/specifications/audit-records-management.md.
+Implements REQ-005.006, REQ-005.007 (lifecycle), NFR-002.002, NFR-004.001, NFR-004.002, BR-014, BR-016. Full behavior, scope, validation, and acceptance details: docs/specifications/audit-records-management.md.
 
 Audit types: `security` (default), `licence`, `architecture`; additional types are usable as sanitized values. Deprecation moves a record to its type directory's `deprecated/` subfolder.
 

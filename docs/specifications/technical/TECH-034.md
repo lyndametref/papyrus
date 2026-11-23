@@ -23,21 +23,21 @@ references:
   - MOCK-0005
   - MOCK-0006
   - MOCK-0007
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-05
-  - REQ-05.005
-  - REQ-05.007
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-005
+  - REQ-005.005
+  - REQ-005.007
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-15
   - TASK-19
@@ -57,7 +57,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), and TASK-40 (UI mockups) so it also serves the business-rules store: active business rules (ID, title, description, rationale, applicability, and references to business requirements). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`business-rule`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-05.005 and the web-visibility part of REQ-05.007 for the browser surface under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for business rules. Deprecated business rules are hidden from lists and unreachable by URL, exactly as deprecated requirements, glossary terms, UI specifications, and UI mockups.
+Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), and TASK-40 (UI mockups) so it also serves the business-rules store: active business rules (ID, title, description, rationale, applicability, and references to business requirements). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`business-rule`), its record model, list/view/edit screens, API endpoints, and tests. It implements REQ-005.005 and the web-visibility part of REQ-005.007 for the browser surface under REQ-006.002, and advances NFR-001.002 (display and edit all Papyrus content) for business rules. Deprecated business rules are hidden from lists and unreachable by URL, exactly as deprecated requirements, glossary terms, UI specifications, and UI mockups.
 
 Business rules are Markdown text records with a fixed section template (`## Description`, `## Rationale`, `## Applicability`, `## Requirements`). The browser edits only the five documented fields and must preserve every other byte/section of the file. Whole-file regeneration of a rule (for example by reusing the CLI's stub serializer) is forbidden because it destroys editor-added and unknown sections.
 
@@ -77,7 +77,7 @@ Business rules are Markdown text records with a fixed section template (`## Desc
 
 ### Out of scope
 
-- Creating, deprecating, restoring, or deleting business rules from the browser; changing record IDs, deprecation state, or status. These remain CLI-only (REQ-05.005, BR-013).
+- Creating, deprecating, restoring, or deleting business rules from the browser; changing record IDs, deprecation state, or status. These remain CLI-only (REQ-005.005, BR-013).
 - Managing the canonical `BR-*.md` business-rule documents that share the same directory; they are not records and are never read or written by the browser.
 - Cross-type navigation beyond rendering requirement references as links, and the final completeness check — TASK-19.
 - Search inside the browser UI, Markdown rendering, rich-text editing, attachments, or file uploads.
@@ -204,7 +204,7 @@ Record views in this specification follow the shared single record view layout d
 
 1. Deprecated business rules live in the active directory's `deprecated/` subfolder. That folder is never scanned for records, never listed, never counted, and never resolved.
 2. A request for a deprecated rule's ID returns `404` on `GET /doc/{id}`, `GET /doc/{id}/edit`, `POST /doc/{id}`, `GET /api/doc/{id}`, and `POST /api/doc/{id}`, exactly as for an unknown ID.
-3. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-05.007, BR-013).
+3. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-005.007, BR-013).
 
 ### 10. JSON API
 
@@ -220,7 +220,7 @@ Record views in this specification follow the shared single record view layout d
      "description": "Every contract must be signed...",
      "rationale": "Reduces disputes...",
      "applicability": "Applies to all contracts...",
-     "requirements": ["REQ-05.005"],
+     "requirements": ["REQ-005.005"],
      "version": "1762000000.123456789.412",
      "path": "business-rules/RUL-001.md"
    }
@@ -240,7 +240,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. Requirement references rendered as links in the view are the only exception to the baseline "requirement references inside any field are displayed as literal text" rule (section 4.19 of the baseline); the link target is derived from a resolved record ID, never from request input.
 3. Tag controls are keyboard operable, every input has a `<label>` or accessible name, remove controls are labelled `Remove <value>`, and the add input is labelled. Focus is not trapped.
 4. The sidebar's Business Rules entry and the business-rules list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
@@ -310,7 +310,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Duplicate requirement references are collapsed on save, matching `rule edit`; this is looser than the CLI's input handling but produces the same stored result.
 - Assumption: The tag field's no-JavaScript fallback uses one text input per value plus a trailing empty input with the same field name; this preserves the approved chip layout with JavaScript and keeps the form usable without it.
 - Assumption: The JSON API exposes the five editable fields; business rules have no status, task, or supersession metadata, unlike decision records.
-- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-005.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 - Assumption: The canonical `BR-*.md` documents sharing the directory are not records and are never touched by the browser; only `<prefix>-<digits>.md` files are.
 
@@ -326,7 +326,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.005, REQ-05.007, REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
+| Requirement | REQ-005, REQ-005.005, REQ-005.007, REQ-006, REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012 |
 | Business rule | BR-004 (browser command behavior), BR-013 (rule command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-43 (record model), TASK-45 (UI design), TASK-25, TASK-86 |

@@ -25,11 +25,6 @@ references:
   - docs/business-rules/index.html
   - tests/document_type_no_drift.rs
 modified_files:
-  - README.md
-  - docs/business-rules/BR-001-papyrus-command-behavior.md
-  - docs/business-rules/BR-005-task-command-behavior.md
-  - docs/business-rules/BR-016-configuration-keys-and-precedence.md
-  - docs/business-rules/index.html
 priority: high
 ordinal: 41530
 ---
@@ -46,7 +41,7 @@ ordinal: 41530
 - BR-001: record `check` as a built-in command outside the document-family command set, add exit 4 as a findings outcome that is not an error, and note the read-only default.
 - BR-005: re-sync the quoted README excerpt range if the new section shifts it; change no task behaviour text.
 - BR-016: list `check` among the tolerant repair surfaces that run while the configuration is invalid, and add it to the reserved built-in names that a document-type slug may not take.
-- Keep requirement files untouched; report any wording conflict with REQ-01.008 or REQ-07.002 instead of editing them.
+- Keep requirement files untouched; report any wording conflict with REQ-001.008 or REQ-007.002 instead of editing them.
 - Regenerate the business-rules index if the change touches indexed headings.
 
 **Out of scope.** Specifications (TASK-148), ADRs, requirement text, release notes, and man-page content.
@@ -59,7 +54,7 @@ ordinal: 41530
 - [x] BR-001 records `check` as a built-in command outside the config-defined document-command family, records exit 4 as a findings outcome that is not an error, and states that `papyrus check` is read-only unless `--fix` is given.
 - [x] BR-005's quoted `task` excerpt heading names the actual README line range of the `task` section after the edit, and the quoted block is otherwise unchanged, with no task behaviour text edited.
 - [x] BR-016 lists `check` among the tolerant repair surfaces that run while the configuration is invalid and among the reserved built-in names a document-type slug may not take.
-- [x] No file under `docs/requirements/`, `docs/architecture/`, or `docs/specifications/`, no ADR, and no release note is edited; any wording conflict with REQ-01.008 or REQ-07.002 is reported in the ticket instead of edited.
+- [x] No file under `docs/requirements/`, `docs/architecture/`, or `docs/specifications/`, no ADR, and no release note is edited; any wording conflict with REQ-001.008 or REQ-007.002 is reported in the ticket instead of edited.
 
 ## Definition of Done
 - [x] #1 The `check` entry sits between the `search` entry and the `STATUSES` heading, and no other COMMANDS entry, the EXIT STATUS section, or the man-page scope note changed.
@@ -98,7 +93,7 @@ Markup: section heading at column 0 as `<b style="color: light-dark(#0969da, #58
 3. Options - `--fix`: "Repair duplicate record IDs." `--force`: "Skip the repair confirmation prompt; requires `--fix`."
 4. Report shape - one finding per line `<kind>: <family> <subject> - <detail> (<locations>)`, sorted by kind, family, subject, and location; a clean run prints exactly `no findings`; when a check was skipped a final `skipped: <identifiers>` line follows; `--json` emits one object with the keys `findings`, `skipped`, and `repaired`.
 5. Finding kinds - indented term list, one line per kind, exact identifiers: `duplicate-id`, `self-dependency`, `dependency-cycle`, `dangling-milestone`, `dangling-release`, `frontmatter-conflict`, `config-invalid`. State that `config-invalid` carries no family and no subject and its location is the configuration file.
-6. Read-only guarantee - nothing is written unless `--fix` is given; a plain run renames, relocates, and rewrites nothing; a `deprecated/` folder stays inert: never read, never listed, no finding (REQ-05.007). The word "inert" (or another allowlisted phrase: not read, legacy, recover, follow, applies to) is mandatory, because `tests/document_type_no_drift.rs` D-06 rejects a README line that names `deprecated/` without inert wording.
+6. Read-only guarantee - nothing is written unless `--fix` is given; a plain run renames, relocates, and rewrites nothing; a `deprecated/` folder stays inert: never read, never listed, no finding (REQ-005.007). The word "inert" (or another allowlisted phrase: not read, legacy, recover, follow, applies to) is mandatory, because `tests/document_type_no_drift.rs` D-06 rejects a README line that names `deprecated/` without inert wording.
 7. `--fix` - repairs duplicate record IDs only; the keeper is the record with the earliest valid `created_date`, records with a missing or unparsable date rank last, and a remaining tie goes to the smallest project-relative path; every other record gets the next ID from the allocator and its file is renamed to the new stem; the plan and the single confirmation prompt go to standard error so `--json` stays parseable; affected references are listed and never rewritten; `--force` skips the prompt and requires `--fix`; a planned repair that cannot be applied is reported as `repair-skipped`; a non-terminal run with a non-empty plan and no `--force` writes nothing and exits 2.
 8. Tolerant configuration - the configuration is loaded like `papyrus config get|set|unset|list`, so an invalid configuration does not block the run: each diagnostic line becomes a `config-invalid` finding, the checks that need a valid `document_types` set are named as skipped, and the remaining checks still run.
 9. Intended loop - run `papyrus check` read-only, inspect the report, then `papyrus check --fix` (interactive) or `papyrus check --fix --force` (unattended), then re-run `papyrus check`: the report is `no findings`, the exit status is 0, and a second `--fix` writes nothing.
@@ -119,8 +114,8 @@ Do not edit the shared EXIT STATUS section, the other COMMANDS entries, or the s
 
 **Step 5 - BR-016 (business-analyst).**
 - `### Validation`, Fail-closed bullet: add `check` to the exception list - "every command except the repair surfaces (`config get|set|unset|list`), `init --force`, and `check` refuses to run while the effective configuration is invalid".
-- `### Validation`, Reserved-names bullet: insert `check` after `config`, matching the REQ-07.002 order: `init`, `config`, `check`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, `version`.
-- `### Repair surfaces`: add one bullet - "`papyrus check` loads tolerantly, reports each configuration diagnostic as a `config-invalid` finding, runs only the checks that do not depend on the effective `document_types` set, and repairs no configuration value (REQ-01.008)."
+- `### Validation`, Reserved-names bullet: insert `check` after `config`, matching the REQ-007.002 order: `init`, `config`, `check`, `task`, `milestone`, `release`, `decision`, `search`, `browser`, `import`, `help`, `version`.
+- `### Repair surfaces`: add one bullet - "`papyrus check` loads tolerantly, reports each configuration diagnostic as a `config-invalid` finding, runs only the checks that do not depend on the effective `document_types` set, and repairs no configuration value (REQ-001.008)."
 - Do not change precedence, key inventory, or `document_types` text.
 
 **Step 6 - regenerate the business-rules index.** Run `./.opencode/skills/business-rules-index-visualization/scripts/generate_business_rules_index.sh` from the project root. Expect `wrote docs/business-rules/index.html: 20 business rules`. Never hand-edit the file. The resulting diff must contain only the BR-001 and BR-016 applicability text.
@@ -132,8 +127,8 @@ Do not edit the shared EXIT STATUS section, the other COMMANDS entries, or the s
 - Re-measure every `README.md` line-range reference under `docs/business-rules/` and record drift outside the edited files in the notes.
 
 **Conflicts to report, not edit.**
-- REQ-01.008 says `--fix` "prompts for confirmation before applying each repair" (and an AC says "each repair prompts for confirmation"). Spec section 10.8 and the frozen help text define exactly one prompt for the whole run. README documents one prompt; the requirement wording needs its owner.
-- REQ-01.008's refusal list names a read-only legacy directory; spec section 5.1 additionally refuses a member in the read/import directory, and section 10.9 adds the `repair-skipped` finding (permitted by ADR-0029 constraint 5). README follows the spec; the requirement is silent rather than contradictory.
+- REQ-001.008 says `--fix` "prompts for confirmation before applying each repair" (and an AC says "each repair prompts for confirmation"). Spec section 10.8 and the frozen help text define exactly one prompt for the whole run. README documents one prompt; the requirement wording needs its owner.
+- REQ-001.008's refusal list names a read-only legacy directory; spec section 5.1 additionally refuses a member in the read/import directory, and section 10.9 adds the `repair-skipped` finding (permitted by ADR-0029 constraint 5). README follows the spec; the requirement is silent rather than contradictory.
 - Pre-existing stale README ranges in BR-003, BR-004, and BR-015 (see baseline). Out of scope here; needs a follow-up ticket.
 
 
@@ -147,7 +142,7 @@ created: 2026-11-15T18:59:00Z
 
 ---
 
-Provenance note for commit 83f79fd: the REQ-01.008 edits between this task's commits came from an orchestrator-dispatched requirements-engineer correction of wording defects found during TASK-137/138 review (one prompt per run, read/import refusal class, repair-skipped, keeper tie-break, --force). They are a separate documentation work item, not part of TASK-140, and the requirement now matches README, BR-001, BR-016, and the shipped binary.
+Provenance note for commit 83f79fd: the REQ-001.008 edits between this task's commits came from an orchestrator-dispatched requirements-engineer correction of wording defects found during TASK-137/138 review (one prompt per run, read/import refusal class, repair-skipped, keeper tie-break, --force). They are a separate documentation work item, not part of TASK-140, and the requirement now matches README, BR-001, BR-016, and the shipped binary.
 
 ---
 

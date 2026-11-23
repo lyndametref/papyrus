@@ -23,13 +23,13 @@ references:
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-01.003.md
-  - docs/requirements/business/REQ-01.004.md
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-04.004.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-001.003.md
+  - docs/requirements/business/REQ-001.004.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-004.004.md
 priority: high
 type: feature
 ordinal: 39090
@@ -40,9 +40,9 @@ ordinal: 39090
 Implement the one-way Backlog.md import command `papyrus import backlog` (ADR-0011; ADR-0013 stage 6): the only bridge from a Backlog.md store into the Papyrus-native layout (ADR-0010). The command plans all IDs before writing, reuses the shared front-matter/document parser and record::store writer, and never persists a source ID or mapping store.
 
 Scope (in):
-- CLI subcommand `papyrus import backlog --from <source-project-dir> [--source-backlog-dir <dir>] [--dry-run] [--allow-existing] [--report <path>]`; target must be an initialized project (REQ-01.003).
+- CLI subcommand `papyrus import backlog --from <source-project-dir> [--source-backlog-dir <dir>] [--dry-run] [--allow-existing] [--report <path>]`; target must be an initialized project (REQ-001.003).
 - Import `backlog/tasks`, `backlog/archive/tasks`, `backlog/milestones`, `backlog/archive/milestones`.
-- Exclude `docs`, `drafts`, `decisions`, `config.yml`, and locks; count/report them as excluded (NFR-04.004).
+- Exclude `docs`, `drafts`, `decisions`, `config.yml`, and locks; count/report them as excluded (NFR-004.004).
 - Phase 1: enumerate and sort source records; allocate consecutive Papyrus IDs per family from max(existing target number in active/archive/legacy/deprecated locations)+1, minimum 1; milestones start at 1; no source number preserved.
 - Phase 2: resolve references, validate/normalize statuses and timestamps, validate destinations.
 - Phase 3: write through record::store::write_atomic; mid-import failure aborts with a summary of records already written.
@@ -56,7 +56,7 @@ Scope (out):
 Design deliverable:
 - Feature specification: docs/specifications/import-backlog-md-records.md
 - ADRs: ADR-0010, ADR-0011, ADR-0012, ADR-0013
-- Requirements: REQ-01.002, REQ-01.003, REQ-01.004, REQ-01.005, REQ-05.010, NFR-04.002, NFR-04.004
+- Requirements: REQ-001.002, REQ-001.003, REQ-001.004, REQ-001.005, REQ-005.010, NFR-004.002, NFR-004.004
 - Downstream: TASK-97, TASK-99, TASK-100
 
 Assumptions:
@@ -110,4 +110,4 @@ Verification: cargo build/test pass, including no_drift; dry-run writes nothing;
 
 
 ## Notes
-Refined TASK-92 against ADR-0010, ADR-0011, ADR-0012, ADR-0013, NFR-04.004, REQ-01.002..REQ-01.005, REQ-05.010, NFR-04.002, and docs/specifications/import-backlog-md-records.md. Scope, ACs, assumptions, dependencies, DoD, and implementation plan aligned; no implementation performed in this pass.
+Refined TASK-92 against ADR-0010, ADR-0011, ADR-0012, ADR-0013, NFR-004.004, REQ-001.002..REQ-001.005, REQ-005.010, NFR-004.002, and docs/specifications/import-backlog-md-records.md. Scope, ACs, assumptions, dependencies, DoD, and implementation plan aligned; no implementation performed in this pass.

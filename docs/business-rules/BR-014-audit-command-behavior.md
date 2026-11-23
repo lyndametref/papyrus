@@ -15,7 +15,7 @@ status: active
 
 ## Rationale
 
-Based on REQ-05.006 — Manage Audit Records, REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-05.010 — Record Metadata in YAML Front Matter, and REQ-07.003 — Dispatch Config-Defined Document Commands, this rule exists because `audit` is the seed type where the field key, the CLI option, and the storage key all differ: `audit_type` is offered as `--audit-type` and kept in front matter as `type` beside its `## Audit Type` section. The generated command must take the option name, the heading, and the `frontmatter_key` from the descriptor rather than a per-type module, or the `type` key, the body section, and the required content would drift apart once the type becomes data; the positional title is added to audit additively, without renaming or removing its existing `--title`.
+Based on REQ-005.006 — Manage Audit Records, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-005.010 — Record Metadata in YAML Front Matter, and REQ-007.003 — Dispatch Config-Defined Document Commands, this rule exists because `audit` is the seed type where the field key, the CLI option, and the storage key all differ: `audit_type` is offered as `--audit-type` and kept in front matter as `type` beside its `## Audit Type` section. The generated command must take the option name, the heading, and the `frontmatter_key` from the descriptor rather than a per-type module, or the `type` key, the body section, and the required content would drift apart once the type becomes data; the positional title is added to audit additively, without renaming or removing its existing `--title`.
 
 ## Applicability
 

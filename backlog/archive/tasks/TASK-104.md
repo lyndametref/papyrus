@@ -15,14 +15,14 @@ dependencies:
 documentation:
   - >-
     docs/architecture/adr/ADR-0019-fail-closed-document-type-configuration-validation.md
-  - docs/requirements/business/REQ-07.002.md
+  - docs/requirements/business/REQ-007.002.md
   - docs/architecture/adr/ADR-0016-runtime-config-derived-command-dispatch.md
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-01.004.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-001.004.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/architecture/document-type-config-validation-contract.md
 priority: high
 ordinal: 41040
@@ -55,7 +55,7 @@ Validate the `document_types` configuration fail-closed and provide repair surfa
 ## Implementation Notes
 ## Implementation Plan
 
-Design authority: ADR-0019 (accepted), ADR-0016, ADR-0017, REQ-07.002, REQ-01.002, REQ-01.004, NFR-02.002, NFR-04.002, and `docs/architecture/document-type-config-validation-contract.md` (TASK-109 implementation contract).
+Design authority: ADR-0019 (accepted), ADR-0016, ADR-0017, REQ-007.002, REQ-001.002, REQ-001.004, NFR-002.002, NFR-004.002, and `docs/architecture/document-type-config-validation-contract.md` (TASK-109 implementation contract).
 
 ### 1. Scope and out of scope
 

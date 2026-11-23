@@ -5,10 +5,10 @@ created_date: '2026-11-19T11:02:54Z'
 updated_date: '2026-11-19T18:56:54Z'
 labels: []
 references:
-  - REQ-06.020
-  - REQ-06.021
-  - REQ-06.022
-  - REQ-06.013
+  - REQ-006.020
+  - REQ-006.021
+  - REQ-006.022
+  - REQ-006.013
   - RE-008
   - TECH-011
   - TECH-062
@@ -80,9 +80,9 @@ type: implementation
 Code and automated tests for ordering milestones and releases by the lowest ordinal of their non-archived tasks ascending, lifecycle markers, and cleanup controls in the browser Backlog board. The ascending lowest-ordinal rule supersedes the earlier highest-ordinal descending rule.
 
 Scope (browser combined Backlog board `/?type=task` only):
-- Ordering (REQ-06.020): milestones inside a release and in the no-release group are ordered by the lowest ordinal among their non-archived tasks, ascending; a milestone with no non-archived task is ordered after every milestone that has one, by milestone ID ascending; ties by milestone ID ascending. Releases are ordered by the lowest ordinal among the non-archived tasks in their milestones, ascending; a release with no such task is ordered after every release that has one, by release ID ascending; ties by release ID ascending. The no-release group precedes all releases. Archived tasks do not contribute to any sort key. The order is recomputed from current record data on every render. Release grouping and the tasks-without-a-milestone section are unchanged.
-- Lifecycle markers (REQ-06.021): the marker 🔘 is shown immediately before the title of an open milestone or a planned release; ✅ immediately before the title of a closed milestone or a released release. Archived milestones are not displayed and carry no marker. The marker reflects stored lifecycle state and changes after that state changes and the view is reloaded. The marker is shown in addition to the record ID and does not change grouping or ordering.
-- Cleanup controls (REQ-06.022): each displayed closed milestone shows a cleanup control immediately after its title; each displayed released release that contains at least one closed milestone shows a cleanup control immediately after its title; a released release with no closed milestone shows none; open milestones and planned releases show none. Activating a milestone cleanup control shows a server-rendered confirmation listing the milestone ID that will be archived; confirming archives that milestone using milestone archive semantics (REQ-03.001) and removes it from the view; cancelling archives nothing. Activating a release cleanup control shows a server-rendered confirmation listing the IDs of the closed milestones in that release that will be archived; confirming archives each listed milestone, one by one; the release itself remains visible and released and is never archived. If archiving one milestone fails, the failure is reported for that milestone, the remaining milestones are still archived, and the failed milestone stays visible. The controls are browser-only and add no CLI command, JSON API endpoint, or write path.
+- Ordering (REQ-006.020): milestones inside a release and in the no-release group are ordered by the lowest ordinal among their non-archived tasks, ascending; a milestone with no non-archived task is ordered after every milestone that has one, by milestone ID ascending; ties by milestone ID ascending. Releases are ordered by the lowest ordinal among the non-archived tasks in their milestones, ascending; a release with no such task is ordered after every release that has one, by release ID ascending; ties by release ID ascending. The no-release group precedes all releases. Archived tasks do not contribute to any sort key. The order is recomputed from current record data on every render. Release grouping and the tasks-without-a-milestone section are unchanged.
+- Lifecycle markers (REQ-006.021): the marker 🔘 is shown immediately before the title of an open milestone or a planned release; ✅ immediately before the title of a closed milestone or a released release. Archived milestones are not displayed and carry no marker. The marker reflects stored lifecycle state and changes after that state changes and the view is reloaded. The marker is shown in addition to the record ID and does not change grouping or ordering.
+- Cleanup controls (REQ-006.022): each displayed closed milestone shows a cleanup control immediately after its title; each displayed released release that contains at least one closed milestone shows a cleanup control immediately after its title; a released release with no closed milestone shows none; open milestones and planned releases show none. Activating a milestone cleanup control shows a server-rendered confirmation listing the milestone ID that will be archived; confirming archives that milestone using milestone archive semantics (REQ-003.001) and removes it from the view; cancelling archives nothing. Activating a release cleanup control shows a server-rendered confirmation listing the IDs of the closed milestones in that release that will be archived; confirming archives each listed milestone, one by one; the release itself remains visible and released and is never archived. If archiving one milestone fails, the failure is reported for that milestone, the remaining milestones are still archived, and the failed milestone stays visible. The controls are browser-only and add no CLI command, JSON API endpoint, or write path.
 
 Implementation surface:
 - src/task.rs: add the task ordinal to TaskData (parsed from the `ordinal` front-matter key) so the browser can read it.
@@ -98,8 +98,8 @@ Assumptions:
 - The browser reads milestone and release lifecycle status from the `status` front-matter key; managed milestones and releases always carry it.
 - The task ordinal is read from the `ordinal` front-matter key; a missing or unparseable ordinal is treated as having no ordinal and does not contribute to a sort key.
 - Active (non-archived) tasks and milestones come from the active backlog directories; archived records are already excluded by the index.
-- Milestone and release cleanup reuse crate::milestone::archive and introduce no new write path (ADR-0013); the release itself is never archived (REQ-03.002).
-- Rust 1.99.1 toolchain available (ADR-0001); Firefox 115+ and no-JavaScript support required (NFR-05.001, NFR-01.002); browser command behaviour governed by BR-004; views render only local data (NFR-01.003).
+- Milestone and release cleanup reuse crate::milestone::archive and introduce no new write path (ADR-0013); the release itself is never archived (REQ-003.002).
+- Rust 1.99.1 toolchain available (ADR-0001); Firefox 115+ and no-JavaScript support required (NFR-005.001, NFR-001.002); browser command behaviour governed by BR-004; views render only local data (NFR-001.003).
 - Verification task TASK-210 tracks MS-030 verification.
 
 Definition of done: TASK-209 implements the change in the files above, automated tests cover TC-066 through TC-097, every acceptance criterion is satisfied and verified by TASK-210, cargo fmt, cargo clippy, and cargo test pass, and no open material questions remain.

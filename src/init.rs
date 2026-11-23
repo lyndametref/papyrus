@@ -446,7 +446,7 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
 
     // Write config file (full replace under --force or when absent). Each
     // document entry is minimal: `prefix` and `directory`, plus `enabled` only
-    // when the walkthrough disables it (REQ-07.002, RE-010 D14). Lists are
+    // when the walkthrough disables it (REQ-007.002, RE-010 D14). Lists are
     // rendered as flow sequences by the shared config renderer (ADR-0024).
     let value = config.init_value().map_err(AppError::Runtime)?;
     let yaml = crate::config::to_config_yaml(&value).map_err(AppError::Runtime)?;

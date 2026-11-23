@@ -148,7 +148,7 @@ fn collect_document_type(
         // Boundary check before any eligibility decision or read, so symlink
         // escapes always surface as exit 1.
         let safe = Context::ensure_within(&ctx.project_dir, &path)?;
-        // Read-path auto-relocation required by REQ-05.007. Failure is a
+        // Read-path auto-relocation required by REQ-005.007. Failure is a
         // validation outcome naming the source record (Behavior 4.2).
         let safe = crate::record::store::relocate_if_archived(ctx, cfg, registry, &safe)
             .map_err(|error| AppError::Validation(error.to_string()))?;

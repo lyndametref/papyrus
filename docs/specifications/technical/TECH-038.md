@@ -25,21 +25,21 @@ references:
   - MOCK-0007
   - MOCK-0008
   - MOCK-0009
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-05
-  - REQ-05.007
-  - REQ-05.009
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-005
+  - REQ-005.007
+  - REQ-005.009
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-15
   - TASK-19
@@ -65,7 +65,7 @@ status: verified
 
 Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), TASK-25 (business rules), and TASK-26 (audit records) so it also serves the technical-specifications store: active technical specifications with a title and a description. The transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`tech-spec`), its record model, list/view/edit screens, API endpoints, and tests.
 
-It implements the browser-visibility part of REQ-05.009 and REQ-05.007 under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for technical specifications. Deprecated technical specifications are hidden from lists and unreachable by URL, consistent with deprecated requirements, glossary terms, UI specifications, UI mockups, business rules, and audit records (REQ-05.007, BR-017).
+It implements the browser-visibility part of REQ-005.009 and REQ-005.007 under REQ-006.002, and advances NFR-001.002 (display and edit all Papyrus content) for technical specifications. Deprecated technical specifications are hidden from lists and unreachable by URL, consistent with deprecated requirements, glossary terms, UI specifications, UI mockups, business rules, and audit records (REQ-005.007, BR-017).
 
 Technical specifications are Markdown text records with a fixed template (`# <ID> <title>`, then `## Description`). The browser edits only the title and the description and must preserve every other byte/section of the file. Whole-file regeneration of a record (for example by reusing the CLI's `render_record` serializer) is forbidden because it destroys editor-added and unknown sections.
 
@@ -85,7 +85,7 @@ Technical specifications are Markdown text records with a fixed template (`# <ID
 
 ### Out of scope
 
-- Creating, deprecating, restoring, or deleting technical specifications from the browser; changing record IDs or deprecation state. These remain CLI-only (REQ-05.009, BR-017).
+- Creating, deprecating, restoring, or deleting technical specifications from the browser; changing record IDs or deprecation state. These remain CLI-only (REQ-005.009, BR-017).
 - Cross-type navigation beyond the baseline sidebar, and the final completeness check — TASK-19.
 - Search inside the browser UI, Markdown rendering, rich-text editing, attachments, or file uploads.
 - Structured references to non-functional requirements or tasks; such references remain literal text in the title or description (BR-017 defines no reference fields).
@@ -191,7 +191,7 @@ Record views in this specification follow the shared single record view layout d
 2. A request for a deprecated technical specification's ID returns `404` on `GET /doc/{id}`, `GET /doc/{id}/edit`, `POST /doc/{id}`, `GET /api/doc/{id}`, and `POST /api/doc/{id}`, exactly as for an unknown ID.
 3. Every HTML `404` response for a technical specification ID renders the technical-specifications `404` page, and that page is identical for a deprecated ID and an unknown ID. It uses the shared error-page layout and shows the `404` status, the heading `Record not found`, the help text "Deprecated technical specifications are not listed and cannot be opened. The same page is used for an unknown address.", and exactly one recovery link, "Back to technical specifications", pointing to `/?type=tech-spec`. Because the deprecated and unknown responses are identical in status, heading, help text, and recovery link, the page never reveals whether a hidden ID exists in `deprecated/`.
 4. The technical-specifications `404` page applies to a requested ID that matches the configured technical-specification prefix pattern (`<prefix>-<digits>`, default `TECH`) on `GET /doc/{id}`, `GET /doc/{id}/edit`, and `POST /doc/{id}`. JSON `404` responses keep the baseline JSON error object (section 10.6), and an ID that matches no technical-specification pattern keeps the baseline `404` page.
-5. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-05.007, BR-017).
+5. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-005.007, BR-017).
 
 ### 10. JSON API
 
@@ -221,7 +221,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's Technical Specifications entry, the technical-specifications list/view/edit/conflict templates, and the technical-specifications `404` page are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Both fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
 
@@ -290,15 +290,15 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The browser edit form requires both title and description, matching MOCK-0009, `technical-specifications-management.md`, and BR-017; an on-disk record with an absent/empty description is viewable as `(none)` but must be completed before it can be saved from the browser.
 - Assumption: The browser description is multi-line and preserves LF; the CLI `--description` remains single-line and `--editor` remains the CLI route for multi-line bodies. This is consistent with `technical-specifications-management.md` section 7.3.
 - Assumption: Browser title and description validation reuses the baseline editing limits (title 1–200, multi-line text at most 20000 Unicode scalar values) for consistency with every other browser document type; MOCK-0009's help text does not draw these limits. See OQ-2.
-- Assumption: Deprecated technical specifications are excluded exactly like other document types: not listed, not counted, not reachable, not editable (REQ-05.007, BR-017).
+- Assumption: Deprecated technical specifications are excluded exactly like other document types: not listed, not counted, not reachable, not editable (REQ-005.007, BR-017).
 - Assumption: The `document_types.tech-spec.enabled` flag controls the sidebar entry and category, like the other document types; a missing directory is an empty category, not an error.
 - Assumption: Technical specifications expose no structured NFR/task reference fields in the browser; such IDs remain literal text in the title or description (BR-017 defines no reference fields).
-- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-005.001) remains a deferred follow-up, consistent with sibling tickets.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
 
-- **OQ-1 (non-blocking, product)** — Whether technical specifications should gain structured references to non-functional requirements or tasks in the browser. REQ-05.009 says they "may be referenced" but BR-017 defines no reference fields; this specification treats them as literal text.
+- **OQ-1 (non-blocking, product)** — Whether technical specifications should gain structured references to non-functional requirements or tasks in the browser. REQ-005.009 says they "may be referenced" but BR-017 defines no reference fields; this specification treats them as literal text.
 - **OQ-2 (non-blocking, validation)** — `technical-specifications-management.md` and BR-017 state no length limit, while the browser baseline applies title 1–200 and multi-line text 20000 limits. This specification adopts the baseline limits for consistency with the other browser document types; MOCK-0009 draws no length help text. If the product prefers no browser length limit, only the documented messages and tests for the two length rules change.
 - **OQ-3 (non-blocking, follow-up)** — Real-browser verification in Firefox 115+ is deferred, consistent with sibling tickets.
 
@@ -306,7 +306,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.009, REQ-05.007, REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
+| Requirement | REQ-005, REQ-005.009, REQ-005.007, REQ-006, REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence), BR-017 (tech-spec command behavior) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25 (sibling), TASK-26 (sibling), TASK-55 (record model), TASK-58 (UI design), TASK-57, TASK-86 |

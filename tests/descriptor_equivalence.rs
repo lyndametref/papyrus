@@ -10,7 +10,7 @@
 //! the frozen `tests/golden/cli-help` snapshots; it is not a production table.
 //! The single permitted projected difference is the reference-visibility
 //! default of a user-defined type: the former `ContentModel::Generic` hidden
-//! rule becomes `Visible` (ADR-036 decision 33, REQ-06.019, TC-185).
+//! rule becomes `Visible` (ADR-036 decision 33, REQ-006.019, TC-185).
 
 use std::collections::BTreeMap;
 use std::fs;

@@ -11,16 +11,16 @@ references:
   - BR-012
   - BR-013
   - BR-014
-  - REQ-05.001
-  - REQ-05.003
-  - REQ-05.005
-  - REQ-05.006
-  - REQ-07.003
+  - REQ-005.001
+  - REQ-005.003
+  - REQ-005.005
+  - REQ-005.006
+  - REQ-007.003
   - BR-001
   - BR-016
-  - REQ-05.002
-  - REQ-05.004
-  - REQ-05.008
+  - REQ-005.002
+  - REQ-005.004
+  - REQ-005.008
 status: Done
 assignee:
   - requirements-engineer
@@ -65,7 +65,7 @@ Each rule must keep every user-visible invariant of its old hand-written command
 - [ ] BR-009 (req) and BR-010 (nfr) state create-group plain IDs, same-type active group requirement, cross-type and archived-group rejection, dotted member IDs, immutable membership, no archive or delete cascade, merged list ordering, and hidden references (MS-031 AC-6, RE-010 D7).
 - [ ] BR-011 states the positional title, --term removal, required definition with heading "## Definition", and survival of existing term values as titles (MS-031 AC-6, RE-010 D13).
 - [ ] BR-012 states the SingleMarkdown baseline and seed-sourced fields; BR-013 states required description, create-only rationale and applicability, and the list requirements field; BR-014 states positional title, audit_type option and frontmatter_key, and required content (MS-031 AC-6).
-- [ ] The six rules remain consistent with BR-001, BR-016, REQ-05.001 to REQ-05.009, and ADR-036, and the user has verified them (MS-031 AC-6, AC-8).
+- [ ] The six rules remain consistent with BR-001, BR-016, REQ-005.001 to REQ-005.009, and ADR-036, and the user has verified them (MS-031 AC-6, AC-8).
 ## Comments
 - **requirements-engineer**: Updated BR-009 BR-010 BR-011 BR-012 BR-013 BR-014 so each describes the generated document command surface without losing user-visible invariants. papyrus check: no new findings, the three pre-existing frontmatter-conflict findings in archived tasks remain. Only the six business-rule files changed; no requirement, TECH, source or test change.
 - **orchestrator**: Acceptance met: BR-009..014 rewritten as generated descriptor behavior, preserving group, title, field and lifecycle invariants; open items recorded (audit-type default location, rule reference removal option, legacy group link migration).

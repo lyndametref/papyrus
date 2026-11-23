@@ -21,18 +21,18 @@ dependencies:
   - TASK-070
   - TASK-072
 references:
-  - docs/requirements/business/REQ-01.md
-  - docs/requirements/business/REQ-02.md
-  - docs/requirements/business/REQ-03.md
-  - docs/requirements/business/REQ-04.md
-  - docs/requirements/business/REQ-05.md
-  - docs/requirements/business/REQ-06.md
-  - docs/requirements/non-functional/NFR-01.md
-  - docs/requirements/non-functional/NFR-02.md
-  - docs/requirements/non-functional/NFR-03.md
-  - docs/requirements/non-functional/NFR-04.md
-  - docs/requirements/non-functional/NFR-05.md
-  - docs/requirements/non-functional/NFR-06.md
+  - docs/requirements/business/REQ-001.md
+  - docs/requirements/business/REQ-002.md
+  - docs/requirements/business/REQ-003.md
+  - docs/requirements/business/REQ-004.md
+  - docs/requirements/business/REQ-005.md
+  - docs/requirements/business/REQ-006.md
+  - docs/requirements/non-functional/NFR-001.md
+  - docs/requirements/non-functional/NFR-002.md
+  - docs/requirements/non-functional/NFR-003.md
+  - docs/requirements/non-functional/NFR-004.md
+  - docs/requirements/non-functional/NFR-005.md
+  - docs/requirements/non-functional/NFR-006.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
   - docs/business-rules/BR-013-rule-command-behavior.md
@@ -40,15 +40,14 @@ references:
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-009-req-command-behavior.md
   - docs/business-rules/BR-010-nfreq-command-behavior.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/non-functional/NFR-04.003.md
-  - docs/requirements/business/REQ-01.006.md
-  - docs/requirements/business/REQ-01.007.md
-  - docs/requirements/business/REQ-06.005.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/non-functional/NFR-004.003.md
+  - docs/requirements/business/REQ-001.006.md
+  - docs/requirements/business/REQ-001.007.md
+  - docs/requirements/business/REQ-006.005.md
   - >-
     docs/specifications/complete-content-management-milestone-packaging-and-verification.md
 documentation:
-  - >-
     docs/specifications/complete-content-management-milestone-packaging-and-verification.md
 ordinal: 30500
 ---
@@ -60,7 +59,7 @@ Package and verify the complete Papyrus content-management milestone (m-12): reb
 Full behavior, scope, verification matrix, assumptions, and open questions: docs/specifications/complete-content-management-milestone-packaging-and-verification.md.
 
 ## Acceptance Criteria
-- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides all implemented Papyrus commands, unified search across all record types, and browser access over all Papyrus content; Debian Trixie and other releases are not claimed or verified.
+- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides all implemented Papyrus commands, unified search across all record types, and browser access over all Papyrus content; Debian Trixie and other releases are not claimed or verified.
 - [ ] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists the full command set (init, config, task, milestone, release, req, nfr, decision, glossary, ui-spec, ui-mockup, rule, audit, tech-spec, search, browser), guarding against packaging a stale binary.
 - [ ] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [ ] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.
@@ -74,7 +73,7 @@ Full behavior, scope, verification matrix, assumptions, and open questions: docs
 - [ ] Installed-binary unified search passes across all record types: quoted phrase matches contiguously, --type doc aggregates document families while task/milestone/release/decision restrict to their store, --limit caps the combined set, --json returns the {id,type,title,path} array (and [] when empty), deprecated and archived records are hidden until restored, disabled/absent types contribute no results or error, and search performs no writes.
 - [ ] Installed-binary browser smoke tests pass with --no-open on a free port: the startup line is printed, the inventory hub renders with one card per supported type and correct counts, the sidebar lists entries in final order with aria-current, per-type lists and record views render, an edit round-trip returns 303 and persists through both the UI and the CLI, the JSON API responds, both embedded assets are served, 320 px markup hooks are present, and no served page/stylesheet/script references an external origin.
 - [ ] Cross-type ID resolution behaves correctly: an ID in exactly one category resolves, an ID in more than one category returns 500, and deprecated and unknown IDs return 404; disabled types contribute no records and no error; empty states render for missing stores.
-- [ ] Front-matter metadata projection (REQ-06.004) holds in the installed binary: list and detail views read id/title/created_date/updated_date/labels/references and type-specific keys from YAML front matter, created_date and updated_date are read-only in the browser, and a save writes changed values, refreshes updated_date, and preserves all other keys and the file body.
+- [ ] Front-matter metadata projection (REQ-006.004) holds in the installed binary: list and detail views read id/title/created_date/updated_date/labels/references and type-specific keys from YAML front matter, created_date and updated_date are read-only in the browser, and a save writes changed values, refreshes updated_date, and preserves all other keys and the file body.
 - [ ] The managed artifacts and lifecycles page (/lifecycle) and the agent skills and workflows page (/skills) render with the shared shell and sidebar in final order.
 - [ ] Lazy front-matter migration and Backlog.md round-trip hold in the installed binary: migrated records remain searchable and viewable, unsafe migrations leave the file untouched, and Backlog.md-edited task/milestone files are read and written without drift.
 - [ ] Offline operation is verified with no internet access (isolated network namespace, or documented fallback): search and browser list/view/edit checks pass using only loopback and locally served assets.

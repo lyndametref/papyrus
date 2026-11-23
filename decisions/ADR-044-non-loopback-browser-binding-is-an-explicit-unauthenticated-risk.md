@@ -5,7 +5,7 @@ created_date: '2026-11-23T11:30:42Z'
 updated_date: '2026-11-23T11:30:55Z'
 labels: []
 references:
-  - REQ-06.002
+  - REQ-006.002
   - BR-004
   - TECH-007
   - AUD-153
@@ -33,7 +33,7 @@ accepted
 8. **Code follow-up status.** Current behaviour was checked on branch `task/TASK-316`. The explicit opt-in in decision 2 is **already satisfied**: `resolve_options` in `src/browser/mod.rs` resolves CLI > environment > configuration > loopback default with no derivation, and `validate_browser_host` in `src/config.rs` validates syntax only and does not reject non-loopback hosts. A one-line startup warning also exists in `run()` at `src/browser/mod.rs` for non-loopback hosts. However, that warning's text ("the interface is reachable from the network") does not name the absence of authentication or the read/modify scope required by decision 3. A small follow-up change is therefore required, and is **not implemented by this ADR**: replace the warning text with a single line such as `warning: binding to non-loopback address <host> without authentication; anyone who can reach this port can read and modify every record`, and update the README/config reference per decision 5. No other code change is needed to enforce the opt-in rule.
 ## Context
 - **Source.** Security audit AUD-153 finding M-2: the browser server warns on a non-loopback bind but has no authentication. The host validator accepts any syntactically valid host, and there is no session or token. Correction options listed by the audit: an explicit network opt-in and/or a per-process bearer token, or a recorded accepted-risk decision.
-- **Existing contract.** REQ-06.002 and BR-004 permit a non-loopback host with a warning. TECH-007 section 9.10 already states that a non-loopback bind "warns and exposes an unauthenticated read/write interface to the network". The approved specification therefore permits the behaviour; the gap is that the risk was never recorded as an explicit architecture decision and the startup warning is weaker than the specification's statement.
+- **Existing contract.** REQ-006.002 and BR-004 permit a non-loopback host with a warning. TECH-007 section 9.10 already states that a non-loopback bind "warns and exposes an unauthenticated read/write interface to the network". The approved specification therefore permits the behaviour; the gap is that the risk was never recorded as an explicit architecture decision and the startup warning is weaker than the specification's statement.
 - **Why authentication is out of scope for 1.0.** Papyrus has no user accounts, no roles, and no multi-tenant data. A token would introduce a new dependency, credential generation and storage, token logging concerns, and a second failure mode in a tool that runs on one machine. For the documented single-user case it adds cost without changing the trust boundary.
 - **Options considered.**
   1. *Bearer token in every build* — strongest control, but adds credential handling and complexity disproportionate to a local single-user tool; deferred.

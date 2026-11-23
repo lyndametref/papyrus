@@ -16,15 +16,15 @@ references:
   - BR-005
   - BR-006
   - BR-007
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-03
-  - REQ-03.001
-  - REQ-03.002
-  - REQ-05.010
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-003
+  - REQ-003.001
+  - REQ-003.002
+  - REQ-005.010
   - TASK-2
   - TASK-7
   - TASK-8
@@ -46,24 +46,24 @@ status: draft
 ## Description
 ## Purpose
 
-Deliver the `milestone` and `release` commands so a project maintainer can create, list, view, edit, close, archive, and delete milestones, and create, list, view, edit, and close releases, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-03, REQ-03.001, and REQ-03.002, including the documented milestone/release relationship, the milestone lifecycle open -> closed -> archived (ADR-032), and the release lifecycle clarified by TASK-22. It provides the delivery containers that later tasks (TASK-9 onward) assign work to.
+Deliver the `milestone` and `release` commands so a project maintainer can create, list, view, edit, close, archive, and delete milestones, and create, list, view, edit, and close releases, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-003, REQ-003.001, and REQ-003.002, including the documented milestone/release relationship, the milestone lifecycle open -> closed -> archived (ADR-032), and the release lifecycle clarified by TASK-22. It provides the delivery containers that later tasks (TASK-9 onward) assign work to.
 
 ## Scope
 
 ### In scope
 
-- `papyrus milestone create <title> [-d <description>] [--release <id>]` (BR-006, REQ-03.001).
+- `papyrus milestone create <title> [-d <description>] [--release <id>]` (BR-006, REQ-003.001).
 - `papyrus milestone list`, `view <id>`, `edit <id> [--title <title>] [-d <description>] [--release <id>] [--no-release [<id>]]` (BR-006).
-- `papyrus milestone close <id>`, `papyrus milestone archive <id>`, and `papyrus milestone delete <id> [--force]` (BR-006, REQ-03.001, ADR-032).
-- `papyrus release create <title>`, `list`, `view <id>`, `edit <id> [--title <title>] [-d <description>]`, and `close <id>` (BR-007, REQ-03.002).
-- Milestone identity: stable IDs of the form `<milestone_prefix>-<number>` (default `MS-001`) using configured `milestone_prefix` and `id_padding` (REQ-03.001, BR-006).
-- Release identity: stable IDs of the form `<release_prefix>-<number>` (default `REL-001`) using configured `release_prefix` and `id_padding` (REQ-03.002, BR-007).
-- Relationship: a milestone is assigned to zero or one release; a release may contain multiple milestones (REQ-03, REQ-03.001, REQ-03.002, BR-006, BR-007).
-- Milestone lifecycle `open -> closed -> archived`: `close` is the only `open -> closed` transition; `archive` closes an open milestone if needed and then moves it to `backlog/archive/milestones/`, marking it `archived` (ADR-032, BR-006, REQ-03.001).
-- Release lifecycle `planned -> released`, reached only through `papyrus release close <id>`; releases are not archived and have no archive, restore, delete, or `--status` command (REQ-03.002, BR-007, ADR-0023 decision 2, `docs/specifications/release-lifecycle.md`).
-- Persistence as UTF-8 text only inside the project directory (NFR-04.001, NFR-04.002).
-- Input sanitization by normalization/escaping before use (NFR-02.002).
-- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-01.004).
+- `papyrus milestone close <id>`, `papyrus milestone archive <id>`, and `papyrus milestone delete <id> [--force]` (BR-006, REQ-003.001, ADR-032).
+- `papyrus release create <title>`, `list`, `view <id>`, `edit <id> [--title <title>] [-d <description>]`, and `close <id>` (BR-007, REQ-003.002).
+- Milestone identity: stable IDs of the form `<milestone_prefix>-<number>` (default `MS-001`) using configured `milestone_prefix` and `id_padding` (REQ-003.001, BR-006).
+- Release identity: stable IDs of the form `<release_prefix>-<number>` (default `REL-001`) using configured `release_prefix` and `id_padding` (REQ-003.002, BR-007).
+- Relationship: a milestone is assigned to zero or one release; a release may contain multiple milestones (REQ-003, REQ-003.001, REQ-003.002, BR-006, BR-007).
+- Milestone lifecycle `open -> closed -> archived`: `close` is the only `open -> closed` transition; `archive` closes an open milestone if needed and then moves it to `backlog/archive/milestones/`, marking it `archived` (ADR-032, BR-006, REQ-003.001).
+- Release lifecycle `planned -> released`, reached only through `papyrus release close <id>`; releases are not archived and have no archive, restore, delete, or `--status` command (REQ-003.002, BR-007, ADR-0023 decision 2, `docs/specifications/release-lifecycle.md`).
+- Persistence as UTF-8 text only inside the project directory (NFR-004.001, NFR-004.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
+- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-001.004).
 
 ### Out of scope
 
@@ -71,7 +71,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 - Search and browser access for milestones and releases — TASK-10 and TASK-11.
 - Packaging and verification of the backlog-discovery milestone — TASK-12.
 - Decision, glossary, UI-specification, business-rule, audit, and deployment record commands — TASK-13 onward.
-- Reopening a milestone (`closed -> open` or `archived -> closed`) or a release (`released -> planned`), bulk close, `--status` on `milestone edit` or `release edit`, milestone restore, and any release archive, restore, or release-delete behavior (BR-006, BR-007, REQ-03.001, REQ-03.002, ADR-032).
+- Reopening a milestone (`closed -> open` or `archived -> closed`) or a release (`released -> planned`), bulk close, `--status` on `milestone edit` or `release edit`, milestone restore, and any release archive, restore, or release-delete behavior (BR-006, BR-007, REQ-003.001, REQ-003.002, ADR-032).
 - UI mockups or web UI — none for this ticket; CLI output only.
 - New configuration keys beyond those already delivered by TASK-2 (`milestone_prefix`, `release_prefix`, `id_padding`, `backlog_directory`).
 
@@ -79,8 +79,8 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 
 ### 1. Project and configuration context
 
-1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
-2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
+1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-001.003, NFR-004.002).
+2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-004.002).
 3. The effective configuration supplies `milestone_prefix` (default `MS`), `release_prefix` (default `REL`), `id_padding` (default 3), and `backlog_directory` (default `backlog/`).
 4. Active milestone records (`open` or `closed`) stay in `<backlog_directory>/milestones/`; archived milestones are moved to `<backlog_directory>/archive/milestones/`. Releases stay in `<backlog_directory>/releases/`. Milestone and release state is the front-matter `status`. `<backlog_directory>/archive/milestones/` is both the milestone lifecycle archive destination and the legacy read/import location: it remains readable by view, search, and browser resolution and participates in ID allocation. `<backlog_directory>/milestones/archived/` remains a legacy read alias. No milestone restore command exists; the one-way Backlog.md import remains a writer of archived milestone records there (ADR-0011, ADR-0022, ADR-0023, ADR-032).
 
@@ -122,7 +122,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 
 #### Close
 
-1. `papyrus milestone close <id>` is the only `open -> closed` transition. It sets the front-matter `status` to `closed` and refreshes `updated_date`, preserving title, description, labels, references, release assignment, and body, and writes the milestone in place: it performs no move and creates no folder (REQ-03.001, ADR-0022 decision 5, ADR-0023 decision 2).
+1. `papyrus milestone close <id>` is the only `open -> closed` transition. It sets the front-matter `status` to `closed` and refreshes `updated_date`, preserving title, description, labels, references, release assignment, and body, and writes the milestone in place: it performs no move and creates no folder (REQ-003.001, ADR-0022 decision 5, ADR-0023 decision 2).
 2. A missing or empty front-matter `status` is read as `open`, so imported and legacy milestone records remain closable.
 3. Closing a milestone whose stored status is anything other than `open` fails with exit code 4, names the current status, and writes nothing; the file stays byte-identical.
 4. Closing an unknown ID fails with exit code 3.
@@ -175,7 +175,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 1. `papyrus release edit <id> [--title <title>] [-d <description>]` updates only the supplied fields; omitted fields retain their previous values.
 2. `--title <title>` updates the title.
 3. `-d, --description <text>` updates the description.
-4. `--status` is not provided; the only lifecycle transition is `papyrus release close <id>`. No release archive, restore, or delete command exists (REQ-03.002, BR-007).
+4. `--status` is not provided; the only lifecycle transition is `papyrus release close <id>`. No release archive, restore, or delete command exists (REQ-003.002, BR-007).
 5. Editing an unknown ID fails with exit code 3.
 
 ### 11. Releases — close
@@ -201,16 +201,16 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 
 ### 13. Persistence and sanitization
 
-1. Milestones and releases are stored as UTF-8 Markdown text files named `<ID>.md` in their respective folders (NFR-04.001).
-2. File content begins with a YAML front-matter block (REQ-05.010, ADR-0012): the general keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references` in canonical order, followed by `release` and `status` (`open`, `closed`, or `archived`) for a milestone, and `status` (`planned` or `released`) for a release (ADR-0023 decision 5, ADR-032). Milestones have no `# <ID> <title>` heading; their body contains only `## Description` (when provided). Metadata is never mirrored into sections. A write to a legacy milestone moves its value to front matter and retires the title heading and the `## Release` section (ADR-0012 decisions 4 and 5); read adoption adds the block only and leaves the legacy body byte-identical (ADR-0012 decision 9). A release keeps its `# <ID> <title>` heading and `## Description` body; `create` seeds `status: planned`.
-3. Open and closed milestones are stored in `<backlog_directory>/milestones/`; archived milestones are stored in `<backlog_directory>/archive/milestones/`. All user-controlled input (title, description, release ID, milestone ID) is sanitized by normalization/escaping before use (NFR-02.002).
-4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
-5. No reads or writes occur outside the canonicalized project directory (NFR-04.002).
-6. No binary data is written (NFR-04.001).
+1. Milestones and releases are stored as UTF-8 Markdown text files named `<ID>.md` in their respective folders (NFR-004.001).
+2. File content begins with a YAML front-matter block (REQ-005.010, ADR-0012): the general keys `id`, `title`, `created_date`, `updated_date`, `labels`, `references` in canonical order, followed by `release` and `status` (`open`, `closed`, or `archived`) for a milestone, and `status` (`planned` or `released`) for a release (ADR-0023 decision 5, ADR-032). Milestones have no `# <ID> <title>` heading; their body contains only `## Description` (when provided). Metadata is never mirrored into sections. A write to a legacy milestone moves its value to front matter and retires the title heading and the `## Release` section (ADR-0012 decisions 4 and 5); read adoption adds the block only and leaves the legacy body byte-identical (ADR-0012 decision 9). A release keeps its `# <ID> <title>` heading and `## Description` body; `create` seeds `status: planned`.
+3. Open and closed milestones are stored in `<backlog_directory>/milestones/`; archived milestones are stored in `<backlog_directory>/archive/milestones/`. All user-controlled input (title, description, release ID, milestone ID) is sanitized by normalization/escaping before use (NFR-002.002).
+4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-002.002).
+5. No reads or writes occur outside the canonicalized project directory (NFR-004.002).
+6. No binary data is written (NFR-004.001).
 
 ### 14. Common CLI controls and outcomes
 
-1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-01.004).
+1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-001.004).
 2. Missing or invalid usage (including mutually exclusive flags, missing required title) exits 2 when it is a usage error, or 4 when it is a validation error, following clap's classification.
 3. Unknown record or release ID exits 3.
 4. Filesystem/IO failure or project-directory boundary violation exits 1.
@@ -242,7 +242,7 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 - Assumption: Rust 1.99.1 via rustup and Cargo are available (ADR-0001).
 - Assumption: `init` already creates `backlog/milestones/` and `backlog/releases/`; `backlog/archive/milestones/` is created by archive or by the one-way Backlog.md import (ADR-0011, ADR-0023, ADR-032).
 - Assumption: an open or closed milestone stays in `backlog/milestones/` and remains listed; `close` rewrites `status` and `updated_date` in front matter in place. `archive` moves the file to `backlog/archive/milestones/` and marks it `archived`; archived milestones are hidden from active listings but remain viewable by ID and editable in place as legacy data. No milestone restore command exists (ADR-032).
-- Assumption: release status is stored in front matter as `planned` or `released`; `create` seeds `planned`, and only `release close` performs the fixed `planned -> released` transition (REQ-03.002, BR-007). A release is never archived.
+- Assumption: release status is stored in front matter as `planned` or `released`; `create` seeds `planned`, and only `release close` performs the fixed `planned -> released` transition (REQ-003.002, BR-007). A release is never archived.
 - Assumption: milestone `delete` prompts on standard input unless `--force` is given; in non-interactive contexts callers should pass `--force`.
 - Assumption: a milestone assigned to a missing release is reported as dangling on view rather than silently cleared.
 - Assumption: relationship data is stored only in the milestone front-matter `release` key, so releases do not need updating when milestones are created, edited, closed, archived, or deleted.
@@ -253,15 +253,15 @@ Deliver the `milestone` and `release` commands so a project maintainer can creat
 
 - OQ-1 (resolved by TASK-118): the transition is `papyrus release close <id>`; it is implemented and covered by CLI tests.
 - OQ-2 (resolved by TASK-118): `released` is a stored front-matter `status` value, not derived from milestone completion.
-- OQ-3 (resolved by ADR-032): `<backlog_directory>/archive/milestones/` is both the milestone lifecycle archive destination and the legacy read/import location. Imported and legacy archived milestone files stay readable and editable in place, and no milestone restore command exists (REQ-03.001, BR-006).
+- OQ-3 (resolved by ADR-032): `<backlog_directory>/archive/milestones/` is both the milestone lifecycle archive destination and the legacy read/import location. Imported and legacy archived milestone files stay readable and editable in place, and no milestone restore command exists (REQ-003.001, BR-006).
 - OQ-4: Whether deleting a release (not documented) should ever be supported is out of scope; if required, it needs a new requirement and command.
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-03, REQ-03.001, REQ-03.002 |
-| Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
+| Requirement | REQ-003, REQ-003.001, REQ-003.002 |
+| Non-functional | NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-006 (milestone command behavior), BR-007 (release command behavior) |
 | Specification | `docs/specifications/release-lifecycle.md` (TASK-22) |
 | Task | TASK-2, TASK-7, TASK-8, TASK-9, TASK-10, TASK-11, TASK-12, TASK-13, TASK-22, TASK-89, TASK-118, TASK-130, TASK-136, TASK-159 |

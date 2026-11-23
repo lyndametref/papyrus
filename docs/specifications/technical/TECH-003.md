@@ -8,9 +8,9 @@ references:
   - ADR-0013
   - BR-001
   - BR-007
-  - REQ-03.002
-  - REQ-05.010
-  - REQ-07.001
+  - REQ-003.002
+  - REQ-005.010
+  - REQ-007.001
   - TASK-118
   - TASK-22
   - TASK-8
@@ -21,16 +21,16 @@ status: verified
 ## Description
 ## Purpose
 
-Define the lifecycle of a Papyrus release record so that REQ-03.002, the README manpage (`papyrus(1)`), BR-007, and the CLI implementation agree. The transition described here is implemented by TASK-118.
+Define the lifecycle of a Papyrus release record so that REQ-003.002, the README manpage (`papyrus(1)`), BR-007, and the CLI implementation agree. The transition described here is implemented by TASK-118.
 
 ## Sources
 
 - `README.md`, `papyrus(1)` → COMMANDS → release (manpage release command entry).
 - `README.md`, `papyrus(1)` → STATUSES → Releases.
 - `README.md`, `papyrus(1)` → STATUSES → Milestones (for contrast).
-- `docs/requirements/business/REQ-03.002.md` — Manage Releases.
+- `docs/requirements/business/REQ-003.002.md` — Manage Releases.
 - `docs/business-rules/BR-007-release-command-behavior.md` — release command behavior.
-- `docs/requirements/business/REQ-07.001.md` — Organize Artifacts into Three Categories.
+- `docs/requirements/business/REQ-007.001.md` — Organize Artifacts into Three Categories.
 - `docs/domain-model/business-glossary/release.md` — Release term.
 - `docs/domain-model/object-model/business-object-model.md` — Release object description.
 - TASK-22 (research task), TASK-8 (initial implementation), TASK-118 (`close` transition).
@@ -47,11 +47,11 @@ The release command exposes these verbs only:
 
 No `archive`, `restore`, `delete`, or `status` command exists for releases. Release edit supports only title and description; it has no `--status` option.
 
-The lifecycle is fixed by the backlog category (REQ-07.001) at `planned -> released`, reached only through `papyrus release close <id>`. It is not configurable through `statuses` or `default_status`.
+The lifecycle is fixed by the backlog category (REQ-007.001) at `planned -> released`, reached only through `papyrus release close <id>`. It is not configurable through `statuses` or `default_status`.
 
 ## Implemented lifecycle
 
-1. **State is stored.** A release stores its lifecycle state in the front-matter `status` field (REQ-05.010). The only valid states are `planned` and `released`.
+1. **State is stored.** A release stores its lifecycle state in the front-matter `status` field (REQ-005.010). The only valid states are `planned` and `released`.
 2. **Create starts planned.** `papyrus release create <title>` writes `status: planned` after `references` in canonical front-matter order.
 3. **Close performs the transition.** `papyrus release close <id>` resolves the release, reads its current status, and on success writes `status: released`, refreshing `updated_date` while preserving title, description, labels, references, and body.
 4. **Legacy tolerance.** A missing or empty front-matter `status` is read as `planned`, so imported and legacy release records remain closable.
@@ -74,17 +74,17 @@ The lifecycle is fixed by the backlog category (REQ-07.001) at `planned -> relea
 - `src/browser/render.rs` — browser lifecycle text and command snippet.
 - `docs/specifications/milestone-and-release-management.md` — lifecycle, create, and close behavior.
 - `tests/release_close_cli.rs` — close success, preservation, rejection, JSON, and legacy-status coverage.
-- `docs/requirements/business/REQ-03.002.md`, `docs/business-rules/BR-007-release-command-behavior.md`, and `docs/requirements/business/REQ-07.001.md` already describe the implemented behavior; this specification does not modify them.
+- `docs/requirements/business/REQ-003.002.md`, `docs/business-rules/BR-007-release-command-behavior.md`, and `docs/requirements/business/REQ-007.001.md` already describe the implemented behavior; this specification does not modify them.
 
 ## Traceability
 
 | Claim | Source |
 |---|---|
 | Release commands are create/list/view/edit/close only | `README.md`, `papyrus(1)` → COMMANDS → release; BR-007 |
-| No release archive/restore/delete/status command is documented | BR-007; REQ-03.002 |
-| Release lifecycle is `planned -> released` | `README.md`, `papyrus(1)` → STATUSES → Releases; REQ-03.002; REQ-07.001; BR-007 |
-| `close` is the only transition | REQ-03.002; BR-007 |
-| Status is stored in front matter and seeded `planned` on create | REQ-05.010; TASK-118 |
+| No release archive/restore/delete/status command is documented | BR-007; REQ-003.002 |
+| Release lifecycle is `planned -> released` | `README.md`, `papyrus(1)` → STATUSES → Releases; REQ-003.002; REQ-007.001; BR-007 |
+| `close` is the only transition | REQ-003.002; BR-007 |
+| Status is stored in front matter and seeded `planned` on create | REQ-005.010; TASK-118 |
 | Missing/empty status reads as `planned`; other values are refused | TASK-118 implementation |
 | Writes use the shared atomic writer | ADR-0013; TASK-118 |
 

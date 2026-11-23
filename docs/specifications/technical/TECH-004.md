@@ -11,17 +11,17 @@ references:
   - BR-009
   - BR-010
   - NFR-001
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
   - REQ-001
   - REQ-001.001
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-05
-  - REQ-05.001
-  - REQ-05.002
-  - REQ-05.007
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-005
+  - REQ-005.001
+  - REQ-005.002
+  - REQ-005.007
   - TASK-2
   - TASK-3
   - TASK-5
@@ -34,25 +34,25 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the `req` and `nfreq` commands so a project contributor can create, list, view, edit, deprecate, and restore business requirements and non-functional requirements, including their required groups, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.001 and REQ-05.002 and the documented lifecycle in REQ-05.007.
+Deliver the `req` and `nfreq` commands so a project contributor can create, list, view, edit, deprecate, and restore business requirements and non-functional requirements, including their required groups, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-005.001 and REQ-005.002 and the documented lifecycle in REQ-005.007.
 
 ## Scope
 
 ### In scope
 
-- `papyrus req create <title> [--title <title>] [--story <text>] [-d <description>] --group <id>` (BR-009, REQ-05.001).
-- `papyrus req create-group --title <title> [--story <text>] [-d <description>]` (BR-009, REQ-05.001).
+- `papyrus req create <title> [--title <title>] [--story <text>] [-d <description>] --group <id>` (BR-009, REQ-005.001).
+- `papyrus req create-group --title <title> [--story <text>] [-d <description>]` (BR-009, REQ-005.001).
 - `papyrus req list`, `view <id>`, `edit <id> [--title <title>] [--story <text>] [-d <description>] [--editor]`, `deprecate <id>`, `restore <id>` (BR-009).
-- `papyrus nfreq create <title> [-d <description>] --group <id>` (BR-010, REQ-05.002).
-- `papyrus nfreq create-group --title <title> [-d <description>]` (BR-010, REQ-05.002).
+- `papyrus nfreq create <title> [-d <description>] --group <id>` (BR-010, REQ-005.002).
+- `papyrus nfreq create-group --title <title> [-d <description>]` (BR-010, REQ-005.002).
 - `papyrus nfreq list`, `view <id>`, `edit <id> [--title <title>] [-d <description>] [--editor]`, `deprecate <id>`, `restore <id>` (BR-010).
-- Requirement-to-group cardinality `1..1`: a requirement is created only with a required group, belongs to exactly one group, and a group contains requirements of one type only (REQ-05.001, REQ-05.002, BR-009, BR-010).
-- Stable requirement IDs that are preserved across deprecation and restoration (REQ-05.001, REQ-05.002, REQ-05.007).
-- Deprecation moving a requirement to its type's `deprecated/` subfolder and hiding it from lists, search, and the web UI (REQ-05.001, REQ-05.002, REQ-05.007, BR-009, BR-010).
-- Restoration returning a deprecated requirement to its original folder with the same ID (REQ-05.001, REQ-05.002, REQ-05.007, BR-009, BR-010).
-- Persistence as UTF-8 text only inside the project directory (NFR-04.001, NFR-04.002).
-- Input sanitization by normalization/escaping before use (NFR-02.002).
-- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-01.004).
+- Requirement-to-group cardinality `1..1`: a requirement is created only with a required group, belongs to exactly one group, and a group contains requirements of one type only (REQ-005.001, REQ-005.002, BR-009, BR-010).
+- Stable requirement IDs that are preserved across deprecation and restoration (REQ-005.001, REQ-005.002, REQ-005.007).
+- Deprecation moving a requirement to its type's `deprecated/` subfolder and hiding it from lists, search, and the web UI (REQ-005.001, REQ-005.002, REQ-005.007, BR-009, BR-010).
+- Restoration returning a deprecated requirement to its original folder with the same ID (REQ-005.001, REQ-005.002, REQ-005.007, BR-009, BR-010).
+- Persistence as UTF-8 text only inside the project directory (NFR-004.001, NFR-004.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
+- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-001.004).
 
 ### Out of scope
 
@@ -67,8 +67,8 @@ Deliver the `req` and `nfreq` commands so a project contributor can create, list
 
 ### 1. Project and configuration context
 
-1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
-2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
+1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-001.003, NFR-004.002).
+2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-004.002).
 3. The effective configuration supplies `document_types.req.prefix` (default `REQ`), `document_types.req.directory` (default `requirements/business/`), and the corresponding `nfr` entries, plus `id_padding` and `doc_directory`.
 
 ### 2. Groups
@@ -78,7 +78,7 @@ Deliver the `req` and `nfreq` commands so a project contributor can create, list
 3. A group is persisted as a text file in its type's configured directory, using a generated ID of the form `<prefix>-<number>` (for example `REQ-001`, `NFR-001`), padded to `id_padding` digits.
 4. The next group number is one greater than the highest existing group number found in both the active and `deprecated/` folders for that type, so IDs are not reused.
 5. A group has a title (required), and the optional user story and/or description provided by the command.
-6. A group contains requirements of its own type only; mixing types is not permitted (REQ-05.001, REQ-05.002).
+6. A group contains requirements of its own type only; mixing types is not permitted (REQ-005.001, REQ-005.002).
 7. Group creation prints the generated group ID (and, in `--json` mode, returns it as JSON).
 
 ### 3. Requirements
@@ -115,8 +115,8 @@ Deliver the `req` and `nfreq` commands so a project contributor can create, list
 
 1. `papyrus req deprecate <id>` moves the business requirement file into `requirements/business/deprecated/`.
 2. `papyrus nfreq deprecate <id>` moves the non-functional requirement file into `requirements/non-functional/deprecated/`.
-3. Deprecated requirements are hidden from `list`, search, and the web UI (REQ-05.001, REQ-05.002, REQ-05.007).
-4. `restore <id>` moves a deprecated requirement back to its original folder and preserves its ID (REQ-05.001, REQ-05.002, REQ-05.007).
+3. Deprecated requirements are hidden from `list`, search, and the web UI (REQ-005.001, REQ-005.002, REQ-005.007).
+4. `restore <id>` moves a deprecated requirement back to its original folder and preserves its ID (REQ-005.001, REQ-005.002, REQ-005.007).
 5. Deprecating or restoring an already-deprecated/active requirement respectively is a validation error (exit code 4) OR a no-op success; this ticket specifies it as a validation error to avoid silent state changes. (Assumption.)
 6. A group itself may be deprecated; deprecating a group does not automatically deprecate its requirements. (Assumption.)
 7. Deprecating a requirement does not change its group membership or ID.
@@ -125,14 +125,14 @@ Deliver the `req` and `nfreq` commands so a project contributor can create, list
 
 1. Every requirement and group is stored as a UTF-8 Markdown text file named `<ID>.md` in its type's configured directory (or `deprecated/` when deprecated).
 2. File content follows the repository's existing requirement-file style, excluding the `Criticality` section and any fields not supported by the documented command options: a top-level heading `# <ID> <title>`, then `## User Story` (when provided), `## Group` (for requirements, recording the owning group ID and title), and `## Description` (when provided). Empty optional fields are omitted.
-3. All user-controlled input (title, user story, description, group ID) is sanitized by normalization/escaping before use (NFR-02.002).
-4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
-5. No reads or writes occur outside the canonicalized project directory, except none for this ticket (init remains the sole exception, delivered by TASK-2) (NFR-04.002).
-6. No binary data is written (NFR-04.001).
+3. All user-controlled input (title, user story, description, group ID) is sanitized by normalization/escaping before use (NFR-002.002).
+4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-002.002).
+5. No reads or writes occur outside the canonicalized project directory, except none for this ticket (init remains the sole exception, delivered by TASK-2) (NFR-004.002).
+6. No binary data is written (NFR-004.001).
 
 ### 8. Common CLI controls and outcomes
 
-1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-01.004).
+1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-001.004).
 2. Missing or invalid usage (including missing `--group`, conflicting title sources) exits 2 when it is a usage error, or 4 when it is a validation error, following clap's classification for missing required arguments.
 3. Unknown record or group ID exits 3.
 4. Filesystem/IO failure or project-directory boundary violation exits 1.
@@ -179,8 +179,8 @@ Deliver the `req` and `nfreq` commands so a project contributor can create, list
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.001, REQ-05.002, REQ-05.007 |
-| Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
+| Requirement | REQ-005, REQ-005.001, REQ-005.002, REQ-005.007 |
+| Non-functional | NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-009 (req), BR-010 (nfreq) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-3 |

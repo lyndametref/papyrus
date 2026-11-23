@@ -19,7 +19,7 @@ dependencies:
   - TASK-111
 documentation:
   - docs/packaging.md
-  - docs/requirements/business/REQ-07.003.md
+  - docs/requirements/business/REQ-007.003.md
   - >-
     docs/specifications/config-defined-document-types-verification-and-packaging.md
   - docs/release-1.0-upgrade-notes.md
@@ -31,7 +31,7 @@ ordinal: 41110
 ## Description
 Verification and packaging gate for m-17. Twelve completed tasks (TASK-105 to TASK-116) each tested their own slice; this task proves the combined document-type change works across the CLI, search, the browser, an upgrade from a pre-change configuration, and the installed Debian package, and that the no-drift rules hold. **Verification only: do not change product behaviour, source, requirements, business rules, ADRs, README, or upgrade notes.** A defect is recorded with a disposition (follow-up, accepted risk, or release blocker), not fixed here.
 
-**Canonical plan:** `docs/specifications/config-defined-document-types-verification-and-packaging.md`. Requirements: REQ-07.001–07.004, REQ-05.007, REQ-05.010, REQ-05.011, REQ-06.014, REQ-01.004, NFR-03.002/03.003/04.002/05.001. Rules: BR-001, BR-016. ADRs: 0016, 0017, 0019, 0020, 0021 (Proposed), 0022, 0023, 0024.
+**Canonical plan:** `docs/specifications/config-defined-document-types-verification-and-packaging.md`. Requirements: REQ-007.001–07.004, REQ-005.007, REQ-005.010, REQ-005.011, REQ-006.014, REQ-001.004, NFR-003.002/03.003/04.002/05.001. Rules: BR-001, BR-016. ADRs: 0016, 0017, 0019, 0020, 0021 (Proposed), 0022, 0023, 0024.
 
 ## Scope (in)
 
@@ -48,7 +48,7 @@ Verification and packaging gate for m-17. Twelve completed tasks (TASK-105 to TA
 
 - Any product/source edit; any edit to `README.md`, `docs/release-1.0-upgrade-notes.md`, `docs/requirements/**`, `docs/business-rules/**`, `docs/architecture/**`, or `scripts/build-deb.sh`.
 - Re-testing every per-feature contract already authoritative in `tests/browser_config_types_cli.rs`, `tests/search_config_types_cli.rs`, `tests/config_list_keys_cli.rs`, `tests/cli_dispatch.rs`, and unit modules.
-- New UI mockups; man-page sources or a generator; any NFR-03.003 claim for config-defined slugs (ADR-0021 stays Proposed).
+- New UI mockups; man-page sources or a generator; any NFR-003.003 claim for config-defined slugs (ADR-0021 stays Proposed).
 - Debian releases other than Forky, architectures other than amd64, real-GUI browser runs, and a version bump.
 
 ## CLI matrix (run against `target/release/papyrus`, then the installed binary)
@@ -72,7 +72,7 @@ Fixture: user-added `note` type (`prefix: NOTE`, `directory: notes/`, `statuses:
 - C-25 `config set`/`unset` repair validates before write; invalid merge exits 4 and leaves the file byte-identical.
 - C-26 `init --force` rewrites the eleven defaults and commands work again.
 
-`--dir`, `--config`, and `--json` apply exactly as REQ-01.004 defines.
+`--dir`, `--config`, and `--json` apply exactly as REQ-001.004 defines.
 
 ## Browser matrix (HTTP only; `browser --no-open --port <free>`)
 
@@ -109,7 +109,7 @@ Fixture: user-added `note` type (`prefix: NOTE`, `directory: notes/`, `statuses:
 4. Installed binary `root:root` 0755, on isolated `PATH`, prints version.
 5. With the installed binary: create a project, declare `note` by editing config only, run create/list/view/status/archive/delete/search; `--help` lists `note`. No rebuild, no other installed file.
 6. Inside `unshare -rn` (loopback up), outbound TCP fails while `papyrus --help` and `papyrus note --help` succeed.
-7. Do not assert a man page for config-defined slugs; record the NFR-03.003 risk/ADR-0021 status.
+7. Do not assert a man page for config-defined slugs; record the NFR-003.003 risk/ADR-0021 status.
 8. `dpkg -r` removes the binary; `dpkg --purge` removes the admin entry and leaves no papyrus file; delete isolated roots.
 
 ## No-drift checks (new `tests/document_type_no_drift.rs`)
@@ -127,10 +127,10 @@ Fixture: user-added `note` type (`prefix: NOTE`, `directory: notes/`, `statuses:
 
 - **G-1** `config set` cannot bootstrap a new type (TASK-116 note 2): single field write fails validation and nothing is written; mapping values refused. Verify the documented direct-edit workaround and that the error names the missing field. Default: accepted limitation; follow-up only if the error is unclear. Not release-blocking.
 - **G-2** Upgrade notes line 148 says task IDs allocate from "active, archived, and deprecated locations". Verify allocation reads only active + archived and record the wording discrepancy; do not edit the notes. Default: docs finding; not release-blocking.
-- **G-3** README Milestones says `active -> archived`, but `src/registry.rs` `MILESTONE_STATES` is `["open","closed"]` and REQ-05.010 fixes `open`/`closed`. Verify shipped behaviour; record stale wording. Default: README finding; not release-blocking for this gate.
+- **G-3** README Milestones says `active -> archived`, but `src/registry.rs` `MILESTONE_STATES` is `["open","closed"]` and REQ-005.010 fixes `open`/`closed`. Verify shipped behaviour; record stale wording. Default: README finding; not release-blocking for this gate.
 - **G-4** `config list` omits `document_types.<slug>.default_status` (`src/config.rs` flattened). Verify `config get`, `config set/unset` validation, and the documented repair path. Default: release-blocking only if an invalid `default_status` cannot be inspected or repaired; otherwise follow-up for TASK-111's owner.
 - **G-5** BR-007 documents `papyrus release close` as the only `planned -> released` transition, but `src/release.rs` has no `Close` variant and the command exits 2; browser text also differs. Default: release-blocking for the m-17 gate unless a follow-up code task is opened or the owner accepts amending BR-007. Record only.
-- **G-6** Limitations: no real-GUI browser run; Forky amd64 only; no man page for config-defined slugs (NFR-03.003 gap); packaging script does not force a rebuild (mitigate by building first and asserting `--help`).
+- **G-6** Limitations: no real-GUI browser run; Forky amd64 only; no man page for config-defined slugs (NFR-003.003 gap); packaging script does not force a rebuild (mitigate by building first and asserting `--help`).
 
 ## Evidence
 
@@ -159,7 +159,7 @@ TASK-105 to TASK-116 are completed (Backlog graph); TASK-117 is the only remaini
 - [x] The CLI matrix (C-01..C-26) is executed and recorded: `--help` lists enabled slugs; `<slug> --help` lists baseline verbs plus type extensions; unknown, disabled, `nfreq`, and undeclared `deploy` exit 2; `--json` is accepted on every document verb; exit codes 0/1/2/3/4 are each observed; `status ... archived` exits 4 and names `archive`; delete prompts without `--force` and skips it with `--force`.
 - [x] The browser matrix (B-01..B-19) is executed over HTTP: `/?type=note` list, `/doc/NOTE-001` detail, edit round trip with 303, read-only status, filter offering exactly active/review/approved plus 400 rejection of archived/bogus/wrong-case/empty/duplicate, archived/unknown identical 404, disabled invisibility with the lifecycle page still listing the entry, `/api/docs/note` shape, assets, and offline loopback.
 - [x] The upgrade scenario starts from a pre-change configuration with `req`, `deploy`, and a `deprecated/` folder; follows the documented repair and migration steps; and ends with no `nfreq`, no static command assumption, no `deprecated/` read, and a working `papyrus deploy` command from configuration alone, with the fixture unchanged outside intentional edits.
-- [x] The Debian package is built from a fresh release build, its metadata/contents and SHA-256 are recorded, it installs in an isolated dpkg root, the installed binary runs `papyrus note ...` and `papyrus --help` offline with `note` listed, no man page is asserted for config-defined slugs, the NFR-03.003 risk is recorded, and uninstall/purge leave the host unchanged.
+- [x] The Debian package is built from a fresh release build, its metadata/contents and SHA-256 are recorded, it installs in an isolated dpkg root, the installed binary runs `papyrus note ...` and `papyrus --help` offline with `note` listed, no man page is asserted for config-defined slugs, the NFR-003.003 risk is recorded, and uninstall/purge leave the host unchanged.
 - [x] `tests/document_type_no_drift.rs` fails the suite on any D-01..D-07 pattern (literal `deprecated/` in `src/`, `nfreq` command, document `deprecate`/`restore` variants, static per-type command list, slug-literal behaviour dispatch outside the type module/registry, stale per-type inventory or `deprecated/` mention in README/upgrade notes/business rules, static inventory in the config-type specs), with the documented historical exclusions.
 - [x] Each carried gap G-1 to G-5 is reproduced or refuted with command output, assigned a severity and an owner, and given a disposition (accepted limitation, follow-up, or release blocker); G-6 limitations are recorded; no gap is fixed by editing source or documents in this task.
 - [x] `docs/packaging.md` contains a TASK-117 section with date/timezone, environment, isolation, test counts, quality gates, package name/size/SHA-256, install/offline/removal results, findings, and limitations; the ticket notes carry the matrices, upgrade transcript, no-drift result, and an explicit `release-ready: yes|no` statement with any blockers.
@@ -237,7 +237,7 @@ Release readiness: **release-ready: no** — blocking gap **G-5** (release `clos
 - Isolated `fakeroot dpkg --instdir/--admindir` install exit 0; installed file root:root 0755/0644; installed binary prints `papyrus 0.1.0`.
 - Installed binary: declare note by editing config only; `--help` lists note; create/list/view/status/archive/delete/search pass. No rebuild, no other installed file.
 - Offline `unshare -rn` (loopback up): outbound TCP fails; `--help`, `note --help`, `note list`, browser list/detail/edit/API/assets succeed.
-- No man page asserted for config-defined slugs (NFR-03.003 gap; ADR-0021 Proposed). `dpkg -r` removes both files; `--purge` removes the admin entry; host `dpkg -l papyrus` unchanged before/after.
+- No man page asserted for config-defined slugs (NFR-003.003 gap; ADR-0021 Proposed). `dpkg -r` removes both files; `--purge` removes the admin entry; host `dpkg -l papyrus` unchanged before/after.
 - No-drift D-01..D-07 PASS including scanner self-test and historical exclusions.
 
 ### Findings / dispositions
@@ -246,7 +246,7 @@ Release readiness: **release-ready: no** — blocking gap **G-5** (release `clos
 - G-3 Low, README owner: README says milestones active->archived; registry is open/closed and shipped milestones carry no status; archive moves the file. Stale wording.
 - G-4 Medium, TASK-111 owner: `config list` omits document_types.<slug>.default_status; `config get` returns it and `config set` repairs an invalid value. Follow-up, not blocking.
 - G-5 High, release owner/BR-007 owner: `papyrus release close REL-001` exits 2 because `ReleaseCmd` has no Close variant; browser lifecycle text names a non-existent `papyrus release status <id> released`. Planned->released is unreachable. **Release-blocking.**
-- F-117-1 Low, REQ-01.004/TASK-110 owner: `sanitize_name` rejects NUL/CR/LF/path separators but accepts TAB 0x09 and 0x01 in titles. Follow-up input-validation hardening; not blocking.
+- F-117-1 Low, REQ-001.004/TASK-110 owner: `sanitize_name` rejects NUL/CR/LF/path separators but accepts TAB 0x09 and 0x01 in titles. Follow-up input-validation hardening; not blocking.
 - G-6 limitations recorded: no real-GUI run; Forky amd64 only; no man page for config-defined slugs; packaging script does not force a rebuild (build first and assert --help); `dpkg -r` removes both files so `--purge` reports already removed.
 
 
@@ -276,4 +276,4 @@ F-117-1 (low): closed by TASK-123 — sanitize_name/sanitize_path_string now rej
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-End-to-end verification complete: 789 tests pass (0 failed, 22 ignored) including new release_document_types_smoke (8) and document_type_no_drift (8); CLI matrix C-01..C-26 and browser matrix B-01..B-19 executed; upgrade scenario from a pre-change config with req/deploy/deprecated works; Debian package built (1,284,160 bytes, SHA-256 6028cc9e...4486d), installed in isolation, run offline, removed; no man page for config-defined slugs and NFR-03.003 recorded as a gap. Evidence in docs/packaging.md and ticket notes. release-ready: no — G-5 (papyrus release close missing, BR-007 documents it) is release-blocking; G-1/G-2/G-3/F-117-1 low, G-4 medium, G-6 limitations recorded.
+End-to-end verification complete: 789 tests pass (0 failed, 22 ignored) including new release_document_types_smoke (8) and document_type_no_drift (8); CLI matrix C-01..C-26 and browser matrix B-01..B-19 executed; upgrade scenario from a pre-change config with req/deploy/deprecated works; Debian package built (1,284,160 bytes, SHA-256 6028cc9e...4486d), installed in isolation, run offline, removed; no man page for config-defined slugs and NFR-003.003 recorded as a gap. Evidence in docs/packaging.md and ticket notes. release-ready: no — G-5 (papyrus release close missing, BR-007 documents it) is release-blocking; G-1/G-2/G-3/F-117-1 low, G-4 medium, G-6 limitations recorded.

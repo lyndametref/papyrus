@@ -13,14 +13,12 @@ dependencies:
   - TASK-064
   - TASK-065
 references:
-  - docs/requirements/non-functional/NFR-04.003.md
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/business/REQ-05.010.md
+  - docs/requirements/non-functional/NFR-004.003.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/business/REQ-005.010.md
   - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
 documentation:
   - docs/specifications/verify-backlog-md-round-trip-interoperability.md
@@ -31,7 +29,7 @@ ordinal: 30085
 
 
 ## Description
-Empirically verify NFR-04.003: Papyrus task and milestone files remain readable, listable, and updatable by Backlog.md in both directions, including translated identity (REQ-01.005) and the additive milestone general keys and release (REQ-05.010), on newly created records and on records migrated lazily on first read and on first write from both input shapes. This is the Backlog.md round-trip gate and a verification task only: no new product behavior is added. Scope, procedure, acceptance criteria, and blocker recording are defined in docs/specifications/verify-backlog-md-round-trip-interoperability.md. Verification uses a scratch project under ./.tmp/ and read-only checks against the repository backlog; any defect found is recorded as a blocker with exact command and output and is not resolved by this ticket.
+Empirically verify NFR-004.003: Papyrus task and milestone files remain readable, listable, and updatable by Backlog.md in both directions, including translated identity (REQ-001.005) and the additive milestone general keys and release (REQ-005.010), on newly created records and on records migrated lazily on first read and on first write from both input shapes. This is the Backlog.md round-trip gate and a verification task only: no new product behavior is added. Scope, procedure, acceptance criteria, and blocker recording are defined in docs/specifications/verify-backlog-md-round-trip-interoperability.md. Verification uses a scratch project under ./.tmp/ and read-only checks against the repository backlog; any defect found is recorded as a blocker with exact command and output and is not resolved by this ticket.
 
 ## Acceptance Criteria
 - [ ] Verification evidence shows a Backlog.md-created task is listed by Papyrus under its translated display ID and papyrus task view <ID> resolves with matching title, status, assignee, labels, milestone, dependencies, references, documentation, type, and ordinal (or any mismatch is recorded as a blocker).

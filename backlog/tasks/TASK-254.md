@@ -6,7 +6,7 @@ updated_date: '2026-11-22T13:02:37Z'
 labels: []
 references:
   - ADR-036
-  - REQ-07.003
+  - REQ-007.003
   - TECH-070
   - ADR-042
 status: Done

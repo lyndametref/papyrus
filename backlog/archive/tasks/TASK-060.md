@@ -14,18 +14,15 @@ dependencies:
   - TASK-058
   - TASK-059
 references:
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/non-functional/NFR-04.003.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/non-functional/NFR-004.003.md
   - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
 documentation:
-  - >-
     docs/specifications/expose-front-matter-metadata-options-on-all-record-commands.md
 priority: high
 type: feature
@@ -34,7 +31,7 @@ ordinal: 30030
 
 
 ## Description
-Expose create and update options for every front-matter field except id, created_date, and updated_date on all managed record commands, with automatic timestamps, ordinal defaulting, and patch-preserving writes (REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.003; ADR-0007, ADR-0008, ADR-0009).
+Expose create and update options for every front-matter field except id, created_date, and updated_date on all managed record commands, with automatic timestamps, ordinal defaulting, and patch-preserving writes (REQ-005.010, REQ-005.011, REQ-006.004, NFR-004.003; ADR-0007, ADR-0008, ADR-0009).
 
 Managed record types: task, milestone, release, decision, business requirement, non-functional requirement, glossary term, UI specification, technical specification, business rule, and audit record. General fields on every type: title, labels, references. Type-specific fields: task status, assignee (list), milestone, dependencies, ordinal, documentation, type; milestone release; decision superseded_by; audit type.
 
@@ -56,7 +53,7 @@ Open questions: whether list fields should gain replace/remove variants; whether
 - [ ] A browser save of a metadata-backed field writes the new value to front matter, preserves the remaining fields and body, keeps created_date and updated_date read-only, and does not refresh updated_date on a no-op save.
 - [ ] Timestamps are quoted ISO-8601 UTC strings of the form 'YYYY-MM-DDTHH:MM:SSZ'.
 - [ ] Tests assert option coverage per type, timestamp behavior, ordinal defaults, and field preservation, including no-op byte identity.
-- [ ] Task and milestone files created or edited with the new options remain readable, listable, and updatable by Backlog.md, including additive keys (NFR-04.003).
+- [ ] Task and milestone files created or edited with the new options remain readable, listable, and updatable by Backlog.md, including additive keys (NFR-004.003).
 
 ## Definition of Done
 - [ ] #1 cargo test passes for the record module, affected command modules, and integration tests.

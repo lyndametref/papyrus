@@ -26,7 +26,7 @@
     <div class="wf-box wf-ticket">
       <h2 class="wf-section-title">Ticket</h2>
       <p><strong>TASK-114</strong> — Serve registry-derived browser views for every enabled document type</p>
-      <p class="wf-note">Sources: REQ-06.014, REQ-06.003, REQ-05.011, REQ-05.007, REQ-07.001, REQ-07.002; ADR-0020, ADR-0017; docs/specifications/ui/browser-technical-specifications-ui.md; docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md; MOCK-0001, MOCK-0009, MOCK-0010, MOCK-0014 (shell and lifecycle patterns).</p>
+      <p class="wf-note">Sources: REQ-006.014, REQ-006.003, REQ-005.011, REQ-005.007, REQ-007.001, REQ-007.002; ADR-0020, ADR-0017; docs/specifications/ui/browser-technical-specifications-ui.md; docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md; MOCK-0001, MOCK-0009, MOCK-0010, MOCK-0014 (shell and lifecycle patterns).</p>
       <p class="wf-note"><strong>Revision 2026-11-14</strong> — status filter corrected: the select has no <code>All</code>/empty-value option. It lists only the filterable statuses plus a disabled, default-selected <code>Status</code> placeholder; an untouched submit sends no <code>status</code>, <code>Show all</code> is the only reset, and an explicit empty <code>status=</code> is rejected with <code>400</code>.</p>
     </div>
 
@@ -367,12 +367,12 @@
 
 Confirm the test suite, the documentation indexes, and the browser mockup registry are current. Record the result in the release task.</p>
 
-            <p class="wf-note">Status is display-only in the browser (REQ-05.011). The record is stored in <code>docs/notes/</code> with the <code>NOTE</code> prefix. Archived notes are not reachable: an archived address and an unknown address return the same 404 page.</p>
+            <p class="wf-note">Status is display-only in the browser (REQ-005.011). The record is stored in <code>docs/notes/</code> with the <code>NOTE</code> prefix. Archived notes are not reachable: an archived address and an unknown address return the same 404 page.</p>
 
             <details style="margin-top:12px">
               <summary>References (2)</summary>
               <ul>
-                <li>REQ-05.014</li>
+                <li>REQ-005.014</li>
                 <li>TASK-117</li>
               </ul>
             </details>
@@ -468,7 +468,7 @@ Confirm the test suite, the documentation indexes, and the browser mockup regist
               <div class="wf-box" aria-label="References">
                 <p class="wf-label" style="font-size:13px;color:var(--wf-fg);font-weight:600">References</p>
                 <div class="wf-row" style="margin-bottom:6px">
-                  <div class="wf-col"><label class="wf-label" for="edit-reference-1">Reference 1</label><input class="wf-input" id="edit-reference-1" name="references" type="text" value="REQ-05.014"></div>
+                  <div class="wf-col"><label class="wf-label" for="edit-reference-1">Reference 1</label><input class="wf-input" id="edit-reference-1" name="references" type="text" value="REQ-005.014"></div>
                   <button class="wf-button" type="button" style="align-self:flex-end">Remove</button>
                 </div>
                 <div class="wf-row" style="margin-bottom:6px">
@@ -478,7 +478,7 @@ Confirm the test suite, the documentation indexes, and the browser mockup regist
                 <button class="wf-button" type="button">Add reference</button>
               </div>
 
-              <p class="wf-note">No status field is drawn: status is lifecycle- and configuration-owned and cannot be edited in the browser (REQ-05.011). A save that carried a status value is rejected as an unknown field.</p>
+              <p class="wf-note">No status field is drawn: status is lifecycle- and configuration-owned and cannot be edited in the browser (REQ-005.011). A save that carried a status value is rejected as an unknown field.</p>
               <p class="wf-note">Hidden field: version (optimistic-concurrency token) — not shown to the user.</p>
               <input type="hidden" name="version" value="2026-11-14T09:30:00Z">
 
@@ -580,7 +580,7 @@ Confirm the test suite, the documentation indexes, and the browser mockup regist
               <div class="wf-box" aria-label="References">
                 <p class="wf-label" style="font-size:13px;color:var(--wf-fg);font-weight:600">References</p>
                 <div class="wf-row" style="margin-bottom:6px">
-                  <div class="wf-col"><label class="wf-label" for="err-reference-1">Reference 1</label><input class="wf-input" id="err-reference-1" name="references" type="text" value="REQ-05.014"></div>
+                  <div class="wf-col"><label class="wf-label" for="err-reference-1">Reference 1</label><input class="wf-input" id="err-reference-1" name="references" type="text" value="REQ-005.014"></div>
                   <button class="wf-button" type="button" style="align-self:flex-end">Remove</button>
                 </div>
                 <button class="wf-button" type="button">Add reference</button>
@@ -652,7 +652,7 @@ Confirm the test suite, the documentation indexes, and the browser mockup regist
               <p><strong>Title:</strong> Release checklist</p>
               <p><strong>Description:</strong> Checks to run before tagging a release. Confirm the test suite and the documentation indexes are current.</p>
               <p><strong>Labels:</strong> <span class="wf-badge">release</span> <span class="wf-badge">process</span></p>
-              <p><strong>References:</strong> REQ-05.014, TASK-117</p>
+              <p><strong>References:</strong> REQ-005.014, TASK-117</p>
             </div>
             <p class="wf-note">Reloading fetches the current record and a fresh version token. No merge is offered. Status is not part of this form and is not affected by the conflict.</p>
           </main>

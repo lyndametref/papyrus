@@ -464,7 +464,7 @@ fn browser_and_cli_metadata_parity() {
     let row = &row[..row.find("</tr>").unwrap()];
     assert!(row.contains(&format!("<td class=\"created-cell\">{created}</td>")));
     assert!(row.contains(&format!("<td class=\"updated-cell\">{updated}</td>")));
-    // Labels and references render in the Title cell for parity (REQ-06.004).
+    // Labels and references render in the Title cell for parity (REQ-006.004).
     assert!(row.contains("<ul class=\"row-tags\"><li class=\"tag\">parity</li></ul>"));
     assert!(row.contains("<ul class=\"row-refs\"><li>PARITY-REF-1</li></ul>"));
     // Every action carries a record-specific accessible name.

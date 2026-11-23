@@ -10,14 +10,14 @@ milestone: MS-003
 dependencies:
   - TASK-008
 references:
-  - docs/requirements/business/REQ-02.md
-  - docs/requirements/business/REQ-02.001.md
-  - docs/requirements/business/REQ-02.002.md
-  - docs/requirements/business/REQ-02.003.md
-  - docs/requirements/business/REQ-02.004.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-002.md
+  - docs/requirements/business/REQ-002.001.md
+  - docs/requirements/business/REQ-002.002.md
+  - docs/requirements/business/REQ-002.003.md
+  - docs/requirements/business/REQ-002.004.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-005-task-command-behavior.md
   - docs/specifications/task-management.md
 ordinal: 9000
@@ -25,7 +25,7 @@ ordinal: 9000
 
 
 ## Description
-Implement `papyrus task` commands (create, list, view, edit, archive, restore, delete) per REQ-02/REQ-02.001-004 and BR-005, with stable task IDs, configurable workflow status, task-to-milestone assignment, dependencies, labels, assignee, acceptance criteria, comments, filtering, sorting, watch mode, archive/restore/delete lifecycle, and UTF-8 text persistence inside the project directory.
+Implement `papyrus task` commands (create, list, view, edit, archive, restore, delete) per REQ-002/REQ-002.001-004 and BR-005, with stable task IDs, configurable workflow status, task-to-milestone assignment, dependencies, labels, assignee, acceptance criteria, comments, filtering, sorting, watch mode, archive/restore/delete lifecycle, and UTF-8 text persistence inside the project directory.
 
 Scope and behavior are defined in docs/specifications/task-management.md. CLI contract is BR-005 (verbatim manpage excerpt). Task records are stored under `<backlog_directory>/tasks/` (active) and `<backlog_directory>/tasks/archived/` (archived).
 
@@ -52,4 +52,4 @@ Assumptions: see specification Assumptions section. Open questions: see specific
 
 
 ## Notes
-Quality review (gatekeeper): Ready to close. All AC #1-#8 pass; DoD pass. cargo build, cargo test (5/5 task_cli, 41 total), clippy -D warnings, fmt --check all pass. Scope: src/task.rs, src/lib.rs, tests/task_cli.rs, spec doc. NFR-02.002/NFR-04.001/NFR-04.002 addressed.
+Quality review (gatekeeper): Ready to close. All AC #1-#8 pass; DoD pass. cargo build, cargo test (5/5 task_cli, 41 total), clippy -D warnings, fmt --check all pass. Scope: src/task.rs, src/lib.rs, tests/task_cli.rs, spec doc. NFR-002.002/NFR-004.001/NFR-004.002 addressed.

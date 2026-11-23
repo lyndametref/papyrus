@@ -11,9 +11,9 @@ dependencies:
   - TASK-013
   - TASK-010
 references:
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-04.001.md
-  - docs/requirements/business/REQ-04.002.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-004.001.md
+  - docs/requirements/business/REQ-004.002.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-008-decision-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -24,7 +24,7 @@ ordinal: 15000
 
 
 ## Description
-Extend the unified search command so decision records are searched alongside task, milestone, release, and doc records. Decision records live in the configured decision_directory (default decisions/), outside the backlog store; only active records of enabled decision types are searched. Query matching, quoted-phrase handling, type filters, ordering, result limits, text/JSON output, boundary enforcement, sanitization, and the read-only guarantee are reused unchanged from search-requirements.md and search-tasks-milestones-and-releases.md. Implements REQ-06.001 under REQ-04/REQ-04.001/REQ-04.002 and advances BR-015, BR-008, BR-016.
+Extend the unified search command so decision records are searched alongside task, milestone, release, and doc records. Decision records live in the configured decision_directory (default decisions/), outside the backlog store; only active records of enabled decision types are searched. Query matching, quoted-phrase handling, type filters, ordering, result limits, text/JSON output, boundary enforcement, sanitization, and the read-only guarantee are reused unchanged from search-requirements.md and search-tasks-milestones-and-releases.md. Implements REQ-006.001 under REQ-004/REQ-004.001/REQ-004.002 and advances BR-015, BR-008, BR-016.
 
 ## Acceptance Criteria
 - [ ] papyrus search includes active decision records by default, alongside task, milestone, release, and doc records.

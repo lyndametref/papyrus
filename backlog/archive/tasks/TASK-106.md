@@ -12,13 +12,13 @@ milestone: MS-018
 dependencies:
   - TASK-104
 references:
-  - REQ-01.002
-  - REQ-07.002
+  - REQ-001.002
+  - REQ-007.002
   - ADR-0019
   - ADR-0024
 documentation:
   - docs/architecture/adr/ADR-0024-list-valued-configuration-keys.md
-  - docs/requirements/business/REQ-01.002.md
+  - docs/requirements/business/REQ-001.002.md
   - docs/specifications/project-initialization-and-configuration.md
 priority: high
 ordinal: 41050
@@ -26,7 +26,7 @@ ordinal: 41050
 
 
 ## Description
-**Why.** `config set` currently parses every value as a YAML scalar and rejects any sequence, so the list-valued keys — the top-level task `statuses` and each `document_types.<slug>.statuses` — cannot be written through the documented configuration surface. They can only be introduced by hand-editing `papyrus.config.yml`, which contradicts REQ-01.002/REQ-07.002 and leaves the ADR-0019 repair path incomplete for the keys most likely to be invalid.
+**Why.** `config set` currently parses every value as a YAML scalar and rejects any sequence, so the list-valued keys — the top-level task `statuses` and each `document_types.<slug>.statuses` — cannot be written through the documented configuration surface. They can only be introduced by hand-editing `papyrus.config.yml`, which contradicts REQ-001.002/REQ-007.002 and leaves the ADR-0019 repair path incomplete for the keys most likely to be invalid.
 
 **What.** Add one list-key classification and a comma-separated value form. `config set` classifies the key first (never the value), splits the raw value on commas, trims each element, rejects an empty value or empty element with exit 4 naming the key, stores the result as a YAML flow sequence, validates the resulting configuration with the existing ADR-0019 validator, and writes only when valid. `config get` and `config list` render the same flow form in declared order. Scalar keys keep their current scalar semantics, where a comma is ordinary data. `config unset` is unchanged. No escaping, quote interpretation, new flags, or browser list editor are added (ADR-0024).
 
@@ -48,7 +48,7 @@ ordinal: 41050
 **Assumptions.**
 
 - An element that is empty after trimming is rejected rather than dropped; otherwise `a,,b` would persist an empty task status as valid data.
-- A list element containing a newline or other control character is rejected (exit 4), because a single-line flow sequence cannot represent it unambiguously (NFR-02.002).
+- A list element containing a newline or other control character is rejected (exit 4), because a single-line flow sequence cannot represent it unambiguously (NFR-002.002).
 - Flow rendering is `[a, b]` (brackets, comma, single space), matching the existing top-level `statuses` rendering in `config list`.
 - `config get` on a document `statuses` key that is not declared remains `key not found` (exit 3); unset means "no declaration", and the effective document model falls back to `active`/`archived`.
 - Setting `document_types.<slug>.statuses` for an entry without `prefix`/`directory` is refused by the existing validator; fields are not auto-filled.
@@ -79,7 +79,7 @@ ordinal: 41050
 ## Implementation Notes
 ## Implementation plan
 
-Authority: ADR-0024 (accepted), ADR-0019, REQ-01.002, REQ-07.002, and the TASK-111 revision of `docs/specifications/project-initialization-and-configuration.md`.
+Authority: ADR-0024 (accepted), ADR-0019, REQ-001.002, REQ-007.002, and the TASK-111 revision of `docs/specifications/project-initialization-and-configuration.md`.
 
 ### 1. List-key classification (`src/config.rs`)
 

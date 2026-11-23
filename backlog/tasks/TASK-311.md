@@ -7,7 +7,7 @@ labels: []
 references:
   - ADR-039
   - TECH-068
-  - REQ-06.014
+  - REQ-006.014
   - TECH-040
   - AUD-144
   - TC-184
@@ -42,7 +42,7 @@ Current code in `src/browser/mod.rs` has per-type document branches in `record_j
 - Do not change routes, status codes, transport, headers, caching, the on-disk layout, or the API aliases; add no dependency, asset, template, client script, or configuration key.
 
 ## Grounding
-ADR-039 decisions 10-13, 17, 22-28, and 35; TECH-068 sections 5 and 7; TECH-040 section 7; REQ-06.014; MS-035 AC-2 and AC-7; AUD-144; TC-184; `tests/fixtures/characterization/corpus/`; `tests/characterization_replay.rs`; `src/browser/mod.rs`; `src/browser/records.rs`; `src/record/view.rs`.
+ADR-039 decisions 10-13, 17, 22-28, and 35; TECH-068 sections 5 and 7; TECH-040 section 7; REQ-006.014; MS-035 AC-2 and AC-7; AUD-144; TC-184; `tests/fixtures/characterization/corpus/`; `tests/characterization_replay.rs`; `src/browser/mod.rs`; `src/browser/records.rs`; `src/record/view.rs`.
 
 ## Definition of done
 `record_json`, `api_doc_list`, `api_get`, and `api_post` no longer inspect a document `TypedHandler`; every document `payload.json` and the `api-post-success` and `api-post-conflict` cases replay byte-for-byte; `/api/requirements` keeps its shape selected by document model and role; no document slug dispatch exists in the JSON path; the full suite, clippy -D warnings, and fmt are clean; evidence records the corpus cases and the deleted JSON branches.

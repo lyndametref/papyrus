@@ -11,14 +11,14 @@ references:
   - ADR-0036
   - ADR-0039
   - BR-001
-  - NFR-04.004
-  - REQ-01.004
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - NFR-004.004
+  - REQ-001.004
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
 status: verified
 ---
 # TECH-042 Expose Front-Matter Metadata Options on All Record Commands

@@ -15,7 +15,7 @@ status: active
 
 ## Rationale
 
-Based on REQ-05.004 — Manage UI Specifications, REQ-07.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-07.002 — Configure Document Types and Slugs, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because a UI specification is the plainest generated document type: it adds a view association and nothing else, so its whole command surface — verbs, field options, help order, storage headings, and list rendering — must be reconstructed from the seed descriptor, and it must keep accepting a create that supplies only a title, without gaining a verb, a lifecycle, or a type-specific module of its own.
+Based on REQ-005.004 — Manage UI Specifications, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, REQ-007.002 — Configure Document Types and Slugs, and REQ-005.007 — Manage Document Archive State and Deletion, this rule exists because a UI specification is the plainest generated document type: it adds a view association and nothing else, so its whole command surface — verbs, field options, help order, storage headings, and list rendering — must be reconstructed from the seed descriptor, and it must keep accepting a create that supplies only a title, without gaining a verb, a lifecycle, or a type-specific module of its own.
 
 ## Applicability
 

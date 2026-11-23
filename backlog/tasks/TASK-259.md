@@ -8,7 +8,7 @@ references:
   - ADR-036
   - TECH-070
   - TECH-066
-  - REQ-07.004
+  - REQ-007.004
   - ADR-042
 status: Done
 assignee:
@@ -49,7 +49,7 @@ The engine and field-derived command metadata (TASK-255), grouped and mockup sur
 The eight document ops builders and the document `TypedHandler` variants are retained. TASK-269 deletes them with the remaining per-type browser branches after TASK-266 lands the generic edit form and form_post. See the note on TASK-269.
 
 ## Grounding
-ADR-036 decisions 8, 28, and 35 and downstream constraints 1 and 6; ADR-042 (browser dependency deferral); TECH-070 sections 2, 4, and 7; TECH-066; REQ-07.004.
+ADR-036 decisions 8, 28, and 35 and downstream constraints 1 and 6; ADR-042 (browser dependency deferral); TECH-070 sections 2, 4, and 7; TECH-066; REQ-007.004.
 
 ## Definition of done
 The nine modules and the transitional document CLI verb tables are gone; `ui_mockup.rs` remains; the eight document ops builders and the document `TypedHandler` variants are retained and their deletion is recorded on MS-035 TASK-269; no document behavior is lost; the no-drift guards are updated; the full build, tests, clippy, and fmt are clean; backlog and decision behavior is unchanged.

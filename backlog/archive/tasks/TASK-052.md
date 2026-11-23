@@ -14,15 +14,15 @@ dependencies:
   - TASK-053
   - TASK-015
 references:
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/business-rules/BR-017-tech-spec-command-behavior.md
@@ -37,12 +37,7 @@ references:
   - >-
     docs/specifications/ui/mockups/MOCK-0009-browser-technical-specifications-review.html
 documentation:
-  - docs/specifications/browser-technical-specifications.md
-  - docs/specifications/ui/browser-technical-specifications-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0009-browser-technical-specifications-review.html
-  - docs/specifications/browser-requirements.md
-  - docs/specifications/technical-specifications-management.md
 priority: medium
 type: feature
 ordinal: 29200
@@ -88,10 +83,10 @@ ASSUMPTIONS
 - Assumption: both title and description are required in the browser per MOCK-0009, technical-specifications-management.md, and BR-017; an on-disk record with an empty description is viewable as (none) but must be completed before saving.
 - Assumption: the browser description is multi-line and preserves LF; the CLI --description remains single-line and --editor remains the CLI route for multi-line bodies.
 - Assumption: browser validation reuses the baseline limits (title 1-200, text 20000) for consistency with other browser document types; MOCK-0009 does not draw length help text.
-- Assumption: deprecated specifications are hidden and unreachable, consistent with REQ-05.007/BR-017 and every other document type.
+- Assumption: deprecated specifications are hidden and unreachable, consistent with REQ-005.007/BR-017 and every other document type.
 - Assumption: a disabled or missing tech-spec type contributes no records and no error; the sidebar entry is omitted and ?type=tech-spec renders the empty state.
 - Assumption: technical specifications expose no structured NFR/task reference fields; such IDs remain literal text.
-- Assumption: real-browser verification (NFR-05.001) is a deferred follow-up, consistent with sibling tickets.
+- Assumption: real-browser verification (NFR-005.001) is a deferred follow-up, consistent with sibling tickets.
 - Assumption: no new dependencies, crates, or ADRs.
 
 OPEN QUESTIONS
@@ -120,7 +115,7 @@ REFERENCES FOR CONTEXT/RATIONALE
 - Search: docs/specifications/search-technical-specifications.md (TASK-56)
 - UI description: docs/specifications/ui/browser-technical-specifications-ui.md
 - MOCK-0009: docs/specifications/ui/mockups/MOCK-0009-browser-technical-specifications-review.html (registry approved)
-- Requirements: REQ-05.009, REQ-05.007, REQ-06.002; NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001; BR-004, BR-016, BR-017
+- Requirements: REQ-005.009, REQ-005.007, REQ-006.002; NFR-001.002, NFR-001.003, NFR-002.002, NFR-004.001, NFR-004.002, NFR-005.001; BR-004, BR-016, BR-017
 
 ## Acceptance Criteria
 - [x] Category and navigation: GET /?type=tech-spec renders the Technical Specifications list; the default category stays req and any other value returns 400; the sidebar shows "Technical Specifications" immediately after "Audit Records" (before Non-functional requirements) with aria-current="page" when selected, and the entry is omitted when document_types.tech-spec.enabled is false.

@@ -7,7 +7,7 @@ labels: []
 references:
   - AUD-107
   - AUD-108
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
   - ADR-034
   - TC-033

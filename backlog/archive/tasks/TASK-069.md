@@ -11,8 +11,8 @@ labels:
 milestone: MS-013
 dependencies: []
 references:
-  - docs/requirements/business/REQ-01.007.md
-  - docs/requirements/business/REQ-01.005.md
+  - docs/requirements/business/REQ-001.007.md
+  - docs/requirements/business/REQ-001.005.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
   - >-
@@ -24,7 +24,7 @@ ordinal: 30005
 
 
 ## Description
-Constrain the `id_padding` configuration key to 1-6 (inclusive) per REQ-01.007, REQ-01.005, and BR-016. Currently `Config::validate()` only rejects 0. This task tightens validation and confirms ID formatting treats padding as a minimum width.
+Constrain the `id_padding` configuration key to 1-6 (inclusive) per REQ-001.007, REQ-001.005, and BR-016. Currently `Config::validate()` only rejects 0. This task tightens validation and confirms ID formatting treats padding as a minimum width.
 
 In scope:
 - `Config::validate()` (src/config.rs) rejects `id_padding` < 1 or > 6 with a key-prefixed message (`id_padding: must be between 1 and 6`).

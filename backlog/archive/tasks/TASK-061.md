@@ -13,25 +13,20 @@ milestone: MS-013
 dependencies:
   - TASK-054
 references:
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
   - docs/specifications/browser-tasks-milestones-and-releases.md
   - docs/specifications/ui/mockups/README.md
   - >-
     docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html
   - docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md
-  - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
   - docs/specifications/browser-requirements.md
 documentation:
-  - docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html
-  - docs/specifications/ui/mockups/README.md
 priority: medium
 type: task
 ordinal: 41621
@@ -39,7 +34,7 @@ ordinal: 41621
 
 
 ## Description
-Design review for the browser changes required by REQ-06.004 (front-matter metadata in CLI and browser views) and REQ-06.003 (managed-artifact lifecycle browser page), under REQ-05.010/05.011 (YAML front matter and its maintenance). This ticket delivers the UI review package and its UI description, not implementation. Implementation is tracked by TASK-67 (metadata projection in CLI/browser views) and TASK-72 (lifecycle page).
+Design review for the browser changes required by REQ-006.004 (front-matter metadata in CLI and browser views) and REQ-006.003 (managed-artifact lifecycle browser page), under REQ-005.010/05.011 (YAML front matter and its maintenance). This ticket delivers the UI review package and its UI description, not implementation. Implementation is tracked by TASK-67 (metadata projection in CLI/browser views) and TASK-72 (lifecycle page).
 
 Scope:
 - Part A - Front-matter metadata display: review list, detail, and edit views for managed record types showing at least id, title, created_date, updated_date, labels, references, and type-specific keys. Timestamps are read-only in edit forms; the editable field set is unchanged; metadata edits target front matter, not body sections.
@@ -52,7 +47,7 @@ Out of scope: browser/CLI implementation (TASK-67, TASK-72), packaging (TASK-20)
 - [ ] The review package covers list, detail, and edit views for managed record types, showing at least id, title, created_date, updated_date, labels, references, and type-specific keys.
 - [ ] Edit forms keep the current editable field set; created_date and updated_date are read-only; metadata edits target front matter, not body sections.
 - [ ] A lifecycle page prototype has one section for each fixed record type and shows task states from configured statuses and documented lifecycles for other types.
-- [ ] UI descriptions for the changed list/detail/edit views and the lifecycle page reference REQ-06.003 and REQ-06.004.
+- [ ] UI descriptions for the changed list/detail/edit views and the lifecycle page reference REQ-006.003 and REQ-006.004.
 - [ ] The mockup is registered in the mockup registry and marked approved only after explicit user approval.
 - [ ] The review package is self-contained, clickable, and consistent with the approved MOCK-0001 shell and navigation.
 - [ ] The lifecycle page excludes Backlog.md docs, drafts, and project configuration files.

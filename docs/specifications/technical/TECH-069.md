@@ -23,23 +23,23 @@ references:
   - ADR-0039
   - BR-001
   - BR-016
-  - NFR-03.002
-  - NFR-03.003
-  - NFR-04.002
-  - NFR-05.001
+  - NFR-003.002
+  - NFR-003.003
+  - NFR-004.002
+  - NFR-005.001
   - NFR-007.001
   - NFR-007.003
-  - REQ-01.004
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-06.014
-  - REQ-06.018
-  - REQ-06.019
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-001.004
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-006.014
+  - REQ-006.018
+  - REQ-006.019
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
   - ADR-043
 status: verified
 ---
@@ -169,7 +169,7 @@ installed binary. A user-added type named `note` is declared in
 | C-25 | Repair via `config set`/`config unset` | valid merged configuration writes; invalid merged configuration exits `4` and leaves the file byte-identical |
 | C-26 | `init --force` on the broken project | rewrites the eleven minimal seed entries; commands work again |
 
-`--json` is accepted before or after the subcommand exactly as REQ-01.004
+`--json` is accepted before or after the subcommand exactly as REQ-001.004
 defines, and `--dir`/`--config` apply to every row.
 
 ### 4. Browser matrix

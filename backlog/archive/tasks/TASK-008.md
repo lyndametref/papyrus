@@ -11,12 +11,12 @@ dependencies:
   - TASK-007
   - TASK-022
 references:
-  - docs/requirements/business/REQ-03.md
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-03.002.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-003.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-003.002.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-006-milestone-command-behavior.md
   - docs/business-rules/BR-007-release-command-behavior.md
   - docs/specifications/milestone-and-release-management.md
@@ -26,7 +26,7 @@ ordinal: 8000
 
 
 ## Description
-Deliver the `papyrus milestone` and `papyrus release` commands so a project maintainer can create, list, view, edit, archive, and delete milestones, and create, list, view, and edit releases, with stable IDs and text-file persistence inside the project directory. This implements REQ-03, REQ-03.001, and REQ-03.002, including the documented milestone/release relationship and the release lifecycle clarified by TASK-22. Milestones provide delivery containers that TASK-9 (tasks) and later tickets assign work to.
+Deliver the `papyrus milestone` and `papyrus release` commands so a project maintainer can create, list, view, edit, archive, and delete milestones, and create, list, view, and edit releases, with stable IDs and text-file persistence inside the project directory. This implements REQ-003, REQ-003.001, and REQ-003.002, including the documented milestone/release relationship and the release lifecycle clarified by TASK-22. Milestones provide delivery containers that TASK-9 (tasks) and later tickets assign work to.
 
 ## Acceptance Criteria
 - [ ] Users can create, list, view, and edit milestones with title, description, and optional release assignment using the documented flags; generated IDs follow the configured prefix and padding (default MS-001).
@@ -60,4 +60,4 @@ Deliver the `papyrus milestone` and `papyrus release` commands so a project main
 
 
 ## Notes
-Quality review (gatekeeper): Ready to close. All AC #1-#10 pass; DoD #2-#5 pass. cargo build --release, cargo test (milestone_cli 3/3 + all suites), clippy -D warnings, fmt --check all pass on Rust 1.99.1. Scope: only src/milestone.rs, src/release.rs, src/lib.rs, tests/milestone_cli.rs, spec doc. NFR-02.002/NFR-04.001/NFR-04.002 addressed. Open items: release create -d flag vs docs mismatch; branch divergence from feedback-collection (resolved at merge).
+Quality review (gatekeeper): Ready to close. All AC #1-#10 pass; DoD #2-#5 pass. cargo build --release, cargo test (milestone_cli 3/3 + all suites), clippy -D warnings, fmt --check all pass on Rust 1.99.1. Scope: only src/milestone.rs, src/release.rs, src/lib.rs, tests/milestone_cli.rs, spec doc. NFR-002.002/NFR-004.001/NFR-004.002 addressed. Open items: release create -d flag vs docs mismatch; branch divergence from feedback-collection (resolved at merge).

@@ -13,13 +13,12 @@ dependencies:
   - TASK-033
 references:
   - docs/specifications/search-ui-specifications.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-05.004.md
-  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-005.004.md
+  - docs/requirements/business/REQ-005.007.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
 documentation:
-  - docs/specifications/search-ui-specifications.md
 priority: medium
 type: task
 ordinal: 24100

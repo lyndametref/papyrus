@@ -7,9 +7,9 @@ labels:
   - bug
 references:
   - RE-001
-  - NFR-04.003
-  - REQ-05.010
-  - REQ-05.011
+  - NFR-004.003
+  - REQ-005.010
+  - REQ-005.011
 status: Done
 assignee:
   - rust-dev

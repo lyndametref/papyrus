@@ -11,24 +11,24 @@ references:
   - MOCK-0001
   - MOCK-0013
   - MOCK-0014
-  - REQ-01.002
-  - REQ-01.003
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - REQ-001.002
+  - REQ-001.003
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-86
   - TASK-87
   - TASK-93
   - TASK-94
   - TASK-95
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
@@ -39,7 +39,7 @@ status: draft
 ## Description
 ## Purpose
 
-Produce the approved clickable UI review package that the browser implementation tasks (TASK-93, TASK-94, TASK-95) must follow for the revised browser contract introduced by REQ-06.003 and REQ-06.006 through REQ-06.012: an editable configuration view, a consistent single record view layout, curated per-artifact descriptions with read-only configuration on the lifecycle page, non-functional requirement grouping under owning groups, shared header branding, record references as links, and a concise glossary landing page. The package is created under TASK-87 and approved by the user before any implementation starts; no browser task may invent layout or skip the approval gate.
+Produce the approved clickable UI review package that the browser implementation tasks (TASK-93, TASK-94, TASK-95) must follow for the revised browser contract introduced by REQ-006.003 and REQ-006.006 through REQ-006.012: an editable configuration view, a consistent single record view layout, curated per-artifact descriptions with read-only configuration on the lifecycle page, non-functional requirement grouping under owning groups, shared header branding, record references as links, and a concise glossary landing page. The package is created under TASK-87 and approved by the user before any implementation starts; no browser task may invent layout or skip the approval gate.
 
 This ticket is UI design work only. It does not change requirements, business rules, specifications, or implementation code. The revised browser contract is already specified in `docs/specifications/browser-requirements.md` (§4a–§4d, §10a), `docs/specifications/browser-managed-artifacts-and-lifecycles.md` (§4a), and `docs/specifications/browser-glossary-terms.md` (§3a), produced by TASK-86.
 
@@ -82,7 +82,7 @@ This ticket is UI design work only. It does not change requirements, business ru
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-06.002, REQ-01.002, REQ-01.003 |
+| Requirement | REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012, REQ-006.002, REQ-001.002, REQ-001.003 |
 | ADR | ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-86 (prerequisite), TASK-87, downstream TASK-93, TASK-94, TASK-95 |
 | UI mockups | MOCK-0014 (approved) — `docs/specifications/ui/mockups/MOCK-0014-browser-configuration-view-single-record-layout-and-lifecycle-configuration-review.html` |
@@ -109,4 +109,4 @@ This ticket is UI design work only. It does not change requirements, business ru
 
 - `docs/specifications/ui/mockups/validate_mockups.sh` reports no errors for MOCK-0014.
 - Registry entry status is `approved` (explicitly approved by the user on 2026-11-12 (UTC), TASK-87).
-- Every REQ-06.003 / REQ-06.006–REQ-06.012 surface listed in [Surfaces](#surfaces) is represented in the prototype and UI description.
+- Every REQ-006.003 / REQ-006.006–REQ-006.012 surface listed in [Surfaces](#surfaces) is represented in the prototype and UI description.

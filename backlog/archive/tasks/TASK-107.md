@@ -13,18 +13,18 @@ dependencies:
   - TASK-100
   - TASK-104
 references:
-  - REQ-07.002
-  - REQ-01.006
-  - REQ-07.001
-  - REQ-05.008
-  - REQ-01.001
+  - REQ-007.002
+  - REQ-001.006
+  - REQ-007.001
+  - REQ-005.008
+  - REQ-001.001
   - ADR-0019
   - ADR-0024
 documentation:
   - docs/specifications/project-initialization-and-configuration.md
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-01.006.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-001.006.md
   - >-
     docs/architecture/adr/ADR-0019-fail-closed-document-type-configuration-validation.md
 priority: high
@@ -33,13 +33,13 @@ ordinal: 41060
 
 
 ## Description
-**Why.** `Config::default()` still seeds the removed `deploy` document type, so every generated configuration and every configuration that relies on the default document-type map (a file with no `document_types` key) offers a type REQ-07.002 removed from the default set. The generated configuration also declares no `statuses` for the default document types, so the document status model stays implicit (`active`/`archived` fallback in the descriptor) instead of the declared, inspectable and editable vocabulary REQ-07.001 requires. `papyrus init` is the surface that writes the default set (REQ-07.002), and its interactive walkthrough (REQ-01.006) must offer exactly that set and disable entries from it.
+**Why.** `Config::default()` still seeds the removed `deploy` document type, so every generated configuration and every configuration that relies on the default document-type map (a file with no `document_types` key) offers a type REQ-007.002 removed from the default set. The generated configuration also declares no `statuses` for the default document types, so the document status model stays implicit (`active`/`archived` fallback in the descriptor) instead of the declared, inspectable and editable vocabulary REQ-007.001 requires. `papyrus init` is the surface that writes the default set (REQ-007.002), and its interactive walkthrough (REQ-001.006) must offer exactly that set and disable entries from it.
 
 **What changes.**
 
 - `Config::default()` document set: remove `deploy`; keep the other eleven entries with their current prefixes and directories (`req`/`REQ`/`requirements/business/`, `nfr`/`NFR`/`requirements/non-functional/`, `glossary`/`GLO`/`glossary/`, `rule`/`RUL`/`business-rules/`, `ui-spec`/`UI`/`specifications/ui/`, `ui-mockup`/`MOCK`/`specifications/ui/mockups/`, `audit`/`AUD`/`audit-records/`, `tech-spec`/`TECH`/`technical/`, `use-case`/`UC`/`use-cases/`, `test-case`/`TC`/`test-cases/`, `test-report`/`TR`/`test-reports/`).
 - Seed `statuses: [active, archived]` in that order on every front-matter-backed default entry: `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`.
-- `ui-mockup` keeps no `statuses` declaration (a `statuses` key on it is invalid configuration, REQ-05.008).
+- `ui-mockup` keeps no `statuses` declaration (a `statuses` key on it is invalid configuration, REQ-005.008).
 - No default entry declares `default_status`; new records start at the effective default `active`.
 - `init`'s selectable document list drops `deploy` (eleven entries); core artifacts task/milestone/release and decision types `adr`/`bdr` are unchanged.
 - `init` persists the generated configuration through the existing `config::to_config_yaml` renderer introduced by TASK-111, so seeded lists are written as flow sequences `[active, archived]` (the same form `config set` writes and `config get`/`config list` print), not as block sequences.

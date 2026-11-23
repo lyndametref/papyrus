@@ -131,8 +131,8 @@ pub fn managed_descriptor(
 
 /// Canonical numeric key of a native stem for a descriptor family.
 ///
-/// Dotted document IDs keep every numeric component, so `REQ-01.001` and
-/// `REQ-01.002` remain distinct.
+/// Dotted document IDs keep every numeric component, so `REQ-001.001` and
+/// `REQ-001.002` remain distinct.
 fn stem_key(desc: &RecordDescriptor, cfg: &crate::config::Config, stem: &str) -> Option<String> {
     desc.configured_prefixes(cfg)
         .iter()

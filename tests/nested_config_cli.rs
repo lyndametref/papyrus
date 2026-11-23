@@ -226,7 +226,7 @@ fn fill_and_replace_follow_the_seed_rules() {
     let list = project.ok(&["config", "list"]);
     assert!(
         list.contains("document_types.req.prefix: REQ"),
-        "an undeclared seed slug stays effective (REQ-01.002, TC-114): {list}"
+        "an undeclared seed slug stays effective (REQ-001.002, TC-114): {list}"
     );
     assert!(
         list.contains("document_types.req.statuses: [active, archived]"),

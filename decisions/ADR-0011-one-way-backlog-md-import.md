@@ -16,15 +16,15 @@ accepted
 
 ## Context
 
-NFR-04.004 requires Papyrus to stop maintaining file-level interoperability with Backlog.md and, instead, to offer a one-way script that imports Backlog.md backlog records. Scope is fixed by the requirement: tasks and milestones are imported; Backlog.md `docs`, `drafts` and `decisions` are out of scope. Imported records receive Papyrus IDs (REQ-01.005) and are written in the Papyrus record format with the front matter of REQ-05.010. REQ-05.011 confirms that no read or write path may adopt a Backlog.md storage ID or re-shape a record into the Backlog.md layout, so the import is the only entry point for such data.
+NFR-004.004 requires Papyrus to stop maintaining file-level interoperability with Backlog.md and, instead, to offer a one-way script that imports Backlog.md backlog records. Scope is fixed by the requirement: tasks and milestones are imported; Backlog.md `docs`, `drafts` and `decisions` are out of scope. Imported records receive Papyrus IDs (REQ-001.005) and are written in the Papyrus record format with the front matter of REQ-005.010. REQ-005.011 confirms that no read or write path may adopt a Backlog.md storage ID or re-shape a record into the Backlog.md layout, so the import is the only entry point for such data.
 
-NFR-04.004 records two open questions that this ADR must answer: **collision handling when an existing Papyrus record has the same number or title**, and implicitly the contractual behaviour of the import itself (what it reads, what it writes, how it reports). ADR-0010 fixes the destination: native `<ID>.md` records with a single Papyrus ID space, `<backlog_directory>/archive/<family>/` for archived records, and no recognition of Backlog storage stems. ADR-0013 fixes that every write goes through the shared record writer.
+NFR-004.004 records two open questions that this ADR must answer: **collision handling when an existing Papyrus record has the same number or title**, and implicitly the contractual behaviour of the import itself (what it reads, what it writes, how it reports). ADR-0010 fixes the destination: native `<ID>.md` records with a single Papyrus ID space, `<backlog_directory>/archive/<family>/` for archived records, and no recognition of Backlog storage stems. ADR-0013 fixes that every write goes through the shared record writer.
 
-Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation); no second ID space and no persisted ID mapping; never destructive on either side; deterministic, reviewable allocation; partial metadata (Backlog has no release, no Papyrus `release` key on milestones); status vocabularies differ (`To Do` versus `ToDo`); a single write path with atomic writes; and NFR-04.002 containment for both the source read and the destination write.
+Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation); no second ID space and no persisted ID mapping; never destructive on either side; deterministic, reviewable allocation; partial metadata (Backlog has no release, no Papyrus `release` key on milestones); status vocabularies differ (`To Do` versus `ToDo`); a single write path with atomic writes; and NFR-004.002 containment for both the source read and the destination write.
 
 ## Decision
 
-1. **Delivery shape (confirmed by the user on 2026-11-11).** The import is the dedicated CLI command `papyrus import backlog`, implemented inside the single crate (ADR-0004, ADR-0005) and using the shared record reader, descriptor, and writer (ADR-0013). No second parser and no second writer may exist for Backlog.md files. An optional convenience shell entry point (for example `scripts/import-backlog.sh`) MAY be provided, but it must only forward arguments to the CLI command and contain no import logic. This satisfies NFR-04.004's "one-way script" without creating an independent writer.
+1. **Delivery shape (confirmed by the user on 2026-11-11).** The import is the dedicated CLI command `papyrus import backlog`, implemented inside the single crate (ADR-0004, ADR-0005) and using the shared record reader, descriptor, and writer (ADR-0013). No second parser and no second writer may exist for Backlog.md files. An optional convenience shell entry point (for example `scripts/import-backlog.sh`) MAY be provided, but it must only forward arguments to the CLI command and contain no import logic. This satisfies NFR-004.004's "one-way script" without creating an independent writer.
 
 2. **Invocation and inputs.**
 
@@ -33,12 +33,12 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
                           [--dry-run] [--allow-existing] [--report <path>]
    ```
 
-   - The target project is selected per REQ-01.003 (`--dir`, `PAPYRUS_DIR`, cwd) and must have a `papyrus.config.yml`; otherwise the command fails as a runtime error (REQ-01.003, REQ-01.004).
+   - The target project is selected per REQ-001.003 (`--dir`, `PAPYRUS_DIR`, cwd) and must have a `papyrus.config.yml`; otherwise the command fails as a runtime error (REQ-001.003, REQ-001.004).
    - `--from` names the Backlog.md project root; `--source-backlog-dir` defaults to `<from>/backlog` for projects that do not use the default folder name.
    - `--dry-run` performs phase 1 and phase 2 fully and prints the plan and report without writing anything.
    - `--allow-existing` is required when the target already holds any record of a family being imported; without it the command refuses before writing (see decision 7).
-   - `--report <path>` writes the same report to a path inside the project directory only; a path outside is a validation error (NFR-04.002). The report is diagnostic output, never a machine-readable store that later commands consult.
-   - Exit codes follow REQ-01.004: `0` when every in-scope source record was imported (or planned, for a dry run); `1` runtime/validation failure; import with skipped records exits non-zero and the summary lists them.
+   - `--report <path>` writes the same report to a path inside the project directory only; a path outside is a validation error (NFR-004.002). The report is diagnostic output, never a machine-readable store that later commands consult.
+   - Exit codes follow REQ-001.004: `0` when every in-scope source record was imported (or planned, for a dry run); `1` runtime/validation failure; import with skipped records exits non-zero and the summary lists them.
 
 3. **Source scope.**
 
@@ -48,7 +48,7 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
    | `backlog/archive/tasks/*.md` | Imported as archived tasks |
    | `backlog/milestones/*.md` | Imported as milestones |
    | `backlog/archive/milestones/*.md` | Imported as archived milestones |
-   | `backlog/docs/**`, `backlog/drafts/**`, `backlog/archive/drafts/**`, `backlog/decisions/**` | Not read as records; counted and reported as excluded by NFR-04.004 |
+   | `backlog/docs/**`, `backlog/drafts/**`, `backlog/archive/drafts/**`, `backlog/decisions/**` | Not read as records; counted and reported as excluded by NFR-004.004 |
    | `backlog/config.yml`, `backlog/.locks/**` | Source metadata only; never written; the source status vocabulary and prefixes may be read to interpret the source |
 
    Only `.md` files whose stem matches the source family's storage form (`<prefix>-<number>`, optionally followed by ` - <slug>`) are candidates. Anything else in a source directory is reported as skipped. Files outside the source backlog directory and outside `backlog/archive/` are never read.
@@ -59,7 +59,7 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
    - Ties, duplicate source numbers and unparseable source numbers are ordered by source path and reported as source anomalies.
    - Phase 2 resolves every reference against the completed plan, and validates statuses, timestamps and destinations.
    - Phase 3 writes. The plan is computed once, so a failed write can never shift a later number.
-   - The plan is printed by both a dry run and a real import. It is the only record of the source→Papyrus mapping: **no mapping file, sidecar, marker key, or extra front-matter field is written**, because that would be the parallel ID space NFR-04.004 and REQ-01.005 forbid. The source ID is not persisted in the imported record.
+   - The plan is printed by both a dry run and a real import. It is the only record of the source→Papyrus mapping: **no mapping file, sidecar, marker key, or extra front-matter field is written**, because that would be the parallel ID space NFR-004.004 and REQ-001.005 forbid. The source ID is not persisted in the imported record.
 
 5. **Field mapping and content preservation.**
 
@@ -80,7 +80,7 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
    | other source keys | any remaining key (`priority`, …) | Preserved verbatim, so no metadata is lost and no source key-set validation exists |
    | `release` (milestones) | none | Not written. Backlog.md has no release and Papyrus does not infer one from milestone names |
 
-   Timestamps are normalized to the quoted ISO-8601 UTC form of REQ-05.010; a source value in another format is replaced by the import time and reported.
+   Timestamps are normalized to the quoted ISO-8601 UTC form of REQ-005.010; a source value in another format is replaced by the import time and reported.
 
 6. **Body mapping.** Backlog.md marker sections are converted to the record's native section layout, preserving content:
 
@@ -93,7 +93,7 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
    | `SECTION:NOTES` | `## Notes` |
    | `COMMENTS` | `## Comments` |
 
-   Marker comment lines are removed. Unknown sections, free text, and any content outside a recognized marker block are appended verbatim in file order, so nothing is discarded. Milestone bodies keep a single `## Description` with the source text verbatim. Tasks acquire no `# <ID> <title>` heading (REQ-05.010). Archived source records are written to the archived destination directory.
+   Marker comment lines are removed. Unknown sections, free text, and any content outside a recognized marker block are appended verbatim in file order, so nothing is discarded. Milestone bodies keep a single `## Description` with the source text verbatim. Tasks acquire no `# <ID> <title>` heading (REQ-005.010). Archived source records are written to the archived destination directory.
 
 7. **Collision and duplicate handling.**
 
@@ -108,11 +108,11 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
 
    The import never overwrites, deletes, renumbers, or merges an existing Papyrus record.
 
-8. **One-way and non-idempotent by design.** The import is a one-time bridge per source store. A second run against the same source allocates new numbers and therefore duplicates records; this is documented, and `--dry-run` plus the same-title report are the review mechanisms. No marker, lock file, import registry, or source-state database is created. Nothing in the import is bidirectional: the source is opened read-only, and Papyrus never regenerates Backlog.md files afterwards (NFR-04.004).
+8. **One-way and non-idempotent by design.** The import is a one-time bridge per source store. A second run against the same source allocates new numbers and therefore duplicates records; this is documented, and `--dry-run` plus the same-title report are the review mechanisms. No marker, lock file, import registry, or source-state database is created. Nothing in the import is bidirectional: the source is opened read-only, and Papyrus never regenerates Backlog.md files afterwards (NFR-004.004).
 
 9. **Shipment coupling with the native layout (confirmed by the user on 2026-11-11).** The import command ships in the same release as ADR-0010's native layout, and that release's upgrade notes document the one-time import: the affected source directories, the command to run, that IDs and milestone numbers are reallocated (ADR-0010 decision 5), that the source store must be kept until the import is verified, and that after import Papyrus owns the records. The import may be delivered earlier, but it may not be delivered later than the layout switch, because the layout switch hides records that have not been imported (ADR-0010 decision 11, ADR-0013 stage constraint).
 
-10. **Security and containment.** Source paths are resolved and checked for existence and readability; destination paths go through `Context::ensure_within` before any write (NFR-04.002). Symlinked records whose real path escapes either root are refused. No source content is echoed into logs beyond the reported titles and paths.
+10. **Security and containment.** Source paths are resolved and checked for existence and readability; destination paths go through `Context::ensure_within` before any write (NFR-004.002). Symlinked records whose real path escapes either root are refused. No source content is echoed into logs beyond the reported titles and paths.
 
 11. **Explicitly out of scope.** Importing `docs`, `drafts`, or `decisions`; importing Backlog.md configuration as Papyrus configuration; release records (none exist upstream); issue/custom fields beyond front-matter copying; re-import reconciliation; continuous or scheduled sync; any reverse export.
 
@@ -121,13 +121,13 @@ Forces: one-way and explicit (no sync, no watcher, no bidirectional expectation)
 - Delivery shape: the dedicated `papyrus import backlog` subcommand is accepted; a wrapper script is optional and logic-free (decision 1).
 - Milestone renumbering: imported milestones are remapped into the Papyrus milestone space (`m-N` → `MS-001`-style IDs) and source numbers are not preserved (ADR-0010 decision 5).
 - Switchover: the import ships in the same release as the native layout and that release documents a one-time import in its upgrade notes (decision 9).
-- Remaining scope decisions of NFR-04.004 stand unchanged: tasks and milestones only, `docs`/`drafts`/`decisions` excluded, single Papyrus ID space, no persisted mapping.
+- Remaining scope decisions of NFR-004.004 stand unchanged: tasks and milestones only, `docs`/`drafts`/`decisions` excluded, single Papyrus ID space, no persisted mapping.
 
 ## Consequences
 
 **Positive:**
 
-- Projects holding a Backlog.md store have one documented, reviewable path into Papyrus, satisfying NFR-04.004 without keeping a compatibility layer.
+- Projects holding a Backlog.md store have one documented, reviewable path into Papyrus, satisfying NFR-004.004 without keeping a compatibility layer.
 - Fresh, planned allocation makes numeric collisions impossible and keeps existing Papyrus records untouched, which removes the hardest failure mode of an import.
 - Content fidelity (front matter, sections, unknown keys, unknown sections) is defined and testable against a real corpus.
 - Only the shared writer is used, so imported records are normal records for every later command, view, and search.
@@ -169,21 +169,21 @@ Implementation and specification tasks for the import MUST follow:
 | Option | Outcome | Reason |
 |---|---|---|
 | Planned fresh Papyrus IDs, no persisted mapping, shared writer (this ADR) | Selected | Single ID space, no collisions, no second store, and imported records become ordinary records. |
-| Preserve source numbers as Papyrus numbers (offset only by prefix/padding) | Rejected | A number reused from a Backlog store can collide with an existing Papyrus record, and it implies adopting the source ID as identity, which REQ-01.005 forbids. |
-| Persist a source→Papyrus mapping file or front-matter key | Rejected | It is a parallel ID space and a second store that can drift; NFR-04.004 and REQ-01.005 exclude it. |
+| Preserve source numbers as Papyrus numbers (offset only by prefix/padding) | Rejected | A number reused from a Backlog store can collide with an existing Papyrus record, and it implies adopting the source ID as identity, which REQ-001.005 forbids. |
+| Persist a source→Papyrus mapping file or front-matter key | Rejected | It is a parallel ID space and a second store that can drift; NFR-004.004 and REQ-001.005 exclude it. |
 | Skip records whose title already exists in the target | Rejected | Silently discarding a source record loses data; the requirement asks for collision handling, not deletion. Merge or overwrite would be worse. |
 | Standalone external script with its own parser/writer | Rejected | A second writer with untested preservation behaviour, outside the no-drift rule (ADR-0013). |
-| Import `docs`/`drafts`/`decisions` as generic documents | Rejected | NFR-04.004 excludes them; mapping them would invent record types and metadata. |
-| Bidirectional sync or re-import reconciliation | Rejected | NFR-04.004 makes the import explicit and one-way; compatibility is renounced. |
+| Import `docs`/`drafts`/`decisions` as generic documents | Rejected | NFR-004.004 excludes them; mapping them would invent record types and metadata. |
+| Bidirectional sync or re-import reconciliation | Rejected | NFR-004.004 makes the import explicit and one-way; compatibility is renounced. |
 
 ## References
 
-- `docs/requirements/non-functional/NFR-04.004.md` — renounce compatibility, provide a one-way import; open questions answered here.
-- `docs/requirements/business/REQ-01.005.md` — single Papyrus ID space; imported records receive Papyrus IDs.
-- `docs/requirements/business/REQ-05.010.md` — front-matter fields and record format for imported records.
-- `docs/requirements/business/REQ-05.011.md` — no path adopts a Backlog storage ID or re-lays out a record.
-- `docs/requirements/business/REQ-01.002.md`, `REQ-01.003.md`, `REQ-01.004.md` — configuration selection, runtime errors, conflict outcomes.
-- `docs/requirements/non-functional/NFR-04.002.md` — project-directory containment.
+- `docs/requirements/non-functional/NFR-004.004.md` — renounce compatibility, provide a one-way import; open questions answered here.
+- `docs/requirements/business/REQ-001.005.md` — single Papyrus ID space; imported records receive Papyrus IDs.
+- `docs/requirements/business/REQ-005.010.md` — front-matter fields and record format for imported records.
+- `docs/requirements/business/REQ-005.011.md` — no path adopts a Backlog storage ID or re-lays out a record.
+- `docs/requirements/business/REQ-001.002.md`, `REQ-001.003.md`, `REQ-001.004.md` — configuration selection, runtime errors, conflict outcomes.
+- `docs/requirements/non-functional/NFR-004.002.md` — project-directory containment.
 - `docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md` — destination layout, ID allocation, no Backlog stems.
 - `docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md` — target record format.
 - `docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md` — one writer, no second serializer.

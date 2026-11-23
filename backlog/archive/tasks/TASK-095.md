@@ -15,7 +15,7 @@ dependencies:
 references:
   - docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
-  - docs/requirements/non-functional/NFR-04.004.md
+  - docs/requirements/non-functional/NFR-004.004.md
 priority: high
 type: chore
 ordinal: 39170

@@ -14,22 +14,18 @@ dependencies:
   - TASK-062
   - TASK-064
 references:
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/non-functional/NFR-04.001.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/non-functional/NFR-004.001.md
   - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
-  - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-04.003.md
-  - >-
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-004.003.md
     docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
 documentation:
-  - >-
     docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md
 priority: high
 type: chore
@@ -38,7 +34,7 @@ ordinal: 30080
 
 
 ## Description
-Deliver ADR-0009 Stage 5: remove all legacy per-module record parsers, renderers, and serializers and enforce the no-drift rule so parsing, identity, and writing each have one implementation under src/record/. Implements REQ-05.010, REQ-05.011, REQ-06.004, NFR-04.001, NFR-04.002, NFR-04.003. Refactor only: no intended change to command behavior, output, or exit codes; existing tests keep expected results. Builds on TASK-63 through TASK-69. Backlog.md round-trip verification remains TASK-71.
+Deliver ADR-0009 Stage 5: remove all legacy per-module record parsers, renderers, and serializers and enforce the no-drift rule so parsing, identity, and writing each have one implementation under src/record/. Implements REQ-005.010, REQ-005.011, REQ-006.004, NFR-004.001, NFR-004.002, NFR-004.003. Refactor only: no intended change to command behavior, output, or exit codes; existing tests keep expected results. Builds on TASK-63 through TASK-69. Backlog.md round-trip verification remains TASK-71.
 
 Scope: remove module-local parsers/renderers/manual front-matter formatting from audit, decision, glossary, milestone, release, requirement, rule, task, tech_spec, ui_spec; replace browser parse_doc/apply_*_edit with shared patch operations; move all ID formatting/allocation to record::identity; move all record writes to record::store::write_atomic including UI mockup HTML; remove duplicate src/record/descriptors.rs; update search to the shared reader and search specifications to state metadata searchable; add no-drift checks to the test suite. Out of scope: new features, mockup metadata format changes, round-trip verification (TASK-71), browser UI (TASK-66/67/72), corpus migration, config/init writes.
 

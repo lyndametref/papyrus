@@ -12,9 +12,9 @@ references:
   - MOCK-0003
   - MOCK-0004
   - MOCK-0005
-  - REQ-05.004
-  - REQ-05.007
-  - REQ-06.002
+  - REQ-005.004
+  - REQ-005.007
+  - REQ-006.002
   - TASK-11
   - TASK-15
   - TASK-19
@@ -31,7 +31,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface so it also serves active UI specifications (title, associated view, description). Reuses TASK-6/TASK-11/TASK-15/TASK-23 baseline (ADR-0005/ADR-0006). Implements REQ-05.004 and REQ-05.007 under REQ-06.002. Deprecated specifications hidden.
+Extend the offline, project-local, read-and-edit web interface so it also serves active UI specifications (title, associated view, description). Reuses TASK-6/TASK-11/TASK-15/TASK-23 baseline (ADR-0005/ADR-0006). Implements REQ-005.004 and REQ-005.007 under REQ-006.002. Deprecated specifications hidden.
 
 ## Scope
 

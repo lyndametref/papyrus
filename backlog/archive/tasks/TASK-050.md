@@ -12,11 +12,11 @@ milestone: MS-005
 dependencies:
   - TASK-013
 references:
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-017-tech-spec-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/domain-model/business-glossary/technical-specification.md
@@ -32,16 +32,16 @@ ordinal: 17500
 Implement the `tech-spec` commands so contributors can create, list, view, edit, deprecate, and restore technical specifications, with stable IDs and text-file persistence inside the project directory.
 
 Scope (in):
-- `papyrus tech-spec create <title> --description <text>` (BR-017, REQ-05.009).
-- `papyrus tech-spec list` (BR-017, REQ-05.009).
-- `papyrus tech-spec view <id>` (BR-017, REQ-05.009).
-- `papyrus tech-spec edit <id> [--title <title>] [--description <text>] [--editor]` (BR-017, REQ-05.009).
-- `papyrus tech-spec deprecate <id>` and `papyrus tech-spec restore <id>` (BR-017, REQ-05.007).
-- Stable IDs of the form <prefix>-<number> (default TECH-001) using configured document_types.tech-spec prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-05.009, REQ-05.007, BR-017, BR-016).
-- Technical-specification fields: title and description (REQ-05.009, BR-017).
-- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID and content (REQ-05.007, BR-017).
-- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-02.002, NFR-04.001, NFR-04.002).
-- Common CLI controls and outcomes inherited from TASK-2 (REQ-01.004).
+- `papyrus tech-spec create <title> --description <text>` (BR-017, REQ-005.009).
+- `papyrus tech-spec list` (BR-017, REQ-005.009).
+- `papyrus tech-spec view <id>` (BR-017, REQ-005.009).
+- `papyrus tech-spec edit <id> [--title <title>] [--description <text>] [--editor]` (BR-017, REQ-005.009).
+- `papyrus tech-spec deprecate <id>` and `papyrus tech-spec restore <id>` (BR-017, REQ-005.007).
+- Stable IDs of the form <prefix>-<number> (default TECH-001) using configured document_types.tech-spec prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-005.009, REQ-005.007, BR-017, BR-016).
+- Technical-specification fields: title and description (REQ-005.009, BR-017).
+- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID and content (REQ-005.007, BR-017).
+- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-002.002, NFR-004.001, NFR-004.002).
+- Common CLI controls and outcomes inherited from TASK-2 (REQ-001.004).
 
 Scope (out):
 - Search and browser access for technical specifications (TASK-56, TASK-57).

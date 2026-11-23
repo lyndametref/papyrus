@@ -24,21 +24,21 @@ references:
   - MOCK-0006
   - MOCK-0007
   - MOCK-0008
-  - NFR-01.002
-  - NFR-05.001
-  - REQ-05
-  - REQ-05.006
-  - REQ-05.007
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-005.001
+  - REQ-005
+  - REQ-005.006
+  - REQ-005.007
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-15
   - TASK-19
@@ -59,7 +59,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), and TASK-25 (business rules) so it also serves the audit-records store: active audit records (ID, title, audit type, and content). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`audit-record`), its record model, list/view/edit screens, API endpoints, and tests. It implements the browser-visibility part of REQ-05.006/REQ-05.007 for audit records under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for audit records. Deprecated audit records are hidden from lists and unreachable by URL, consistent with deprecated requirements, glossary terms, UI specifications, UI mockups, and business rules.
+Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), and TASK-25 (business rules) so it also serves the audit-records store: active audit records (ID, title, audit type, and content). The command contract, transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged; this increment adds one documentation category (`audit-record`), its record model, list/view/edit screens, API endpoints, and tests. It implements the browser-visibility part of REQ-005.006/REQ-005.007 for audit records under REQ-006.002, and advances NFR-001.002 (display and edit all Papyrus content) for audit records. Deprecated audit records are hidden from lists and unreachable by URL, consistent with deprecated requirements, glossary terms, UI specifications, UI mockups, and business rules.
 
 Audit records are Markdown text records with a fixed section template (`# <ID> <title>`, then `## Audit Type`, then `## Content`). The browser edits only the three documented fields and must preserve every other byte/section of the file. Whole-file regeneration of a record (for example by reusing the CLI's stub serializer) is forbidden because it destroys editor-added and unknown sections.
 
@@ -79,7 +79,7 @@ Audit records are Markdown text records with a fixed section template (`# <ID> <
 
 ### Out of scope
 
-- Creating, deprecating, restoring, or deleting audit records from the browser; changing record IDs, deprecation state, or status. These remain CLI-only (REQ-05.006, BR-014).
+- Creating, deprecating, restoring, or deleting audit records from the browser; changing record IDs, deprecation state, or status. These remain CLI-only (REQ-005.006, BR-014).
 - Cross-type navigation beyond the baseline sidebar, and the final completeness check — TASK-19.
 - Search inside the browser UI, Markdown rendering, rich-text editing, attachments, or file uploads.
 - Authentication, authorization, sessions, cookies, or TLS.
@@ -187,7 +187,7 @@ Record views in this specification follow the shared single record view layout d
 
 1. Deprecated audit records live in the active directory's `deprecated/` subfolder. That folder is never scanned for records, never listed, never counted, and never resolved.
 2. A request for a deprecated record's ID returns `404` on `GET /doc/{id}`, `GET /doc/{id}/edit`, `POST /doc/{id}`, `GET /api/doc/{id}`, and `POST /api/doc/{id}`, exactly as for an unknown ID.
-3. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-05.007, BR-014).
+3. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-005.007, BR-014).
 
 ### 10. JSON API
 
@@ -219,7 +219,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's Audit Records entry and the audit-records list/view/edit templates are the only rendering additions; the shared shell and error pages are reused.
 3. Tag controls are not applicable; the audit type is a `<select>` with three options and a default, keyboard operable by default. Every input has a `<label>` or accessible name. Focus is not trapped.
 
@@ -288,7 +288,7 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: Content may be cleared on edit, removing the `## Content` section, consistent with the UI description and sibling browser increments.
 - Assumption: The tag-field progressive-enhancement pattern is not applicable; the audit type uses a native `<select>`, which is operable without JavaScript.
 - Assumption: The JSON API exposes the three editable fields; audit records have no status, task, or supersession metadata, unlike decision records, and no requirement references, unlike business rules.
-- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40/TASK-25.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-005.001) remains a deferred follow-up, consistent with TASK-15/TASK-23/TASK-24/TASK-40/TASK-25.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 - Assumption: The canonical business-rule-style `BR-*.md` documents are not applicable; only `<prefix>-<digits>.md` files are records.
 
@@ -302,7 +302,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.006, REQ-05.007, REQ-06, REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
+| Requirement | REQ-005, REQ-005.006, REQ-005.007, REQ-006, REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012 |
 | Business rule | BR-004 (browser command behavior), BR-014 (audit command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25 (sibling), TASK-47 (record model), TASK-49 (UI design), TASK-26, TASK-86 |

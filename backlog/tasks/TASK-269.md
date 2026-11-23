@@ -7,12 +7,12 @@ labels: []
 references:
   - ADR-039
   - TECH-068
-  - REQ-06.014
+  - REQ-006.014
   - ADR-042
   - AUD-135
   - AUD-144
-  - REQ-06.004
-  - REQ-07.004
+  - REQ-006.004
+  - REQ-007.004
   - TECH-040
   - TC-183
   - TC-184
@@ -22,7 +22,6 @@ assignee:
   - rust-dev
 milestone: MS-035
 dependencies:
-  - TASK-311
 ordinal: 80
 documentation:
   - src/browser/mod.rs
@@ -61,7 +60,7 @@ After TASK-265 to TASK-268 and TASK-311, the document list, view, edit, conflict
 - Do not change the status-code surface (415, 400, 404, 409, 422, 303, 500), the transport, headers, caching, `no-store`, the single writer, or the on-disk layout. Do not add a dependency, asset, template, client script, route, or configuration key.
 
 ## Grounding
-ADR-039 decisions 10-13, 17, 22-28, 35, and downstream constraints 1-10; ADR-042; ADR-0006 and ADR-0013; ADR-0035 as amended; ADR-0038; REQ-06.014, REQ-06.019, REQ-06.004, and REQ-07.004; TECH-040 section 7; TECH-068 sections 4-8; TC-183 and TC-184; MS-032 `EXPECTED-DELTAS.md` item 6; TASK-311 (269a) for the generic JSON projection. Symbols: `src/browser/{mod,records,render,list,routes,shell,assets}.rs`, `src/record/edit.rs`, `src/registry.rs`, `src/config.rs`, `src/document.rs`, `tests/characterization_replay.rs`, `tests/support/characterization.rs`, `tests/document_type_no_drift.rs`, `tests/ui_spec_cli.rs`, `tests/fixtures/characterization/corpus/`, and `tests/fixtures/characterization/corpus/EXPECTED-DELTAS.md`.
+ADR-039 decisions 10-13, 17, 22-28, 35, and downstream constraints 1-10; ADR-042; ADR-0006 and ADR-0013; ADR-0035 as amended; ADR-0038; REQ-006.014, REQ-006.019, REQ-006.004, and REQ-007.004; TECH-040 section 7; TECH-068 sections 4-8; TC-183 and TC-184; MS-032 `EXPECTED-DELTAS.md` item 6; TASK-311 (269a) for the generic JSON projection. Symbols: `src/browser/{mod,records,render,list,routes,shell,assets}.rs`, `src/record/edit.rs`, `src/registry.rs`, `src/config.rs`, `src/document.rs`, `tests/characterization_replay.rs`, `tests/support/characterization.rs`, `tests/document_type_no_drift.rs`, `tests/ui_spec_cli.rs`, `tests/fixtures/characterization/corpus/`, and `tests/fixtures/characterization/corpus/EXPECTED-DELTAS.md`.
 
 ## Definition of done
 No document `TypedHandler` variant, per-type document browser branch, per-type document ops builder, document `PRESENTATION` entry, or document slug dispatch remains outside the seed and its tests; list, view, edit, conflict, not-found, and JSON are served by descriptor-driven code (JSON delivered by TASK-311); the ui-spec front-matter re-adoption is a descriptor-keyed, tested engine rule with no slug literal; the semantic corpus replay passes with only the three attributed reason codes; the record, JSON, and status-code comparison is strict; Backlog and Decision output is byte-identical; the full suite, clippy -D warnings, and fmt are clean; evidence records the deleted symbols, corpus case counts, the semantic allowlist, before/after production lines, and the ui-spec exception and its test.

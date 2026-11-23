@@ -17,17 +17,16 @@ references:
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
 documentation:
-  - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
   - src/record/descriptor.rs
   - src/document.rs
   - docs/specifications/registry-sourced-record-descriptors.md
-  - docs/requirements/business/REQ-07.001.md
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-07.003.md
-  - docs/requirements/business/REQ-07.004.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.010.md
+  - docs/requirements/business/REQ-007.001.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-007.003.md
+  - docs/requirements/business/REQ-007.004.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.010.md
 priority: high
 ordinal: 41220
 ---
@@ -85,7 +84,7 @@ ordinal: 41220
 ## Implementation Notes
 # Implementation Plan
 
-Canonical design: `docs/specifications/registry-sourced-record-descriptors.md`. Requirements: REQ-07.001/002/003/004, REQ-05.007/010. ADRs: 0017, 0018, 0022, 0013.
+Canonical design: `docs/specifications/registry-sourced-record-descriptors.md`. Requirements: REQ-007.001/002/003/004, REQ-005.007/010. ADRs: 0017, 0018, 0022, 0013.
 
 ## 1. Capture the current contract
 

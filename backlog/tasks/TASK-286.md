@@ -8,7 +8,7 @@ references:
   - ADR-037
   - ADR-038
   - ADR-039
-  - REQ-07.002
+  - REQ-007.002
   - MS-037
   - REL-001
   - NFR-007.003

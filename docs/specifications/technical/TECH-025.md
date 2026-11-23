@@ -10,14 +10,14 @@ references:
   - BR-011
   - BR-015
   - BR-016
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-05
-  - REQ-05.003
-  - REQ-05.007
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-005
+  - REQ-005.003
+  - REQ-005.007
+  - REQ-006
+  - REQ-006.001
   - TASK-10
   - TASK-14
   - TASK-18
@@ -38,7 +38,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend `papyrus search` so that glossary terms are searched in addition to business and non-functional requirements, task, milestone, release, and decision records. Glossary terms are document records: they are stored under the configured `document_types.glossary` directory and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md` and `docs/specifications/search-decision-records.md` are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.003/REQ-05.007, and advances BR-015 and BR-011.
+Extend `papyrus search` so that glossary terms are searched in addition to business and non-functional requirements, task, milestone, release, and decision records. Glossary terms are document records: they are stored under the configured `document_types.glossary` directory and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by `docs/specifications/search-tasks-milestones-and-releases.md` and `docs/specifications/search-decision-records.md` are reused unchanged. This increment implements REQ-006.001 under REQ-005/REQ-005.003/REQ-005.007, and advances BR-015 and BR-011.
 
 ## Scope
 
@@ -194,8 +194,8 @@ None of these block implementation; each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-05, REQ-05.003, REQ-05.007 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary) |
+| Requirement | REQ-006, REQ-006.001, REQ-005, REQ-005.003, REQ-005.007 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary) |
 | Business rule | BR-015 (search command behavior), BR-011 (glossary command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-31 |

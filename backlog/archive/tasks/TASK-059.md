@@ -13,15 +13,13 @@ milestone: MS-013
 dependencies:
   - TASK-058
 references:
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/non-functional/NFR-04.003.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/non-functional/NFR-004.003.md
   - >-
     docs/architecture/adr/ADR-0008-adopt-backlog-md-on-disk-layout-for-tasks-and-milestones.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
 documentation:
-  - >-
     docs/specifications/translate-papyrus-and-backlog-md-ids-at-the-storage-boundary.md
 priority: high
 type: feature

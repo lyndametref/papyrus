@@ -11,14 +11,14 @@ references:
   - BR-011
   - BR-016
   - GLO-001
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-05
-  - REQ-05.003
-  - REQ-05.007
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-005
+  - REQ-005.003
+  - REQ-005.007
   - TASK-2
   - TASK-23
   - TASK-30
@@ -31,25 +31,25 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the `glossary` commands so a project contributor can create, list, view, edit, deprecate, and restore glossary terms, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.003 and REQ-05.007, together with the documented command contract in BR-011. It provides the glossary terms that later tickets search (TASK-31) and expose in the browser (TASK-23).
+Deliver the `glossary` commands so a project contributor can create, list, view, edit, deprecate, and restore glossary terms, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-005.003 and REQ-005.007, together with the documented command contract in BR-011. It provides the glossary terms that later tickets search (TASK-31) and expose in the browser (TASK-23).
 
 ## Scope
 
 ### In scope
 
-- `papyrus glossary create --term <term> --definition <text>` (BR-011, REQ-05.003).
-- `papyrus glossary list` (BR-011, REQ-05.003).
-- `papyrus glossary view <id>` (BR-011, REQ-05.003).
-- `papyrus glossary edit <id> [--term <term>] [--definition <text>] [--editor]` (BR-011, REQ-05.003).
-- `papyrus glossary deprecate <id>` (BR-011, REQ-05.007).
-- `papyrus glossary restore <id>` (BR-011, REQ-05.007).
-- Glossary identity: stable IDs of the form `<prefix>-<number>` (for example `GLO-001`), using the configured `document_types.glossary` prefix and `id_padding` (REQ-05.003, BR-011, BR-016).
-- Glossary fields: term (title) and definition (REQ-05.003, BR-011).
-- Deprecation moving a term to its type's `deprecated/` subfolder and hiding it from lists, search, and the web UI (REQ-05.003, REQ-05.007, BR-011).
-- Restoration returning a deprecated term to its original folder with the same ID (REQ-05.003, REQ-05.007, BR-011).
-- Persistence as UTF-8 text only inside the project directory (NFR-04.001, NFR-04.002).
-- Input sanitization by normalization/escaping before use (NFR-02.002).
-- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-01.004).
+- `papyrus glossary create --term <term> --definition <text>` (BR-011, REQ-005.003).
+- `papyrus glossary list` (BR-011, REQ-005.003).
+- `papyrus glossary view <id>` (BR-011, REQ-005.003).
+- `papyrus glossary edit <id> [--term <term>] [--definition <text>] [--editor]` (BR-011, REQ-005.003).
+- `papyrus glossary deprecate <id>` (BR-011, REQ-005.007).
+- `papyrus glossary restore <id>` (BR-011, REQ-005.007).
+- Glossary identity: stable IDs of the form `<prefix>-<number>` (for example `GLO-001`), using the configured `document_types.glossary` prefix and `id_padding` (REQ-005.003, BR-011, BR-016).
+- Glossary fields: term (title) and definition (REQ-005.003, BR-011).
+- Deprecation moving a term to its type's `deprecated/` subfolder and hiding it from lists, search, and the web UI (REQ-005.003, REQ-005.007, BR-011).
+- Restoration returning a deprecated term to its original folder with the same ID (REQ-005.003, REQ-005.007, BR-011).
+- Persistence as UTF-8 text only inside the project directory (NFR-004.001, NFR-004.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
+- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-001.004).
 
 ### Out of scope
 
@@ -63,8 +63,8 @@ Deliver the `glossary` commands so a project contributor can create, list, view,
 
 ### 1. Project and configuration context
 
-1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
-2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
+1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-001.003, NFR-004.002).
+2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-004.002).
 3. The effective configuration supplies `document_types.glossary.prefix` (default `GLO`), `document_types.glossary.directory` (default `glossary/`), `document_types.glossary.enabled`, plus `doc_directory` and `id_padding`.
 4. A disabled glossary type is rejected by `create` (exit code 4) and its terms are hidden from `list` (BR-016).
 
@@ -108,7 +108,7 @@ Deliver the `glossary` commands so a project contributor can create, list, view,
 1. `papyrus glossary deprecate <id>` moves the glossary term file from the active folder to the `deprecated/` folder.
 2. Deprecating an already-deprecated term fails with exit code 4.
 3. Deprecating an unknown ID fails with exit code 3.
-4. Deprecated terms are hidden from `list`, search, and the web UI (REQ-05.003, REQ-05.007).
+4. Deprecated terms are hidden from `list`, search, and the web UI (REQ-005.003, REQ-005.007).
 5. `papyrus glossary restore <id>` moves a deprecated term back to its original folder.
 6. Restoring an already-active term fails with exit code 4.
 7. Restoring an unknown ID fails with exit code 3.
@@ -118,14 +118,14 @@ Deliver the `glossary` commands so a project contributor can create, list, view,
 
 1. Glossary terms are stored as UTF-8 Markdown text files named `<ID>.md` in the configured glossary directory (active) or its `deprecated/` subfolder (deprecated). The `deprecated/` subfolder is created on first deprecation if absent.
 2. File content follows this template: a top-level heading `# <ID> <term>`, then a `## Definition` section containing the definition text. Empty optional fields are omitted; `term` and `definition` are required.
-3. All user-controlled input (term, definition, ID) is sanitized by normalization/escaping before use (NFR-02.002).
-4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-02.002).
-5. No reads or writes occur outside the canonicalized project directory (NFR-04.002).
-6. No binary data is written (NFR-04.001).
+3. All user-controlled input (term, definition, ID) is sanitized by normalization/escaping before use (NFR-002.002).
+4. Values that cannot be normalized into a valid form fail with exit code 4 (NFR-002.002).
+5. No reads or writes occur outside the canonicalized project directory (NFR-004.002).
+6. No binary data is written (NFR-004.001).
 
 ### 8. Common CLI controls and outcomes
 
-1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-01.004).
+1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-001.004).
 2. Missing required arguments (for example missing `--term` or `--definition`) exits 2 (usage).
 3. Unknown glossary ID exits 3.
 4. Filesystem/IO failure or project-directory boundary violation exits 1.
@@ -167,8 +167,8 @@ Deliver the `glossary` commands so a project contributor can create, list, view,
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.003, REQ-05.007 |
-| Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
+| Requirement | REQ-005, REQ-005.003, REQ-005.007 |
+| Non-functional | NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-011 |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002) |
 | Ticket | TASK-30 |

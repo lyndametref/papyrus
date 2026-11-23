@@ -7,9 +7,9 @@ labels:
   - bug
 references:
   - RE-001
-  - NFR-04.003
-  - REQ-05.010
-  - REQ-05.011
+  - NFR-004.003
+  - REQ-005.010
+  - REQ-005.011
 status: Done
 assignee:
   - test-manager
@@ -24,4 +24,4 @@ type: test-design
 ## Description
 Outcome: test cases covering import of Backlog.md task metadata where assignee entries require Papyrus-canonical YAML quoting, plus parsing of the affected task files. Done when the user has verified the test cases.
 ## Comments
-- **orchestrator**: Test cases TC-001..TC-006 created and approved by user (verified). Coverage: REQ-05.010, REQ-05.011.
+- **orchestrator**: Test cases TC-001..TC-006 created and approved by user (verified). Coverage: REQ-005.010, REQ-005.011.

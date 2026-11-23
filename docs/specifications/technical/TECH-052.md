@@ -22,24 +22,24 @@ references:
   - BR-016
   - BR-017
   - MOCK-0001
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-04.004
-  - REQ-02
-  - REQ-02.001
-  - REQ-02.003
-  - REQ-03
-  - REQ-03.001
-  - REQ-03.002
-  - REQ-04
-  - REQ-04.001
-  - REQ-04.002
-  - REQ-05
-  - REQ-05.001
-  - REQ-05.011
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-004.004
+  - REQ-002
+  - REQ-002.001
+  - REQ-002.003
+  - REQ-003
+  - REQ-003.001
+  - REQ-003.002
+  - REQ-004
+  - REQ-004.001
+  - REQ-004.002
+  - REQ-005
+  - REQ-005.001
+  - REQ-005.011
+  - REQ-006
+  - REQ-006.001
   - TASK-001
   - TASK-10
   - TASK-14
@@ -66,7 +66,7 @@ status: verified
 ## Description
 ## Purpose
 
-Final integration increment of `papyrus search`: one query searches every documented record type that Papyrus manages, so that a contributor can find any project record without knowing which store or document family it lives in. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, sanitization, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by every later search increment are reused unchanged; this increment adds no new `--type` value and no new option. It completes REQ-06.001 across all of REQ-05's document types plus REQ-02 (tasks), REQ-03 (milestones/releases), and REQ-04 (decisions), and advances BR-015. It also confirms that lazy front-matter migration (ADR-0012, ADR-0013) does not break or narrow search coverage.
+Final integration increment of `papyrus search`: one query searches every documented record type that Papyrus manages, so that a contributor can find any project record without knowing which store or document family it lives in. The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, sanitization, and read-only guarantee established by `docs/specifications/search-requirements.md` and reused by every later search increment are reused unchanged; this increment adds no new `--type` value and no new option. It completes REQ-006.001 across all of REQ-005's document types plus REQ-002 (tasks), REQ-003 (milestones/releases), and REQ-004 (decisions), and advances BR-015. It also confirms that lazy front-matter migration (ADR-0012, ADR-0013) does not break or narrow search coverage.
 
 ## Scope
 
@@ -214,8 +214,8 @@ With `--json`, errors use the existing convention: a JSON object `{"error":{"cod
 ## Assumptions
 
 - Assumption: Rust 1.99.1 and the existing single-crate layout are retained (ADR-0001, ADR-0004). `search` is extended inside the existing crate; no new crate, application, technology stack, external interface, or dependency is introduced, so no new ADR or architecture contract is required for search behavior itself. Front-matter migration is governed by ADR-0012 and ADR-0013.
-- Assumption: the man page (BR-015) and REQ-06.001 are the behavior contract; where they are silent, this specification fixes explicit defaults, recorded as open questions with recommended defaults.
-- Assumption: the `doc` type remains the only aggregate filter; no per-document-type filter value is added, consistent with REQ-06.001 and BR-015.
+- Assumption: the man page (BR-015) and REQ-006.001 are the behavior contract; where they are silent, this specification fixes explicit defaults, recorded as open questions with recommended defaults.
+- Assumption: the `doc` type remains the only aggregate filter; no per-document-type filter value is added, consistent with REQ-006.001 and BR-015.
 - Assumption: archived task and milestone records are hidden from search, mirroring deprecated requirement records; a future increment may add an option to include them.
 - Assumption: release records have no archived state and are all searched.
 - Assumption: the searchable text is the whole persisted record text, not only parsed fields, so editor-added body sections and front-matter metadata are searchable.
@@ -231,7 +231,7 @@ With `--json`, errors use the existing convention: a JSON object `{"error":{"cod
 
 None of these block implementation; each has a specified default in this document. User confirmation is recommended before release.
 
-- **OQ-1 (recommended default: no dedicated type filter)** — The documented `--type` vocabulary contains no per-document-type value. This specification keeps `doc` as the aggregate for all document types. A future change to add per-type filters would be a man-page/REQ-06.001 change, not a search change.
+- **OQ-1 (recommended default: no dedicated type filter)** — The documented `--type` vocabulary contains no per-document-type value. This specification keeps `doc` as the aggregate for all document types. A future change to add per-type filters would be a man-page/REQ-006.001 change, not a search change.
 - **OQ-2 (recommended default: whole record text)** — The man page says "free-text search" without defining fields. This specification searches the whole persisted record text. A narrower field set would risk hiding relevant matches.
 - **OQ-3 (recommended default: hide deprecated and archived)** — BR-014/BR-015 do not state whether deprecated or archived records are searchable. This specification hides them, consistent with every prior search increment and the list commands.
 - **OQ-4 (recommended default: title from heading, front-matter fallback for task/milestone/release)** — The man page does not prescribe title extraction. This specification uses the heading text for Markdown records and the front-matter `title` for task/milestone/release records that have no `#` heading, consistent with the per-type list commands.
@@ -242,8 +242,8 @@ None of these block implementation; each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-05, REQ-05.001–REQ-05.011, REQ-02, REQ-02.001, REQ-02.003, REQ-03, REQ-03.001, REQ-03.002, REQ-04, REQ-04.001, REQ-04.002 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary), NFR-04.004 (Papyrus-native layout; no Backlog.md file compatibility) || Business rule | BR-015 (search command behavior), BR-005 (task), BR-006 (milestone), BR-007 (release), BR-008 (decision), BR-011 (glossary), BR-012 (UI specification), BR-013 (business rule), BR-014 (audit), BR-016 (configuration keys and precedence), BR-017 (technical specification) |
+| Requirement | REQ-006, REQ-006.001, REQ-005, REQ-005.001–REQ-005.011, REQ-002, REQ-002.001, REQ-002.003, REQ-003, REQ-003.001, REQ-003.002, REQ-004, REQ-004.001, REQ-004.002 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary), NFR-004.004 (Papyrus-native layout; no Backlog.md file compatibility) || Business rule | BR-015 (search command behavior), BR-005 (task), BR-006 (milestone), BR-007 (release), BR-008 (decision), BR-011 (glossary), BR-012 (UI specification), BR-013 (business rule), BR-014 (audit), BR-016 (configuration keys and precedence), BR-017 (technical specification) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate), ADR-0012 (YAML front matter), ADR-0013 (shared record envelope) |
 | Ticket | TASK-18 |
 | UI mockups | none |

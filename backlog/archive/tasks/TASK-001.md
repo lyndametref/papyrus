@@ -10,11 +10,11 @@ labels:
 milestone: MS-001
 dependencies: []
 references:
-  - docs/requirements/non-functional/NFR-01.001.md
-  - docs/requirements/non-functional/NFR-03.001.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/non-functional/NFR-001.001.md
+  - docs/requirements/non-functional/NFR-003.001.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-001-papyrus-command-behavior.md
   - docs/specifications/rust-cli-and-debian-package-baseline.md
   - docs/architecture/adr/ADR-0001-implementation-language-rust.md
@@ -29,7 +29,7 @@ Establish the installable executable foundation for Papyrus before any project-m
 
 Scope (in): create the Papyrus Rust crate (single crate, binary + library) on the pinned Rust 1.99.1 toolchain (ADR-0001); implement the minimal CLI surface (`--help`/`-h`, `--version`) with correct exit codes (BR-001); declare GPL-3.0-or-later in source and package metadata; build an amd64 `.deb` via `dpkg-deb` with standard control metadata; document build/package/install/uninstall/smoke-test steps; audit runtime dependency licenses.
 
-Scope (out): subcommands and their behavior (TASK-2+); runtime semantics of global options beyond help/version (TASK-2); multi-crate/workspace layout or internal module architecture beyond `src/main.rs` + `src/lib.rs`; additional architectures or non-Debian formats (ADR-0002); advertising support for Debian releases beyond Trixie and Forky (NFR-03.002 open question).
+Scope (out): subcommands and their behavior (TASK-2+); runtime semantics of global options beyond help/version (TASK-2); multi-crate/workspace layout or internal module architecture beyond `src/main.rs` + `src/lib.rs`; additional architectures or non-Debian formats (ADR-0002); advertising support for Debian releases beyond Trixie and Forky (NFR-003.002 open question).
 
 Assumptions:
 - Assumption: Rust 1.99.1 via rustup and `dpkg-deb` are available in the build environment (ADR-0001, ADR-0002).
@@ -40,8 +40,8 @@ Assumptions:
 - Assumption: package metadata values not specified by requirements (maintainer, section, priority) follow Debian policy defaults and are recorded in packaging files.
 
 Open questions:
-- OQ-1: The "later Debian releases" boundary (NFR-03.002) is unresolved; this task advertises only Trixie and Forky. Tracked against NFR-03.002 / ADR-0002.
-- OQ-2: The interpretation of "open source" and "linking" for dev/build-time dependencies (NFR-06.002) is unresolved; this task audits runtime dependencies only.
+- OQ-1: The "later Debian releases" boundary (NFR-003.002) is unresolved; this task advertises only Trixie and Forky. Tracked against NFR-003.002 / ADR-0002.
+- OQ-2: The interpretation of "open source" and "linking" for dev/build-time dependencies (NFR-006.002) is unresolved; this task audits runtime dependencies only.
 
 Dependencies: none (foundational task). All other tasks (TASK-2..TASK-22) depend on this one.
 

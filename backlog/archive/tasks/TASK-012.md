@@ -13,11 +13,11 @@ dependencies:
   - TASK-010
   - TASK-011
 references:
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-005-task-command-behavior.md
   - docs/business-rules/BR-006-milestone-command-behavior.md
   - docs/business-rules/BR-007-release-command-behavior.md
@@ -25,7 +25,6 @@ references:
   - >-
     docs/specifications/backlog-discovery-milestone-packaging-and-verification.md
 documentation:
-  - >-
     docs/specifications/backlog-discovery-milestone-packaging-and-verification.md
 type: chore
 ordinal: 12000
@@ -72,7 +71,7 @@ Open questions (non-blocking, defaults in the specification):
 Dependencies: TASK-10 and TASK-11 (Done), and transitively TASK-8, TASK-9, and the whole m-1 chain TASK-1..TASK-7.
 
 ## Acceptance Criteria
-- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides task, milestone, release, search, and browser (all five categories), including the backlog categories; Debian Trixie and any other release are not claimed or verified.
+- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides task, milestone, release, search, and browser (all five categories), including the backlog categories; Debian Trixie and any other release are not claimed or verified.
 - [x] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists task, milestone, release, search, and browser (guards against packaging a stale binary).
 - [x] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [x] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.
@@ -136,4 +135,4 @@ Documentation: docs/packaging.md updated with Forky-only claim, procedures, exte
 
 Limitations/deviations: OQ-1 no real-GUI browser run (markup/asset level only). Forky only; no Trixie verification. Host baseline already had papyrus installed (unchanged, not absent). scripts/build-deb.sh unchanged. No requirements/BR/ADRs/UI changed; no product code changes.
 
-Quality review (gatekeeper): Ready to close. All AC #1-#17 pass; DoD #1-#7 pass. cargo build/test (160)/clippy/fmt all pass; deb build/contents/install/uninstall pass; smoke pass. Scope: tests + docs only, no source changes. NFR-03.002/NFR-04.001/NFR-05.001 (deferred)/NFR-06.001/002 addressed. OQ-1/OQ-2/OQ-4 deferred non-blocking.
+Quality review (gatekeeper): Ready to close. All AC #1-#17 pass; DoD #1-#7 pass. cargo build/test (160)/clippy/fmt all pass; deb build/contents/install/uninstall pass; smoke pass. Scope: tests + docs only, no source changes. NFR-003.002/NFR-004.001/NFR-005.001 (deferred)/NFR-006.001/002 addressed. OQ-1/OQ-2/OQ-4 deferred non-blocking.

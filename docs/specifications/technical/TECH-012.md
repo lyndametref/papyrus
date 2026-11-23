@@ -11,17 +11,17 @@ references:
   - BR-006
   - BR-007
   - BR-015
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-02
-  - REQ-02.001
-  - REQ-02.003
-  - REQ-03
-  - REQ-03.001
-  - REQ-03.002
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-002
+  - REQ-002.001
+  - REQ-002.003
+  - REQ-003
+  - REQ-003.001
+  - REQ-003.002
+  - REQ-006
+  - REQ-006.001
   - TASK-10
   - TASK-11
   - TASK-12
@@ -37,7 +37,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend `papyrus search` so that task, milestone, and release records are searched in addition to business and non-functional requirements (delivered by TASK-5). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged; this increment adds three backlog record stores to the set of searchable types. It implements the backlog-store part of REQ-06.001 under REQ-02/REQ-02.001/REQ-02.003 and REQ-03/REQ-03.001/REQ-03.002, and advances BR-015.
+Extend `papyrus search` so that task, milestone, and release records are searched in addition to business and non-functional requirements (delivered by TASK-5). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged; this increment adds three backlog record stores to the set of searchable types. It implements the backlog-store part of REQ-006.001 under REQ-002/REQ-002.001/REQ-002.003 and REQ-003/REQ-003.001/REQ-003.002, and advances BR-015.
 
 ## Scope
 
@@ -195,8 +195,8 @@ None of these block implementation; each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-02, REQ-02.001, REQ-02.003, REQ-03, REQ-03.001, REQ-03.002 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary) |
+| Requirement | REQ-006, REQ-006.001, REQ-002, REQ-002.001, REQ-002.003, REQ-003, REQ-003.001, REQ-003.002 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary) |
 | Business rule | BR-015 (search command behavior), BR-005 (task command behavior), BR-006 (milestone command behavior), BR-007 (release command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-10 |

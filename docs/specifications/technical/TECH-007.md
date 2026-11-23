@@ -33,29 +33,29 @@ references:
   - BR-016
   - MOCK-0001
   - NFR-001.001
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-05.001
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-005.001
   - REQ-001.001
-  - REQ-01.002
-  - REQ-01.003
-  - REQ-01.005
-  - REQ-05.001
-  - REQ-05.002
-  - REQ-05.007
-  - REQ-06.002
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
-  - REQ-06.018
-  - REQ-06.019
-  - REQ-07.004
+  - REQ-001.002
+  - REQ-001.003
+  - REQ-001.005
+  - REQ-005.001
+  - REQ-005.002
+  - REQ-005.007
+  - REQ-006.002
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
+  - REQ-006.018
+  - REQ-006.019
+  - REQ-007.004
 status: verified
 ---
 # TECH-007 Offline Browser Access for Requirement Content

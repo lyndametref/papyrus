@@ -73,6 +73,6 @@ PAPYRUS_CAPTURE_COMMIT=d60f71c9b5bc6a7e419e2cef682763e0c914160a \
   records; every other value is decoded from the rendered list.
 - `excluded` lists archived IDs in the family's archive directory; they must
   never appear in a list.
-- Tasks are captured from the REQ-06.013 board (the task family has no list
+- Tasks are captured from the REQ-006.013 board (the task family has no list
   route): `grouped` carries milestone groups and card order; cards carry no
   dates.

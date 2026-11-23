@@ -5,7 +5,7 @@ created_date: '2026-11-16T21:03:01Z'
 updated_date: '2026-11-19T10:53:19Z'
 labels: []
 references:
-  - REQ-03.001
+  - REQ-003.001
   - RE-002
   - BR-006
   - BR-001

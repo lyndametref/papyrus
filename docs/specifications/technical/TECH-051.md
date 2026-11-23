@@ -15,18 +15,18 @@ references:
   - MOCK-0001
   - MOCK-0010
   - MOCK-0011
-  - NFR-01.002
-  - NFR-01.003
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.005
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-001.003
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.005
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-001
   - TASK-19
   - TASK-20
@@ -35,7 +35,7 @@ references:
   - TASK-77
   - TASK-86
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
@@ -46,7 +46,7 @@ status: draft
 ## Description
 ## Purpose
 
-Add a read-only page to the offline, project-local web interface that lists the agent skills and workflows used to configure and operate Papyrus, per REQ-06.005. The page is agent-facing (not end-user) reference material: it presents instructions whose values are parameterized by the effective `papyrus.conf.yaml` (prefixes, `id_padding`, statuses, enabled document and decision types, directories, paths, date format) so generated instructions match the configured project. It advances NFR-01.002 (display all Papyrus content) and NFR-01.003 (offline use).
+Add a read-only page to the offline, project-local web interface that lists the agent skills and workflows used to configure and operate Papyrus, per REQ-006.005. The page is agent-facing (not end-user) reference material: it presents instructions whose values are parameterized by the effective `papyrus.conf.yaml` (prefixes, `id_padding`, statuses, enabled document and decision types, directories, paths, date format) so generated instructions match the configured project. It advances NFR-001.002 (display all Papyrus content) and NFR-001.003 (offline use).
 
 ## Scope
 
@@ -207,11 +207,11 @@ Each group contains the skill articles listed below. Each article is an element 
 
 ## Open questions
 
-- None. REQ-06.005's open questions (content format, derived vs static, page location/navigation, covered workflows) are resolved by the approved MOCK-0011 and the UI description's section 9 (user confirmation 2026-11-10). OQ-1..OQ-5 in the UI description are resolved to their recommended defaults.
+- None. REQ-006.005's open questions (content format, derived vs static, page location/navigation, covered workflows) are resolved by the approved MOCK-0011 and the UI description's section 9 (user confirmation 2026-11-10). OQ-1..OQ-5 in the UI description are resolved to their recommended defaults.
 
 ## Related artifacts
 
-- Requirement: `docs/requirements/business/REQ-06.005.md` (primary); `docs/requirements/business/REQ-06.002.md`; `docs/requirements/business/REQ-06.003.md`; `docs/requirements/business/REQ-06.006.md`; `docs/requirements/business/REQ-06.007.md`; `docs/requirements/business/REQ-06.008.md`; `docs/requirements/business/REQ-06.009.md`; `docs/requirements/business/REQ-06.010.md`; `docs/requirements/business/REQ-06.011.md`; `docs/requirements/business/REQ-06.012.md`; `docs/requirements/non-functional/NFR-01.002.md`; `docs/requirements/non-functional/NFR-01.003.md`
+- Requirement: `docs/requirements/business/REQ-006.005.md` (primary); `docs/requirements/business/REQ-006.002.md`; `docs/requirements/business/REQ-006.003.md`; `docs/requirements/business/REQ-006.006.md`; `docs/requirements/business/REQ-006.007.md`; `docs/requirements/business/REQ-006.008.md`; `docs/requirements/business/REQ-006.009.md`; `docs/requirements/business/REQ-006.010.md`; `docs/requirements/business/REQ-006.011.md`; `docs/requirements/business/REQ-006.012.md`; `docs/requirements/non-functional/NFR-001.002.md`; `docs/requirements/non-functional/NFR-001.003.md`
 - Business rule: `docs/business-rules/BR-016-configuration-keys-and-precedence.md`
 - UI description: `docs/specifications/ui/browser-agent-skills-ui.md`
 - UI mockup: `docs/specifications/ui/mockups/MOCK-0011-browser-agent-skills-review.html` (approved)

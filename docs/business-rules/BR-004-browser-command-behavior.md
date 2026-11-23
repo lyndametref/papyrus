@@ -15,7 +15,7 @@ The papyrus browser command performs the behavior stated in its Papyrus manpage 
 
 ## Rationale
 
-Based on REQ-06.002 — Serve the Local Web Interface, this rule exists because the documented browser behavior is the contract for papyrus browser; README.md is the sole behavior source.
+Based on REQ-006.002 — Serve the Local Web Interface, this rule exists because the documented browser behavior is the contract for papyrus browser; README.md is the sole behavior source.
 
 ## Applicability
 

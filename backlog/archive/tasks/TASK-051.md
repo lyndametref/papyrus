@@ -12,12 +12,12 @@ milestone: MS-012
 dependencies:
   - TASK-050
 references:
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-017-tech-spec-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -38,7 +38,7 @@ Matching, ordering, output shapes, exit codes, boundary enforcement, and the rea
 
 Assumptions:
 - Assumption: Rust 1.99.1 and the existing single-crate layout are retained (ADR-0001, ADR-0004); no new ADR or dependency is required.
-- Assumption: deprecated technical specifications are hidden from search, consistent with other document types and BR-017/REQ-05.007.
+- Assumption: deprecated technical specifications are hidden from search, consistent with other document types and BR-017/REQ-005.007.
 - Assumption: the searchable text is the whole persisted record text, so editor-added body sections are searchable.
 - Assumption: text output uses doc as the type value, not the tech-spec type or prefix.
 - Assumption: record IDs come from file stems, so configured prefixes are honored without hardcoding TECH.

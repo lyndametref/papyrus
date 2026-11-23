@@ -35,40 +35,39 @@ references:
   - MOCK-0012
   - NFR-001
   - NFR-001.001
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-02.002
-  - NFR-03.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-04.003
-  - NFR-04.004
-  - NFR-05.001
-  - NFR-06.001
-  - NFR-06.002
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-002.002
+  - NFR-003.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-004.003
+  - NFR-004.004
+  - NFR-005.001
+  - NFR-006.001
+  - NFR-006.002
   - REQ-001
   - REQ-001.001
-  - REQ-01
-  - REQ-01.003
-  - REQ-01.006
-  - REQ-01.007
-  - REQ-02
-  - REQ-02.001
-  - REQ-02.003
-  - REQ-03
-  - REQ-03.001
-  - REQ-03.002
-  - REQ-04
-  - REQ-04.001
-  - REQ-04.002
-  - REQ-05
-  - REQ-05.001
-  - REQ-05.011
-  - REQ-06
-  - REQ-06.001
-  - REQ-06.002
-  - REQ-06.004
-  - REQ-06.005
+  - REQ-001.003
+  - REQ-001.006
+  - REQ-001.007
+  - REQ-002
+  - REQ-002.001
+  - REQ-002.003
+  - REQ-003
+  - REQ-003.001
+  - REQ-003.002
+  - REQ-004
+  - REQ-004.001
+  - REQ-004.002
+  - REQ-005
+  - REQ-005.001
+  - REQ-005.011
+  - REQ-006
+  - REQ-006.001
+  - REQ-006.002
+  - REQ-006.004
+  - REQ-006.005
   - TASK-001
   - TASK-1
   - TASK-12
@@ -93,13 +92,13 @@ references:
   - TECH-001
   - UI-001
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
 # TECH-054 Complete Content-Management Milestone Packaging and Verification
 
-> **Revised (TASK-201, 2026-11-18):** the managed-artifacts-and-lifecycles and agent-skills browser pages, their sidebar entries, and their packaging render checks are retired per ADR-034 and REQ-06.018; the package verification now asserts the removed-surface contract (routes `404`, no sidebar entry, no inventory card) instead. See TECH-080.
+> **Revised (TASK-201, 2026-11-18):** the managed-artifacts-and-lifecycles and agent-skills browser pages, their sidebar entries, and their packaging render checks are retired per ADR-034 and REQ-006.018; the package verification now asserts the removed-surface contract (routes `404`, no sidebar entry, no inventory card) instead. See TECH-080.
 
 ## Description
 ## Purpose
@@ -128,7 +127,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
 ### Out of scope
 
 - New product features, commands, options, record types, or UI changes (any future work).
-- Verification on Debian Trixie or any Debian release other than Forky (ADR-0003, NFR-03.002).
+- Verification on Debian Trixie or any Debian release other than Forky (ADR-0003, NFR-003.002).
 - Advertising support for any release beyond Forky.
 - Real-GUI rendering checks in Firefox, Edge, or Safari; only markup- and asset-level verification is performed (see OQ-1).
 - Re-running the runtime dependency-license audit (no new runtime dependencies; TASK-1/TASK-4 audit remains valid).
@@ -152,7 +151,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
    - `Depends: libc6 (>= 2.34)`
    - `Section: utils`, `Priority: optional`, a `Maintainer` value, and a `Homepage` value
    - a `Description` naming Papyrus as a project-level backlog and documentation manager.
-6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching `Cargo.toml`'s `license` field (NFR-06.001).
+6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching `Cargo.toml`'s `license` field (NFR-006.001).
 7. `dpkg-deb -c` lists exactly `/usr/bin/papyrus` (mode `0755`) and `/usr/share/doc/papyrus/copyright`, plus their directories. It lists no `.css`, `.js`, `.html`, configuration, or man file.
 8. `target/release/papyrus --version` and the installed binary's `--version` both print `papyrus <version>`, equal to the package version.
 
@@ -234,8 +233,8 @@ For each family the installed binary exercises at least create → list → view
 14. Every `text/html` response carries exactly one of the two CSP strings fixed in `browser-requirements.md` §9.7: the strict string when the pre-pass did not set `has_diagram`, and the diagram string only when it did. `/assets/` and non-HTML responses carry no CSP; `script-src` never gains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
 15. Asset verification: `cargo test` runs the manifest test and asserts the manifest row set equals `ASSETS[].path` with no duplicate or missing row and recomputes SHA-256 and byte length for every entry; `dpkg-deb --fsys-tarfile papyrus_<version>_amd64.deb | tar -xO ./usr/share/doc/papyrus/copyright` shows the GPL-3.0-or-later block plus one section per bundled family; `dpkg-deb -c` still lists exactly the binary and the copyright file; `stat -c %s` on the built binary is at most 12,582,912 B (12 MiB), with the measured budget recorded in `docs/packaging.md`.
 16. A missing or empty store directory renders its empty state instead of failing (no server error).
-17. `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` return `404` per ADR-034 and REQ-06.018, and `GET /` renders no card for the two retired virtual pages. The managed-artifacts-and-lifecycles and agent-skills documentation stays outside the browser.
-18. Front-matter metadata projection (REQ-06.004): list and detail views read `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and type-specific keys from the YAML front matter; `created_date` and `updated_date` are read-only in the browser; a save writes changed values to the front matter, refreshes `updated_date`, preserves every other front-matter key and the rest of the file, and never copies metadata into the body.
+17. `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` return `404` per ADR-034 and REQ-006.018, and `GET /` renders no card for the two retired virtual pages. The managed-artifacts-and-lifecycles and agent-skills documentation stays outside the browser.
+18. Front-matter metadata projection (REQ-006.004): list and detail views read `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and type-specific keys from the YAML front matter; `created_date` and `updated_date` are read-only in the browser; a save writes changed values to the front matter, refreshes `updated_date`, preserves every other front-matter key and the rest of the file, and never copies metadata into the body.
 
 #### 3.5 Offline operation
 
@@ -261,7 +260,7 @@ For each family the installed binary exercises at least create → list → view
 #### 3.8 Lazy migration
 
 1. A record written by an older serializer form is migrated to front matter on first read and remains searchable and viewable; a migration that cannot be applied safely leaves the file untouched and the record is still searched from its existing text.
-2. After an external edit of a task or milestone file that keeps it valid Papyrus-native content, Papyrus reads and writes the record without drift and reports no conflict; no Backlog.md file-compatibility is asserted (NFR-04.004, ADR-0010).
+2. After an external edit of a task or milestone file that keeps it valid Papyrus-native content, Papyrus reads and writes the record without drift and reports no conflict; no Backlog.md file-compatibility is asserted (NFR-004.004, ADR-0010).
 
 ### 4. Automated integration test
 
@@ -276,7 +275,7 @@ For each family the installed binary exercises at least create → list → view
 
 ### 5. Documentation and evidence
 
-1. `docs/packaging.md` states the supported release as Debian Forky only (amd64), per ADR-0003 and NFR-03.002, and explicitly states that Trixie and other releases are not claimed or verified.
+1. `docs/packaging.md` states the supported release as Debian Forky only (amd64), per ADR-0003 and NFR-003.002, and explicitly states that Trixie and other releases are not claimed or verified.
 2. `docs/packaging.md` contains the build/package commands, the isolated install and uninstall procedure (scratch directories under `./.tmp/`, removed afterwards), and the extended smoke-test checklist covering sections 3.1–3.8.
 3. `docs/packaging.md` records observed results as a pass/fail table with the environment (Debian Forky version, glibc, `rustc`/`cargo` 1.99.1, `dpkg` version, isolation method, whether `unshare -rn` was available) and the date with timezone (UTC).
 4. The TASK-20 ticket notes record the same evidence: environment, date/timezone, package file name and size, quality-gate outcomes with test counts, smoke-test outcomes, and any deviation or bug fix found.
@@ -342,14 +341,14 @@ For each family the installed binary exercises at least create → list → view
 
 ## Assumptions
 
-- Assumption: the verification host is Debian Forky amd64. At refinement it reports `Debian GNU/Linux forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and `rustc`/`cargo` 1.99.1 pinned by `rust-toolchain.toml`. The isolated `dpkg --instdir/--admindir` install therefore runs against Forky's glibc and dpkg, satisfying the NFR-03.002 verification method without a container.
+- Assumption: the verification host is Debian Forky amd64. At refinement it reports `Debian GNU/Linux forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and `rustc`/`cargo` 1.99.1 pinned by `rust-toolchain.toml`. The isolated `dpkg --instdir/--admindir` install therefore runs against Forky's glibc and dpkg, satisfying the NFR-003.002 verification method without a container.
 - Assumption: isolation via `fakeroot dpkg --instdir/--admindir` is acceptable; a Forky container, chroot, or VM may substitute with the same checks (OQ-2).
 - Assumption: scratch directories live under `./.tmp/` and are removed before the task ends (project convention forbids system temporary directories).
 - Assumption: the package version stays `0.1.0`; no version bump is defined for m-12 and release versioning belongs to release orchestration (OQ-4). TASK-73 (Release 1.0) follows this ticket.
 - Assumption: `scripts/build-deb.sh` is used unchanged and does not force a rebuild; `cargo build --release` must run first.
-- Assumption: `search`, `browser`, and the new cross-type features require no new runtime dependency; the TASK-1/TASK-4 dependency-license audit remains valid (NFR-06.002).
+- Assumption: `search`, `browser`, and the new cross-type features require no new runtime dependency; the TASK-1/TASK-4 dependency-license audit remains valid (NFR-006.002).
 - Assumption: no UI change ships in this ticket, so MOCK-0012 stays the approved layout reference and no new mockup is produced.
-- Assumption: NFR-05.001 browser-version support was verified at markup/feature-subset level by the per-type increments and is not re-verified in a real GUI browser here (OQ-1).
+- Assumption: NFR-005.001 browser-version support was verified at markup/feature-subset level by the per-type increments and is not re-verified in a real GUI browser here (OQ-1).
 - Assumption: the new integration test runs the built binary, not the installed package; the installed-package checks are the manual/scripted checklist in sections 2–3, recorded in `docs/packaging.md`.
 - Assumption: the offline check is environment-dependent; `unshare -rn` is available at refinement, with the documented fallback if not.
 - Assumption: per-type contract coverage remains authoritative in `tests/*_cli.rs` and `tests/*_smoke.rs`; this ticket adds only one milestone-level test that exercises the cross-type flow.
@@ -359,18 +358,18 @@ For each family the installed binary exercises at least create → list → view
 
 None of these blocks implementation; each has a specified default. OQ-1 is recommended for user confirmation before release.
 
-- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox 115+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on the per-type increments' markup-level verification plus the approved MOCK-0012; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
+- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-005.001's verification method asks for checks in Firefox 115+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on the per-type increments' markup-level verification plus the approved MOCK-0012; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
 - **OQ-2 (recommended default: fakeroot `dpkg --instdir/--admindir` on the Forky build host)** — Whether a full Forky container/VM is mandatory. Default: use the fakeroot isolated install, which exercises Forky's glibc and dpkg and never touches the host; if the user requires container-level isolation, the same checklist applies unchanged. Non-blocking.
 - **OQ-3 (recommended default: a new `tests/content_management_smoke.rs`)** — Whether the milestone test belongs in an existing smoke file or a new one. Default: a new file keeps each milestone's smoke coverage separate. Non-blocking.
 - **OQ-4 (recommended default: keep version 0.1.0)** — No m-12 release version is defined in the requirements. Default: package the current Cargo version unchanged; a bump belongs to release orchestration (TASK-73). Non-blocking.
 - **OQ-5 (recommended default: repeat the full record-family lifecycle smoke in this milestone package)** — End-to-end proof of the complete m-12 increment, even though earlier milestone packages verified subsets. Non-blocking.
-- **OQ-6 (recommended default: verify lazy migration at markup/CLI level only)** — Real Backlog.md interoperability edge cases are out of scope under NFR-04.004; this ticket re-checks lazy front-matter migration in the installed binary without re-implementing. Non-blocking.
+- **OQ-6 (recommended default: verify lazy migration at markup/CLI level only)** — Real Backlog.md interoperability edge cases are out of scope under NFR-004.004; this ticket re-checks lazy front-matter migration in the installed binary without re-implementing. Non-blocking.
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-01, REQ-01.003, REQ-01.006, REQ-01.007, REQ-02, REQ-02.001, REQ-02.003, REQ-03, REQ-03.001, REQ-03.002, REQ-04, REQ-04.001, REQ-04.002, REQ-05, REQ-05.001–REQ-05.011, REQ-06, REQ-06.001, REQ-06.002, REQ-06.004, REQ-06.005 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-03.002, NFR-04.001, NFR-04.002, NFR-04.003, NFR-05.001, NFR-06.001, NFR-06.002 |
+| Requirement | REQ-001, REQ-001.003, REQ-001.006, REQ-001.007, REQ-002, REQ-002.001, REQ-002.003, REQ-003, REQ-003.001, REQ-003.002, REQ-004, REQ-004.001, REQ-004.002, REQ-005, REQ-005.001–REQ-005.011, REQ-006, REQ-006.001, REQ-006.002, REQ-006.004, REQ-006.005 |
+| Non-functional | NFR-001.002, NFR-001.003, NFR-002.002, NFR-003.002, NFR-004.001, NFR-004.002, NFR-004.003, NFR-005.001, NFR-006.001, NFR-006.002 |
 | Business rule | BR-004 (browser), BR-005 (task), BR-006 (milestone), BR-007 (release), BR-008 (decision), BR-009 (req), BR-010 (nfr), BR-011 (glossary), BR-012 (ui-spec), BR-013 (rule), BR-014 (audit), BR-015 (search), BR-016 (config keys), BR-017 (tech-spec) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only), ADR-0004 (repository-root single crate), ADR-0005 (embedded dependency-free HTTP server and server-rendered UI), ADR-0006 (optimistic concurrency and atomic writes), ADR-0007 (YAML front matter), ADR-0009 (shared record envelope) |
 | Ticket | TASK-20 |

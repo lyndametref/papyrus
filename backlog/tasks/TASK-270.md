@@ -5,8 +5,8 @@ created_date: '2026-11-20T17:42:52Z'
 updated_date: '2026-11-22T20:12:09Z'
 labels: []
 references:
-  - REQ-06.014
-  - REQ-06.019
+  - REQ-006.014
+  - REQ-006.019
   - ADR-039
   - MS-035
   - ADR-043
@@ -24,7 +24,6 @@ assignee:
 milestone: MS-035
 dependencies:
   - TASK-269
-  - TASK-309
   - TASK-312
 ordinal: 90
 documentation:

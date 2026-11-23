@@ -13,16 +13,16 @@ milestone: MS-013
 dependencies:
   - TASK-061
 references:
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-03.002.md
-  - docs/requirements/business/REQ-04.001.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-05.006.md
-  - docs/requirements/business/REQ-05.008.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-003.002.md
+  - docs/requirements/business/REQ-004.001.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-005.006.md
+  - docs/requirements/business/REQ-005.008.md
 documentation:
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
 priority: medium
@@ -32,7 +32,7 @@ ordinal: 41622
 
 
 ## Description
-Add a read-only browser page that describes every managed artifact/document type and its lifecycle, per REQ-06.003 and the approved MOCK-0010 layout. The page covers a fixed set of twelve types (tasks, milestones, releases, decisions, business requirements, non-functional requirements, glossary terms, UI specifications, technical specifications, UI mockups, business rules, audit records); the set does not change with configured document_types. The task section renders the configured task statuses (REQ-01.002) in their configured order. Every other section states the documented lifecycle for its type (REQ-03.001, REQ-03.002, REQ-04.001, REQ-05.006, REQ-05.007, REQ-05.008). Backlog.md docs, drafts, and project configuration files are excluded. The page is HTML only, reuses the shared shell/sidebar/CSP, and adds a sidebar entry 'Managed artifacts & lifecycles' at the end of the list. No records are listed, viewed, edited, or mutated by this page; all lifecycle operations remain CLI-only.
+Add a read-only browser page that describes every managed artifact/document type and its lifecycle, per REQ-006.003 and the approved MOCK-0010 layout. The page covers a fixed set of twelve types (tasks, milestones, releases, decisions, business requirements, non-functional requirements, glossary terms, UI specifications, technical specifications, UI mockups, business rules, audit records); the set does not change with configured document_types. The task section renders the configured task statuses (REQ-001.002) in their configured order. Every other section states the documented lifecycle for its type (REQ-003.001, REQ-003.002, REQ-004.001, REQ-005.006, REQ-005.007, REQ-005.008). Backlog.md docs, drafts, and project configuration files are excluded. The page is HTML only, reuses the shared shell/sidebar/CSP, and adds a sidebar entry 'Managed artifacts & lifecycles' at the end of the list. No records are listed, viewed, edited, or mutated by this page; all lifecycle operations remain CLI-only.
 
 Scope and behavior are fully specified in docs/specifications/browser-managed-artifacts-and-lifecycles.md. Lifecycle wording uses the documented lifecycles (per user selection during refinement), not the shorthand sentences in MOCK-0010 where those conflict.
 
@@ -49,7 +49,7 @@ Dependencies: TASK-66 (Done). Related: TASK-19, TASK-20 (depend on this ticket).
 - [ ] The browser serves a page with one section for each of tasks, milestones, releases, decisions, business requirements, non-functional requirements, glossary terms, UI specifications, technical specifications, UI mockups, business rules, and audit records.
 - [ ] The covered set is fixed and does not change with configured document_types.
 - [ ] Task states and transitions reflect the configured task statuses.
-- [ ] Every other section explains the documented lifecycle states and transitions and agrees with REQ-03.002, REQ-04.001, and REQ-05.007.
+- [ ] Every other section explains the documented lifecycle states and transitions and agrees with REQ-003.002, REQ-004.001, and REQ-005.007.
 - [ ] Backlog.md docs, drafts, and project configuration files are not described.
 - [ ] A navigation entry reaches the page and the layout follows the approved mockup.
 

@@ -14,12 +14,11 @@ dependencies:
   - TASK-096
   - TASK-097
 references:
-  - docs/requirements/business/REQ-06.013.md
+  - docs/requirements/business/REQ-006.013.md
   - docs/specifications/ui/browser-backlog-records-ui.md
   - docs/specifications/browser-tasks-milestones-and-releases.md
   - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
-  - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
   - docs/specifications/browser-spec-revisions-task-101.md
   - docs/specifications/browser-spec-revisions-task-102.md
@@ -32,7 +31,7 @@ ordinal: 39145
 ## Description
 ## Purpose
 
-Replace the flat `GET /?type=task` task list with the per-milestone kanban board required by REQ-06.013, and let a status be changed from that board. The work is board rendering plus a status-only write that reuses the existing `POST /doc/{id}` endpoint, the ADR-0006 version token, and the single shared patcher/writer (ADR-0013 `record::patch` + `record::store::write_atomic`). No new route, endpoint, module, crate, dependency, non-functional requirement, or ADR is introduced. The approved mockup is MOCK-0002 (kanban-board revision approved 2026-11-12 UTC under TASK-102).
+Replace the flat `GET /?type=task` task list with the per-milestone kanban board required by REQ-006.013, and let a status be changed from that board. The work is board rendering plus a status-only write that reuses the existing `POST /doc/{id}` endpoint, the ADR-0006 version token, and the single shared patcher/writer (ADR-0013 `record::patch` + `record::store::write_atomic`). No new route, endpoint, module, crate, dependency, non-functional requirement, or ADR is introduced. The approved mockup is MOCK-0002 (kanban-board revision approved 2026-11-12 UTC under TASK-102).
 
 ## Current state (verified in the repository)
 

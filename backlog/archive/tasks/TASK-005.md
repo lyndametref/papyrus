@@ -11,15 +11,15 @@ milestone: MS-002
 dependencies:
   - TASK-004
 references:
-  - docs/requirements/business/REQ-06.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-05.001.md
-  - docs/requirements/business/REQ-05.002.md
-  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-006.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-005.001.md
+  - docs/requirements/business/REQ-005.002.md
+  - docs/requirements/business/REQ-005.007.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/specifications/search-requirements.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.002.md
 ordinal: 5000
 ---
 

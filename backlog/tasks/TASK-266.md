@@ -8,9 +8,9 @@ references:
   - ADR-039
   - ADR-0028
   - ADR-0013
-  - REQ-07.003
+  - REQ-007.003
   - TECH-068
-  - REQ-06.014
+  - REQ-006.014
   - TECH-040
   - TC-183
   - TC-184
@@ -43,7 +43,7 @@ Edit forms and `POST /doc/{id}` handling are duplicated per document type. `src/
 - Keep the Backlog and Decision edit and POST behavior unchanged; route the document category to the new builder and handler. Do not add a route, dependency, asset, template, client script, or client-side script. The JSON `api_post` document path is handled by TASK-269.
 
 ## Grounding
-ADR-039 decisions 22-28; ADR-0028 (template set); ADR-0006 and ADR-0013 (optimistic concurrency and single write); TECH-040 section 7; TECH-068 sections 4.2-4.3; REQ-07.003 and REQ-06.014. Symbols: `src/browser/{mod,render,records}.rs`, `src/record/{edit,document,store,patch}.rs`, `src/browser/templates/edit.html`, and `Record::MAX_TITLE_CHARS`.
+ADR-039 decisions 22-28; ADR-0028 (template set); ADR-0006 and ADR-0013 (optimistic concurrency and single write); TECH-040 section 7; TECH-068 sections 4.2-4.3; REQ-007.003 and REQ-006.014. Symbols: `src/browser/{mod,render,records}.rs`, `src/record/{edit,document,store,patch}.rs`, `src/browser/templates/edit.html`, and `Record::MAX_TITLE_CHARS`.
 
 ## Definition of done
 One field-map-driven edit form and one document `form_post` serve every document type and role; the status-code surface and optimistic concurrency are preserved; the document path no longer calls the eight ops builders; Backlog and Decision output is unchanged; tests, clippy -D warnings, and fmt are clean.

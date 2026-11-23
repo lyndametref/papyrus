@@ -57,7 +57,7 @@ ordinal: 41240
 - [x] #1 cargo build, cargo test, and cargo clippy --all-targets are clean.
 - [x] #2 No new dependency, configuration key, CLI flag, or browser route is introduced; the only behavior change is the one additional listing line.
 - [x] #3 G-4 is closed with command evidence in the ticket notes, and the stale omission statement in the G-4 entry of docs/specifications/config-defined-document-types-verification-and-packaging.md is updated to record its resolution.
-- [x] #4 No change to BR-003, BR-016, or REQ-01.002 is required or made; docs/specifications/project-initialization-and-configuration.md §3 item 21 and the traceability table describe the delivered behavior.
+- [x] #4 No change to BR-003, BR-016, or REQ-001.002 is required or made; docs/specifications/project-initialization-and-configuration.md §3 item 21 and the traceability table describe the delivered behavior.
 
 
 ## Implementation Notes

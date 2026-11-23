@@ -15,7 +15,7 @@ status: active
 
 ## Rationale
 
-Based on REQ-05.003 — Manage Glossary Terms, REQ-07.003 — Dispatch Config-Defined Document Commands, REQ-05.010 — Record Metadata in YAML Front Matter, and REQ-05.007 — Manage Document Archive State and Deletion, this rule exists because the glossary is the type where the uniform title contract replaces a former type-specific option: a term is the record's name and the definition its meaning, so the term must be the title, positional on create and renameable through `--title`, while the definition stays a required declared field under its heading. Removing `--term` must change the command surface only: every stored term value survives as the record title, and an invocation that still supplies `--term` fails as a usage error instead of writing a record.
+Based on REQ-005.003 — Manage Glossary Terms, REQ-007.003 — Dispatch Config-Defined Document Commands, REQ-005.010 — Record Metadata in YAML Front Matter, and REQ-005.007 — Manage Document Archive State and Deletion, this rule exists because the glossary is the type where the uniform title contract replaces a former type-specific option: a term is the record's name and the definition its meaning, so the term must be the title, positional on create and renameable through `--title`, while the definition stays a required declared field under its heading. Removing `--term` must change the command surface only: every stored term value survives as the record title, and an invocation that still supplies `--term` fails as a usage error instead of writing a record.
 
 ## Applicability
 

@@ -12,7 +12,7 @@
 <!-- status: approved -->
 <!-- task: TASK-179 -->
 <!-- specs: UI-019 -->
-<!-- refs: REQ-06.019 RE-006 ADR-035 MOCK-0016 -->
+<!-- refs: REQ-006.019 RE-006 ADR-035 MOCK-0016 -->
 
 <header class="wf-chrome" role="navigation" aria-label="Review navigation (not part of the design)">
   <span class="wf-chrome-label">Review</span>
@@ -31,7 +31,7 @@
     <div class="wf-box wf-ticket">
       <h2 class="wf-section-title">Ticket</h2>
       <p><strong>TASK-179</strong> — Design UI for removing the reference list from document-type browser list views</p>
-      <p class="wf-note">Sources: REQ-06.019 (source RE-006), ADR-035, TECH-074, TECH-076, TECH-068, TECH-045, MOCK-0016 (shared list contract), UI-016 (shared shell); spec UI-019. Milestone MS-028.</p>
+      <p class="wf-note">Sources: REQ-006.019 (source RE-006), ADR-035, TECH-074, TECH-076, TECH-068, TECH-045, MOCK-0016 (shared list contract), UI-016 (shared shell); spec UI-019. Milestone MS-028.</p>
       <p class="wf-note">Contract applied here: generic document-type list rows render no reference list in any row; typed and HtmlMockup families keep references; labels render for every family. Single-document view, CLI list and view, JSON API, RecordView, and front matter are unchanged.</p>
     </div>
 
@@ -244,7 +244,7 @@
               <summary style="cursor:pointer;font-weight:600">References (2)</summary>
               <ul style="margin:8px 0 0;padding-left:20px">
                 <li><a class="wf-link" href="#web/view-note" data-goto="view-note">ADR-0017</a></li>
-                <li><a class="wf-link" href="#web/view-note" data-goto="view-note">REQ-06.014</a></li>
+                <li><a class="wf-link" href="#web/view-note" data-goto="view-note">REQ-006.014</a></li>
               </ul>
             </details>
           </main>
@@ -252,7 +252,7 @@
 
         <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
       </div>
-      <p class="wf-note">Annotation (not part of the design): generic single-document view. The collapsible <code>References (2)</code> section stays at the end of the page, exactly as today (REQ-06.012, ADR-033). This view is unchanged by the list change; reference links are illustrative.</p>
+      <p class="wf-note">Annotation (not part of the design): generic single-document view. The collapsible <code>References (2)</code> section stays at the end of the page, exactly as today (REQ-006.012, ADR-033). This view is unchanged by the list change; reference links are illustrative.</p>
     </section>
 
     <!-- TYPED FAMILY LIST: reference line stays in the Title cell -->
@@ -330,7 +330,7 @@
                       <td>
                         <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Papyrus command behavior</a>
                         <span style="display:block;margin-top:4px"><span class="wf-badge">cli</span></span>
-                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-01.005, REQ-05.010</span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-001.005, REQ-005.010</span>
                       </td>
                       <td><span class="wf-badge">active</span></td>
                       <td style="white-space:nowrap">2026-11-15</td>
@@ -342,7 +342,7 @@
                       <td>
                         <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Papyrus init command behavior</a>
                         <span style="display:block;margin-top:4px"><span class="wf-badge">cli</span></span>
-                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">ADR-0018, REQ-01.002</span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">ADR-0018, REQ-001.002</span>
                       </td>
                       <td><span class="wf-badge">active</span></td>
                       <td style="white-space:nowrap">2026-11-12</td>
@@ -354,7 +354,7 @@
                       <td>
                         <a class="wf-link" href="#web/list-business-rules" data-goto="list-business-rules">Papyrus browser command behavior</a>
                         <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span></span>
-                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-06.002, REQ-06.003</span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-006.002, REQ-006.003</span>
                       </td>
                       <td><span class="wf-badge">active</span></td>
                       <td style="white-space:nowrap">2026-11-01</td>
@@ -370,7 +370,7 @@
 
         <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
       </div>
-      <p class="wf-note">Annotation (not part of the design): typed family list. The Title cell keeps its label tag line and its reference line (muted text under the labels). This row layout is unchanged by REQ-06.019. The typed detail and edit views are outside this review; row links are drawn but do not navigate here.</p>
+      <p class="wf-note">Annotation (not part of the design): typed family list. The Title cell keeps its label tag line and its reference line (muted text under the labels). This row layout is unchanged by REQ-006.019. The typed detail and edit views are outside this review; row links are drawn but do not navigate here.</p>
     </section>
 
     <!-- HTML MOCKUP FAMILY LIST: reference line stays in the Title cell -->
@@ -448,7 +448,7 @@
                       <td>
                         <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups">Browser document-type list reference visibility review</a>
                         <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">list</span></span>
-                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-06.019, ADR-035</span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">REQ-006.019, ADR-035</span>
                       </td>
                       <td><span class="wf-badge">approved</span></td>
                       <td style="white-space:nowrap">2026-11-19</td>
@@ -460,7 +460,7 @@
                       <td>
                         <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups">Browser shell and shared list layout review</a>
                         <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">shell</span></span>
-                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">TASK-141, REQ-06.016</span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">TASK-141, REQ-006.016</span>
                       </td>
                       <td><span class="wf-badge">draft</span></td>
                       <td style="white-space:nowrap">2026-11-15</td>
@@ -472,7 +472,7 @@
                       <td>
                         <a class="wf-link" href="#web/list-ui-mockups" data-goto="list-ui-mockups">Browser config-defined document type views review</a>
                         <span style="display:block;margin-top:4px"><span class="wf-badge">browser</span> <span class="wf-badge">documents</span></span>
-                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">TASK-114, REQ-06.014</span>
+                        <span style="display:block;margin-top:2px;font-size:12px;color:var(--wf-muted)">TASK-114, REQ-006.014</span>
                       </td>
                       <td><span class="wf-badge">approved</span></td>
                       <td style="white-space:nowrap">2026-11-14</td>
@@ -488,7 +488,7 @@
 
         <footer class="wf-footer" aria-label="Footer (site-footer)">Papyrus local browser — every page is served from this project; no network access.</footer>
       </div>
-      <p class="wf-note">Annotation (not part of the design): HtmlMockup family list. The Title cell keeps its label tag line and its reference line. This row layout is unchanged by REQ-06.019. The mockup detail and edit views are outside this review; row links are drawn but do not navigate here.</p>
+      <p class="wf-note">Annotation (not part of the design): HtmlMockup family list. The Title cell keeps its label tag line and its reference line. This row layout is unchanged by REQ-006.019. The mockup detail and edit views are outside this review; row links are drawn but do not navigate here.</p>
     </section>
 
   </div>

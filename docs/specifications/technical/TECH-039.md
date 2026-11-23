@@ -18,19 +18,19 @@ references:
   - MOCK-0001
   - MOCK-0008
   - MOCK-0009
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-02.002
-  - NFR-03.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-05.001
-  - NFR-06.001
-  - NFR-06.002
-  - REQ-05.007
-  - REQ-05.009
-  - REQ-06.001
-  - REQ-06.002
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-002.002
+  - NFR-003.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-005.001
+  - NFR-006.001
+  - NFR-006.002
+  - REQ-005.007
+  - REQ-005.009
+  - REQ-006.001
+  - REQ-006.002
   - TASK-1
   - TASK-150
   - TASK-20
@@ -86,7 +86,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
 - A `supersede` or `delete` command for technical specifications — BR-017 defines create/list/view/edit/deprecate/restore only. The lifecycle smoke covers those commands only and claims no supersede step.
 - A dedicated `--type tech-spec` search filter — the documented `--type` vocabulary is `task`, `milestone`, `release`, `decision`, `doc`; technical specifications are searched through `--type doc` (and default search).
 - Structured references between technical specifications and non-functional requirements or tasks — BR-017 defines no reference fields; such IDs remain literal text in the title or description.
-- Verification on Debian Trixie or any Debian release other than Forky (ADR-0003, NFR-03.002).
+- Verification on Debian Trixie or any Debian release other than Forky (ADR-0003, NFR-003.002).
 - Real-GUI rendering checks in Firefox, Edge, or Safari; only markup- and asset-level verification is performed (OQ-1).
 - Re-running the runtime dependency-license audit (no new runtime dependencies; TASK-1/TASK-4 audit remains valid).
 - Changes to requirements (`docs/requirements/`), business rules (`docs/business-rules/`), ADRs (`docs/architecture/adr/`), or packaging scripts (`scripts/build-deb.sh`, `packaging/deb/**`).
@@ -111,7 +111,7 @@ This is a packaging and verification task: no new product behavior is added. Wor
    - `Depends: libc6 (>= 2.34)`
    - `Section: utils`, `Priority: optional`, a `Maintainer` value, and a `Homepage` value
    - a `Description` naming Papyrus as a project-level backlog and documentation manager.
-6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching `Cargo.toml`'s `license` field (NFR-06.001).
+6. The packaged copyright file (`/usr/share/doc/papyrus/copyright`) is in Debian copyright format and declares `GPL-3.0-or-later`, matching `Cargo.toml`'s `license` field (NFR-006.001).
 7. `dpkg-deb -c` lists exactly `/usr/bin/papyrus` (mode `0755`) and `/usr/share/doc/papyrus/copyright`, plus their directories. It lists no `.css`, `.js`, or `.html` file, no configuration file, and no man page.
 8. `target/release/papyrus --version` and the installed binary's `--version` both print `papyrus <version>`, equal to the package version.
 
@@ -137,7 +137,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 1. `papyrus --help` exits 0 and lists `tech-spec`, `search`, and `browser` among the subcommands.
 2. `papyrus --version` exits 0 and prints `papyrus <version>`.
 3. `papyrus --dir <project> init <name> --no-git` creates `papyrus.config.yml` and the configured directory structure, including the technical-specification directory and its `deprecated/` subfolder.
-4. Technical-specification lifecycle (BR-017, REQ-05.009, REQ-05.007):
+4. Technical-specification lifecycle (BR-017, REQ-005.009, REQ-005.007):
    - `papyrus tech-spec create <title> --description <text>` prints `TECH-001` (or the next free ID), and the file is written as UTF-8 Markdown `<doc_directory>/technical/TECH-001.md` with a `# TECH-001 <title>` heading, a `## Description` section, and a single trailing newline.
    - `tech-spec list` lists active specifications in ID ascending order as `TECH-001 <title>`; deprecated specifications are hidden.
    - `tech-spec view TECH-001` prints the full persisted text, including the heading and `## Description`; viewing a deprecated specification by ID is allowed; an unknown ID exits 3.
@@ -216,7 +216,7 @@ All commands run against the installed binary with `--dir <project>` pointing at
 
 ### 5. Documentation and evidence
 
-1. `docs/packaging.md` states the supported release as Debian Forky only (amd64), per ADR-0003 and NFR-03.002, and explicitly states that Trixie and other releases are not claimed or verified.
+1. `docs/packaging.md` states the supported release as Debian Forky only (amd64), per ADR-0003 and NFR-003.002, and explicitly states that Trixie and other releases are not claimed or verified.
 2. `docs/packaging.md` contains the build/package commands, the isolated install and uninstall procedure (scratch directories under `./.tmp/`, removed afterwards), and the extended smoke-test checklist covering sections 3.1–3.6.
 3. `docs/packaging.md` records observed results as a pass/fail table with the environment (Debian Forky version, glibc, `rustc`/`cargo` 1.99.1, `dpkg` version, isolation method, whether `unshare -rn` was available) and the date with timezone.
 4. The TASK-59 ticket notes record the same evidence: environment, date/timezone, package file name and size, quality-gate outcomes with test counts, smoke-test outcomes, and any deviation or bug fix found.
@@ -279,27 +279,27 @@ All commands run against the installed binary with `--dir <project>` pointing at
 
 ## Assumptions
 
-- Assumption: the verification host is Debian Forky amd64. At refinement it reports `Debian GNU/Linux forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and `rustc`/`cargo` 1.99.1 pinned by `rust-toolchain.toml`. The isolated `dpkg --instdir/--admindir` install therefore runs against Forky's glibc and dpkg, satisfying the NFR-03.002 verification method without a container.
+- Assumption: the verification host is Debian Forky amd64. At refinement it reports `Debian GNU/Linux forky/sid`, glibc 2.43, `dpkg` 1.23.11, with `fakeroot`, `dpkg-deb`, `ip`, and `unshare -rn` available, and `rustc`/`cargo` 1.99.1 pinned by `rust-toolchain.toml`. The isolated `dpkg --instdir/--admindir` install therefore runs against Forky's glibc and dpkg, satisfying the NFR-003.002 verification method without a container.
 - Assumption: isolation via `fakeroot dpkg --instdir/--admindir` is acceptable; a Forky container, chroot, or VM may substitute with the same checks (OQ-2).
 - Assumption: scratch directories live under `./.tmp/` and are removed before the task ends (project convention forbids system temporary directories).
 - Assumption: the package version stays `0.1.0`; no version bump is defined for m-11 and release versioning belongs to release orchestration (OQ-4).
 - Assumption: `scripts/build-deb.sh` is used unchanged and does not force a rebuild; `cargo build --release` must run first. The repository may contain a stale `target/release/papyrus` and `papyrus_0.1.0_amd64.deb` built before TASK-57, so packaging without a rebuild would ship a binary lacking technical-specification browser support. AC #2 guards this.
-- Assumption: `tech-spec`, `search`, and `browser` require no new runtime dependency; the TASK-1/TASK-4 dependency-license audit remains valid (NFR-06.002).
+- Assumption: `tech-spec`, `search`, and `browser` require no new runtime dependency; the TASK-1/TASK-4 dependency-license audit remains valid (NFR-006.002).
 - Assumption: no UI change ships in this ticket, so MOCK-0001…MOCK-0009 remain the approved layout references and no new mockup is produced. MOCK-0009 is `approved` in the mockup registry (user approval recorded 2026-11-07 UTC, TASK-58).
-- Assumption: NFR-05.001 browser-version support was verified at markup/feature-subset level by TASK-6/TASK-57 and is not re-verified in a real GUI browser here (OQ-1).
+- Assumption: NFR-005.001 browser-version support was verified at markup/feature-subset level by TASK-6/TASK-57 and is not re-verified in a real GUI browser here (OQ-1).
 - Assumption: the new integration test runs the built binary, not the installed package; the installed-package checks are the manual/scripted checklist in sections 2–3, recorded in `docs/packaging.md`.
 - Assumption: the offline check is environment-dependent; `unshare -rn` is available at refinement, with the documented fallback if not.
 - Assumption: technical specifications support `restore` after `deprecate` (BR-017); smoke tests assert restoration and ID preservation.
 - Assumption: `--description` is a single-line sanitized CLI input and `--editor` is the CLI route for multi-line bodies; the browser otherwise allows a multi-line description. `--editor` is not exercised in the isolated install because it depends on the environment; `tests/technical_specifications_cli.rs` remains its contract coverage.
 - Assumption: the browser requires both title and description; an on-disk record with an absent or empty description is viewable as `(none)` but must be completed before it can be saved from the browser.
-- Assumption: deprecated technical specifications are excluded from list, search, and browser per REQ-05.007/BR-017; the smoke test asserts exclusion at all three surfaces.
+- Assumption: deprecated technical specifications are excluded from list, search, and browser per REQ-005.007/BR-017; the smoke test asserts exclusion at all three surfaces.
 - Assumption: the dedicated packaging specification authored with this refinement (`docs/specifications/technical-specifications-milestone-packaging-and-verification.md`) is the canonical home for this ticket; the generic `docs/specifications/cli-milestone-packaging-and-verification.md` (TASK-62) remains the m-4 precedent and does not claim search/browser coverage for technical specifications.
 
 ## Open questions
 
 None of these blocks implementation; each has a specified default. OQ-1 is recommended for user confirmation before release.
 
-- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-05.001's verification method asks for checks in Firefox 115+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on TASK-6/TASK-57 markup-level verification plus the approved MOCK-0001…MOCK-0009; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
+- **OQ-1 (recommended default: markup/asset-level verification only)** — NFR-005.001's verification method asks for checks in Firefox 115+. This headless packaging task verifies the served markup, asset set, viewport hooks, and absence of forbidden features, but does not drive a real GUI browser. Default: record the limitation in `docs/packaging.md` and rely on TASK-6/TASK-57 markup-level verification plus the approved MOCK-0001…MOCK-0009; schedule a manual browser pass outside this ticket if the user requires one. Non-blocking.
 - **OQ-2 (recommended default: fakeroot `dpkg --instdir/--admindir` on the Forky build host)** — Whether a full Forky container/VM is mandatory. Default: use the fakeroot isolated install, which exercises Forky's glibc and dpkg and never touches the host; if the user requires container-level isolation, the same checklist applies unchanged. Non-blocking.
 - **OQ-3 (recommended default: a new `tests/technical_specifications_smoke.rs`)** — Whether the milestone test belongs in an existing smoke file or a new file. Default: a new file keeps each milestone's smoke coverage separate and avoids growing an already consolidated file. Non-blocking.
 - **OQ-4 (recommended default: keep version 0.1.0)** — No m-11 release version is defined in the requirements. Default: package the current Cargo version unchanged; a bump belongs to release orchestration. Non-blocking.
@@ -309,8 +309,8 @@ None of these blocks implementation; each has a specified default. OQ-1 is recom
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05.007, REQ-05.009, REQ-06.001, REQ-06.002 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-03.002, NFR-04.001, NFR-04.002, NFR-05.001, NFR-06.001, NFR-06.002 |
+| Requirement | REQ-005.007, REQ-005.009, REQ-006.001, REQ-006.002 |
+| Non-functional | NFR-001.002, NFR-001.003, NFR-002.002, NFR-003.002, NFR-004.001, NFR-004.002, NFR-005.001, NFR-006.001, NFR-006.002 |
 | Business rule | BR-004 (browser command behavior), BR-015 (search command behavior), BR-016 (configuration keys and precedence), BR-017 (tech-spec command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0004 (repository-root single crate), ADR-0005 (embedded HTTP server and server-rendered UI), ADR-0006 (optimistic concurrency and atomic writes) |
 | Ticket | TASK-59 |

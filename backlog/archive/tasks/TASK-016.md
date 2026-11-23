@@ -11,21 +11,20 @@ dependencies:
   - TASK-014
   - TASK-015
 references:
-  - docs/requirements/business/REQ-04.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/business/REQ-004.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-008-decision-command-behavior.md
   - docs/specifications/decision-records-milestone-packaging-and-verification.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
-  - docs/specifications/decision-records-milestone-packaging-and-verification.md
 ordinal: 16000
 ---
 
@@ -69,7 +68,7 @@ Open questions (non-blocking, defaults in the specification):
 - OQ-4: Keep version 0.1.0.
 
 ## Acceptance Criteria
-- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides decision creation, list, view, edit, archive, and supersession, search (including decision records), and browser access (all six categories including decision); Debian Trixie and any other release are not claimed or verified.
+- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides decision creation, list, view, edit, archive, and supersession, search (including decision records), and browser access (all six categories including decision); Debian Trixie and any other release are not claimed or verified.
 - [ ] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists decision, task, milestone, release, search, and browser (guards against packaging a stale binary).
 - [ ] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [ ] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

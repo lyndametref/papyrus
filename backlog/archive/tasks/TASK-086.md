@@ -13,13 +13,13 @@ milestone: MS-017
 dependencies:
   - TASK-080
 references:
-  - docs/requirements/business/REQ-01.001.md
-  - docs/requirements/business/REQ-01.003.md
-  - docs/requirements/business/REQ-01.006.md
+  - docs/requirements/business/REQ-001.001.md
+  - docs/requirements/business/REQ-001.003.md
+  - docs/requirements/business/REQ-001.006.md
   - docs/specifications/project-initialization-and-configuration.md
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-01.007.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-001.007.md
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
   - docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md
   - >-
@@ -31,7 +31,7 @@ ordinal: 39080
 
 
 ## Description
-Align `papyrus init` and non-init command startup with REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.006, and REQ-01.007.
+Align `papyrus init` and non-init command startup with REQ-001.001, REQ-001.002, REQ-001.003, REQ-001.006, and REQ-001.007.
 
 Scope:
 - Init succeeds in a non-empty directory and modifies no pre-existing file other than `papyrus.config.yml`.
@@ -77,7 +77,7 @@ Assumptions:
 
 
 ## Implementation Notes
-1. Review current init/startup implementation and tests; map gaps to REQ-01.001/002/003/006/007.
+1. Review current init/startup implementation and tests; map gaps to REQ-001.001/002/003/006/007.
 2. Update src/init.rs: remove non-empty-directory rejection; block only when papyrus.config.yml exists without --force; replace the config file in full under --force; leave all other files untouched; preserve --no-git.
 3. Update command startup in src/lib.rs::run (or a shared helper): for every non-init command, check the resolved configuration path exists before building context; return runtime error exit 1 naming the searched path and papyrus init remedy; remove defaults fallback and discovery.
 4. Refactor the interactive walkthrough in src/init.rs to a single space-toggle artifact list: task, milestone, and release always active; decision/document toggles; prompt prefix/folder only for activated artifacts; prompt each shared root once; bracket defaults; validation hints; inactive types enabled: false.

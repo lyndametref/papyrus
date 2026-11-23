@@ -12,13 +12,13 @@ references:
   - ADR-0019
   - ADR-0029
   - REQ-001
-  - REQ-01.002
-  - REQ-01.004
-  - REQ-01.005
-  - REQ-01.008
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-07.002
+  - REQ-001.002
+  - REQ-001.004
+  - REQ-001.005
+  - REQ-001.008
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-007.002
   - TASK-001
   - TASK-002
   - TASK-003
@@ -31,7 +31,7 @@ status: verified
 # TECH-073 Project Diagnostics (`papyrus check`)
 
 ## Description
-**Requirement:** REQ-01.008 (Run Project Diagnostics)
+**Requirement:** REQ-001.008 (Run Project Diagnostics)
 **Architecture:** ADR-0029 (Read-Only Corpus Diagnostics with Duplicate-ID Repair), decisions 1-9
 **Milestone:** m-21
 **UI mockups:** none (CLI only)
@@ -47,7 +47,7 @@ document is the implementation contract.
 
 - `papyrus check` is a built-in command with no subcommands. It takes two flags of its
   own, `--fix` and `--force` (section 10.1); `--json`, `--dir`, `--config`, and
-  `--no-color` apply as global options (REQ-01.004).
+  `--no-color` apply as global options (REQ-001.004).
 - `check` is exempt from fail-closed startup (ADR-0019). `lib.rs::run` builds the
   command tree with no registry when the first positional is `check`, so
   `papyrus check --help` works on a project whose configuration is invalid
@@ -97,7 +97,7 @@ environment-specific detail.
 
 **Stage A — tolerant self-load.** Parse the effective configuration through
 `commands::load_effective_config_tolerant`, the loader used by
-`config get|set|unset|list` (REQ-01.002, REQ-07.002). It merges the defaults with the
+`config get|set|unset|list` (REQ-001.002, REQ-007.002). It merges the defaults with the
 file and deserializes, without `Config::validate`.
 
 - A load error (missing configuration file, malformed YAML, duplicate key, schema
@@ -140,7 +140,7 @@ and does not abort the run.
   only; they carry no front matter, so no other scanner reads them.
 - A path with a `deprecated` component is never listed or read, even if a configured
   directory points at one. Files under `deprecated/` are not candidates for any
-  finding and produce no report entry (REQ-05.007).
+  finding and produce no report entry (REQ-005.007).
 - Reads go through `record::frontmatter` and `record::document` only: one parser, one
   projection, no second metadata model (ADR-0013, ADR-0018).
 
@@ -173,7 +173,7 @@ member of that family and is ignored.
 - Compare canonical keys per family across the family's active, archived, and
   read-only legacy directories.
 - Grouped families (`req`, `nfr`) compare group records (`REQ-001`) and member
-  records (`REQ-01.008`) in separate spaces: a key with one number and a key with two
+  records (`REQ-001.008`) in separate spaces: a key with one number and a key with two
   numbers never collide.
 - A key seen in two or more distinct paths is one finding: `family` = family name,
   `subject` = display ID of the first path in sorted order, `locations` = all paths,
@@ -239,11 +239,11 @@ body both carry the value and disagree".
   front-matter `id` and `title`. A disagreeing ID or title is one finding naming the
   field and both values. A missing heading is not a conflict. Tasks and milestones
   keep no `# <ID> <title>` heading, so the check does not apply to them
-  (REQ-05.010).
+  (REQ-005.010).
 - **Decisions are excluded entirely** from this kind. `## Status`, `## Date`, and
   `## References` are canonical decision sections, and a frozen ADR body keeps its own
   heading, so neither a retired-section nor a heading comparison can be expected to
-  agree (REQ-01.008, REQ-05.010).
+  agree (REQ-001.008, REQ-005.010).
 - `subject` = record ID, `locations` = `[record path]`, `detail` names the field and
   both values, for example `"section ## Status \"Done\" disagrees with front matter
   status \"In Progress\""` or `"heading title \"A\" disagrees with front matter title
@@ -320,7 +320,7 @@ fills it with the entries of section 10.10.
 | Code | Meaning |
 |---|---|
 | 0 | The run completed and found nothing. |
-| 4 | The run completed and found at least one finding (the validation/conflict code of REQ-01.004, reused for findings), including a run in which `--fix` repaired every repairable finding and a run whose repair was cancelled (section 10.11). |
+| 4 | The run completed and found at least one finding (the validation/conflict code of REQ-001.004, reused for findings), including a run in which `--fix` repaired every repairable finding and a run whose repair was cancelled (section 10.11). |
 | 1 | I/O failure (a directory could not be listed, the project directory is unreadable). |
 | 2 | Usage error: a clap parse error, `--force` without `--fix`, or the non-terminal `--fix` refusal of section 10.8. |
 
@@ -396,7 +396,7 @@ Within one duplicate group:
     plain document type): observed numbers are `numbers[0]` of every scanned record in
     the same family whose configured prefix matches case-insensitively; the new ID is
     `identity::format_id(prefix, n, cfg.id_padding)`.
-  - **Member of a dotted or grouped family** (`REQ-01.008`, a dotted document member):
+  - **Member of a dotted or grouped family** (`REQ-001.008`, a dotted document member):
     observed numbers are `numbers[1]` of every scanned record in the same family, with
     the same configured prefix and the same `numbers[0]`; the group component is
     `identity::format_id(prefix, numbers[0], cfg.id_padding)`; the new ID is
@@ -453,7 +453,7 @@ Reported and left untouched, with no write to any file of the group:
 - Every non-`duplicate-id` finding: dangling `milestone`/`release` references,
   dependency cycles, self-dependencies, front-matter/section conflicts including heading
   disagreements, and invalid configuration.
-- No `deprecated/` folder is read, migrated, or repaired (REQ-05.007).
+- No `deprecated/` folder is read, migrated, or repaired (REQ-005.007).
 
 A refusal does not abort the run: the finding stays in the report, other groups are
 still repaired, and the exit code stays 4.
@@ -509,7 +509,7 @@ apply repairs? [y/N]
   prints nothing to stdout, and exits 2. This is a usage error, so `--json` emits no
   report object, exactly like a clap usage error.
   - Interpretation: the refusal is gated on a non-empty plan. A run with nothing to
-    repair never prompts and therefore does not fail, which satisfies REQ-01.008's
+    repair never prompts and therefore does not fail, which satisfies REQ-001.008's
     intent that an unattended run never blocks on a prompt.
 - The confirmation reads one line from stdin with `std::io`; no terminal crate, no raw
   mode, no `stty` (ADR-0029 decision 8).
@@ -605,12 +605,12 @@ has no affected reference. Entries keep the key order shown (`serde_json` with
 
 ## 11. Traceability
 
-- REQ-01.008 — run project diagnostics (behavior, finding categories, skipped checks).
-- REQ-01.002, REQ-07.002 — tolerant configuration surfaces and validity diagnostics.
-- REQ-01.004 — global `--json` and exit codes 0/1/2/3/4.
-- REQ-01.005 — canonical ID shape and the single ID space.
-- REQ-05.007 — an inert `deprecated/` folder.
-- REQ-05.010 — front matter authority, heading policy, canonical decision sections.
+- REQ-001.008 — run project diagnostics (behavior, finding categories, skipped checks).
+- REQ-001.002, REQ-007.002 — tolerant configuration surfaces and validity diagnostics.
+- REQ-001.004 — global `--json` and exit codes 0/1/2/3/4.
+- REQ-001.005 — canonical ID shape and the single ID space.
+- REQ-005.007 — an inert `deprecated/` folder.
+- REQ-005.010 — front matter authority, heading policy, canonical decision sections.
 - ADR-0029 — decisions 2-6 (exemption from fail-closed startup, exit-code path,
   read-only scanners, descriptor-driven detection, finding shape and order) and
   decisions 7-9 (keeper and reassignment rules, the refusals, no inbound reference

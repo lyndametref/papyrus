@@ -5,15 +5,15 @@ created_date: '2026-11-20T17:40:57Z'
 updated_date: '2026-11-21T17:03:47Z'
 labels: []
 references:
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
   - NFR-007.001
   - NFR-007.002
   - TECH-069
   - TC-183
   - TC-184
-  - REQ-05.001
+  - REQ-005.001
   - BR-001
 status: Done
 assignee:
@@ -32,7 +32,7 @@ type: test-design
 ## Description
 Context: every later milestone (MS-033 onward) proves equivalence against this corpus, so a missing case becomes an undetectable regression. Extend the existing conventions instead of inventing new ones: `tests/fixtures/characterization/lists/` with `tests/list_characterization_capture.rs` (`#[ignore]` capture) and `tests/list_characterization_replay.rs` (default-suite replay), and `tests/golden/cli-help/` with `tests/cli_help_golden.rs` (byte-for-byte help goldens, regenerated with `PAPYRUS_UPDATE_CLI_HELP=1`). Do not modify `tests/fixtures/characterization/lists/`: it is pinned to commit d60f71c9.
 
-Inputs: MS-032 AC-2 and AC-6; TC-183 (strict bytes, JSON, status codes); TC-184 (semantic HTML for later milestones); REQ-07.003 and REQ-05.001 to REQ-05.014 (uniform title contract); BR-001, BR-009 to BR-014, BR-017 to BR-020.
+Inputs: MS-032 AC-2 and AC-6; TC-183 (strict bytes, JSON, status codes); TC-184 (semantic HTML for later milestones); REQ-007.003 and REQ-005.001 to REQ-005.014 (uniform title contract); BR-001, BR-009 to BR-014, BR-017 to BR-020.
 
 Scope:
 
@@ -60,11 +60,11 @@ Scope:
 
 6. CLI capture per type: `create` with the minimum required options, `create --json`, `list`, `list --json`, `view`, `view --json`, `edit`, `edit --json`, `archive`, `delete` (on a throwaway copy), `status` where the type declares it, `supersede` for `ui-mockup`, and `create-group` for `req` and `nfr`. Each case captures the stored record bytes, stdout, stderr, exit code, and the JSON payload when `--json` is used.
 
-7. Title and term bytes (MS-032 AC-6): capture the current pre-refactor form `glossary create --term <X> --definition <Y>` and `glossary edit <ID> --term <Z>` (see `src/glossary.rs`), the help text that documents `--term`, and the positional `TITLE` create form plus today's `--title` edit form for every other type. The uniform title contract of REQ-07.003 and BR-011 must stay measurable from these bytes.
+7. Title and term bytes (MS-032 AC-6): capture the current pre-refactor form `glossary create --term <X> --definition <Y>` and `glossary edit <ID> --term <Z>` (see `src/glossary.rs`), the help text that documents `--term`, and the positional `TITLE` create form plus today's `--title` edit form for every other type. The uniform title contract of REQ-007.003 and BR-011 must stay measurable from these bytes.
 
 8. CLI help snapshot (MS-032 AC-5): extend `tests/cli_help_golden.rs::cases()` and `tests/golden/cli-help/` with `config --help`, `config get --help`, `config set --help`, `config unset --help`, `config list --help`, `help --help`, `browser --help`, `search --help`, `init --help`, `import --help`, and the `task`, `milestone`, `release`, and `decision` verb helps the current case list omits (`release` has none). Keep `golden_snapshot_set_is_complete` and the `PAPYRUS_UPDATE_CLI_HELP=1` regeneration path.
 
-9. `tests/fixtures/characterization/corpus/EXPECTED-DELTAS.md`: the deliberate differences a later milestone may observe, each with its source. Uniform title contract (REQ-07.003, REQ-05.001, REQ-05.003, BR-011); `--term` removed and answered as a usage error (REQ-05.003, BR-011); help prose (REQ-07.003); asset cache headers and versioned vendor URLs (NFR-007.003, ADR-038); latency (NFR-007.001, NFR-007.002); conflict and not-found renderer collapse from 9 to 1 and 5 to 1 (ADR-039, proven in MS-035). No other difference is expected.
+9. `tests/fixtures/characterization/corpus/EXPECTED-DELTAS.md`: the deliberate differences a later milestone may observe, each with its source. Uniform title contract (REQ-007.003, REQ-005.001, REQ-005.003, BR-011); `--term` removed and answered as a usage error (REQ-005.003, BR-011); help prose (REQ-007.003); asset cache headers and versioned vendor URLs (NFR-007.003, ADR-038); latency (NFR-007.001, NFR-007.002); conflict and not-found renderer collapse from 9 to 1 and 5 to 1 (ADR-039, proven in MS-035). No other difference is expected.
 
 10. `README.md`: the single regeneration command `PAPYRUS_CAPTURE_COMMIT=$(git rev-parse HEAD) cargo test --test characterization_capture -- --ignored`, the case schema, the timestamp normalisation rule, and the corpus hash rule (sha256 over sorted `<relative path>\0<sha256(bytes)>` lines).
 
@@ -83,7 +83,7 @@ Definition of done: a second capture run is idempotent (`git status --porcelain 
 - [ ] #7 Every conflict page the stale-version dispatcher can select is exercised by a stale-version POST: document_conflict_page, conflict_page_ui_mockup, conflict_page_business_rule, conflict_page_audit_record, conflict_page_tech_spec, conflict_page_use_case and conflict_page, across the nine document types that reach them, and conflict_page_test_case plus conflict_page_test_report are recorded as unreachable rather than claimed as covered.
 - [ ] #8 Every NotFoundPage variant is exercised by a request: TECH-999, UC-999, TC-999, TR-999 and NOTE-999, five cases in total.
 - [ ] #9 The CLI matrix captures create, create with JSON, list, list with JSON, view, view with JSON, edit, edit with JSON, archive, delete, status where declared, supersede for ui-mockup and create-group for req and nfr, with record bytes, stdout, stderr and exit codes (MS-032 AC-2).
-- [ ] #10 The pre-refactor glossary create and edit calls that pass a term option, their help text, and the positional title create plus the current title-option edit form of every other type are captured, so the REQ-07.003 title migration is measurable from bytes (MS-032 AC-6).
+- [ ] #10 The pre-refactor glossary create and edit calls that pass a term option, their help text, and the positional title create plus the current title-option edit form of every other type are captured, so the REQ-007.003 title migration is measurable from bytes (MS-032 AC-6).
 - [ ] #11 The CLI help golden set covers every document command and the config subcommands config, config get, config set, config unset, config list, help, browser, search, init and import, plus the missing task, milestone, release and decision verb helps, and the golden set completeness check passes (MS-032 AC-5).
 - [ ] #12 The expected-delta list states exactly the six documented deltas with their sources: uniform title contract, term option removal, help prose, asset cache headers, latency, and the nine-to-one and five-to-one renderer collapse; no other difference is listed.
 - [ ] #13 One documented command regenerates the expected tree from a clean checkout, and the replay test passes in the default cargo test run.

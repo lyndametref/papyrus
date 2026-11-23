@@ -11,15 +11,15 @@ dependencies:
   - TASK-016
   - TASK-021
 references:
-  - docs/requirements/business/REQ-05.md
-  - docs/requirements/business/REQ-05.003.md
-  - docs/requirements/business/REQ-05.004.md
-  - docs/requirements/business/REQ-05.005.md
-  - docs/requirements/business/REQ-05.006.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.md
+  - docs/requirements/business/REQ-005.003.md
+  - docs/requirements/business/REQ-005.004.md
+  - docs/requirements/business/REQ-005.005.md
+  - docs/requirements/business/REQ-005.006.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
   - docs/business-rules/BR-013-rule-command-behavior.md

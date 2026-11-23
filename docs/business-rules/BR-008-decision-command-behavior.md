@@ -15,7 +15,7 @@ The `papyrus decision` command creates, lists, views, and edits decision records
 
 ## Rationale
 
-Based on REQ-04.001 — Create and Inspect Decisions and REQ-04.002 — Update and Supersede Decisions, this rule exists because decisions belong to the decision category, whose lifecycle is the five Nygard statuses; an inactive or replaced decision is marked `superseded` or `deprecated`, so documenting an archive operation would invent a state the category does not have and contradict the command set.
+Based on REQ-004.001 — Create and Inspect Decisions and REQ-004.002 — Update and Supersede Decisions, this rule exists because decisions belong to the decision category, whose lifecycle is the five Nygard statuses; an inactive or replaced decision is marked `superseded` or `deprecated`, so documenting an archive operation would invent a state the category does not have and contradict the command set.
 
 ## Applicability
 

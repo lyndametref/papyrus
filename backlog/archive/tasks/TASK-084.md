@@ -18,10 +18,9 @@ references:
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
   - docs/specifications/papyrus-native-record-layout-and-single-id-space.md
-  - >-
     docs/specifications/migrate-document-record-types-to-front-matter-lazily-on-first-read-and-first-write.md
   - docs/specifications/shared-record-envelope-and-front-matter-patcher.md
 priority: high
@@ -31,7 +30,7 @@ ordinal: 39060
 
 
 ## Description
-Implement ADR-0013 Stage 4 for tasks and milestones (ADR-0012 decisions 4, 5, 8 and 9; REQ-05.010, REQ-05.011). `src/record/migrate.rs` still converts a legacy task or milestone body into the Backlog.md layout on read/write through `convert_task`, `convert_milestone` and `is_legacy_shape`. That target shape was renounced by NFR-04.004, so adoption must be front-matter-only and the conversion must be deleted together with its tests and fixtures. Task and milestone creation also still emits a `# <ID> <title>` heading and the retired metadata sections.
+Implement ADR-0013 Stage 4 for tasks and milestones (ADR-0012 decisions 4, 5, 8 and 9; REQ-005.010, REQ-005.011). `src/record/migrate.rs` still converts a legacy task or milestone body into the Backlog.md layout on read/write through `convert_task`, `convert_milestone` and `is_legacy_shape`. That target shape was renounced by NFR-004.004, so adoption must be front-matter-only and the conversion must be deleted together with its tests and fixtures. Task and milestone creation also still emits a `# <ID> <title>` heading and the retired metadata sections.
 
 This ticket:
 - adds the front-matter block on the first single-record read (block only; body byte-identical) and on the first write (block plus retirement of the legacy metadata sections and the title heading);
@@ -45,7 +44,7 @@ This ticket:
 Adoption remains per record, idempotent, and never renames or relocates a file. Bulk `list` commands do not adopt. Out of scope: the browser save path (removed by TASK-97), the Backlog.md import (TASK-92), document record types (already adopted by TASK-68), and any bulk migration command. Browser task/milestone saves may keep the old body shape until TASK-97; this ticket must not add new browser serialization.
 
 **Assumptions**
-- Assumption: the task/milestone `# <ID> <title>` heading is a legacy metadata carrier. Read adoption leaves it in place; the first write removes it (REQ-05.010 heading policy; ADR-0012 decision 5).
+- Assumption: the task/milestone `# <ID> <title>` heading is a legacy metadata carrier. Read adoption leaves it in place; the first write removes it (REQ-005.010 heading policy; ADR-0012 decision 5).
 - Assumption: read adoption derives values from legacy sections because writing defaults would hide an existing status, assignee, milestone, labels, dependencies or release; the body itself stays byte-identical (ADR-0012 decision 9).
 - Assumption: bulk `list` is not a single-record read and does not adopt, which preserves the "no bulk pass" rule (ADR-0012 decision 9).
 - Assumption: an adopted task with no `## Status` uses the configured `default_status`; an adopted task with no ordinal uses `max(observed)+1`, consistent with create (ADR-0012 decision 10).
@@ -55,7 +54,7 @@ Adoption remains per record, idempotent, and never renames or relocates a file. 
 - Assumption: key completion for partially front-mattered records is removed to satisfy idempotency (ADR-0012 decision 9). This replaces the current `dropped_task_keys_are_readded_on_next_read` behaviour and its test.
 - Assumption: no UI mockup is required; the change is a CLI read/write-path and file-format change.
 
-**Open questions:** none. The behaviour above is fixed by REQ-05.010, REQ-05.011, ADR-0012 and ADR-0013; the two implementation interpretations (heading removal on write and removal of key completion) are recorded as assumptions and justified by the cited decisions.
+**Open questions:** none. The behaviour above is fixed by REQ-005.010, REQ-005.011, ADR-0012 and ADR-0013; the two implementation interpretations (heading removal on write and removal of key completion) are recorded as assumptions and justified by the cited decisions.
 
 ## Acceptance Criteria
 - [x] A task or milestone that starts without front matter and is read through a single-record path (view, edit, archive, restore, delete) gains a front-matter block at byte 0 with every documented key for its type; the body after the block is byte-identical (no heading removal, no section removal, no re-rendering, no rename or relocation) and one report line `<path>\tadded-front-matter\t<keys>` is printed. Bulk list commands do not adopt.

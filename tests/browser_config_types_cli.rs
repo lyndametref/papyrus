@@ -1298,7 +1298,7 @@ fn t182_03_glossary_landing_page_display_is_unchanged() {
     let _ = fs::remove_dir_all(&d);
 }
 
-// TC-065 / NFR-01.003: the list views and their assets are fully local.
+// TC-065 / NFR-001.003: the list views and their assets are fully local.
 #[test]
 fn t182_04_list_views_and_assets_require_no_network_access() {
     let d = init("182-04");

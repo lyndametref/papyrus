@@ -13,8 +13,8 @@ milestone: MS-017
 dependencies:
   - TASK-081
 references:
-  - docs/requirements/business/REQ-06.007.md
-  - docs/requirements/non-functional/NFR-02.001.md
+  - docs/requirements/business/REQ-006.007.md
+  - docs/requirements/non-functional/NFR-002.001.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-spec-revisions-task-86.md
   - docs/business-rules/BR-004-browser-command-behavior.md
@@ -28,11 +28,11 @@ ordinal: 39130
 ## Description
 ## Problem
 
-`papyrus browser` currently writes a request line for every parsed request (`<method> <path> <status>`) to standard error regardless of options, so normal browsing is noisy and request-derived text appears in the console even though record content must not leak there (REQ-06.007, NFR-02.001). The existing pre-parse rejection lines (`- - <status>`, `- - 503`) are error diagnostics and are not the noise this ticket removes.
+`papyrus browser` currently writes a request line for every parsed request (`<method> <path> <status>`) to standard error regardless of options, so normal browsing is noisy and request-derived text appears in the console even though record content must not leak there (REQ-006.007, NFR-002.001). The existing pre-parse rejection lines (`- - <status>`, `- - 503`) are error diagnostics and are not the noise this ticket removes.
 
 ## Required behavior
 
-REQ-06.007 and `docs/specifications/browser-requirements.md` section 2.12 require an error-only console by default and a browser-only `--debug` flag that logs exactly one line per received request with method, path, response status, and duration. Request headers and bodies are never logged. Errors are printed whether or not `--debug` is set. The exact line format, the duration unit, and the over-capacity exception are recorded in the specification.
+REQ-006.007 and `docs/specifications/browser-requirements.md` section 2.12 require an error-only console by default and a browser-only `--debug` flag that logs exactly one line per received request with method, path, response status, and duration. Request headers and bodies are never logged. Errors are printed whether or not `--debug` is set. The exact line format, the duration unit, and the over-capacity exception are recorded in the specification.
 
 ## Scope
 
@@ -53,7 +53,7 @@ Out of scope:
 
 ## Assumptions
 
-- Assumption: the duration is a whole number of milliseconds with the `ms` suffix (for example `4ms`); `0ms` is valid. Chosen because REQ-06.007 requires a duration but leaves the unit and formatting open.
+- Assumption: the duration is a whole number of milliseconds with the `ms` suffix (for example `4ms`); `0ms` is valid. Chosen because REQ-006.007 requires a duration but leaves the unit and formatting open.
 - Assumption: the duration is measured from the start of connection handling to the end of the response write.
 - Assumption: parsed requests that return a 4xx or 5xx response are responses, not console errors, so they are logged only with `--debug`. "Errors are printed whether or not `--debug` is set" covers warnings, bind/startup/runtime failures, and pre-parse rejection lines.
 - Assumption: the over-capacity line stays exactly `- - 503` with no duration, because the request is never read and the specification fixes that literal line.

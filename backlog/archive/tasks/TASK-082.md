@@ -16,23 +16,21 @@ dependencies:
   - TASK-081
 references:
   - docs/specifications/ui/mockups/README.md
-  - docs/requirements/business/REQ-06.008.md
-  - docs/requirements/business/REQ-06.012.md
-  - docs/requirements/business/REQ-06.003.md
+  - docs/requirements/business/REQ-006.008.md
+  - docs/requirements/business/REQ-006.012.md
+  - docs/requirements/business/REQ-006.003.md
   - >-
     docs/specifications/ui/mockups/MOCK-0014-browser-configuration-view-single-record-layout-and-lifecycle-configuration-review.html
-  - >-
     docs/specifications/ui/browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md
-  - docs/requirements/business/REQ-06.006.md
-  - docs/requirements/business/REQ-06.007.md
-  - docs/requirements/business/REQ-06.009.md
-  - docs/requirements/business/REQ-06.010.md
-  - docs/requirements/business/REQ-06.011.md
+  - docs/requirements/business/REQ-006.006.md
+  - docs/requirements/business/REQ-006.007.md
+  - docs/requirements/business/REQ-006.009.md
+  - docs/requirements/business/REQ-006.010.md
+  - docs/requirements/business/REQ-006.011.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - docs/specifications/browser-glossary-terms.md
   - docs/specifications/browser-spec-revisions-task-86.md
-  - >-
     docs/specifications/browser-configuration-view-single-record-layout-and-lifecycle-configuration.md
 priority: high
 type: task
@@ -41,7 +39,7 @@ ordinal: 41624
 
 
 ## Description
-Design the approved clickable UI review package for the revised browser contract introduced by REQ-06.003 and REQ-06.006 through REQ-06.012: an editable configuration view, a consistent single record view layout, curated per-artifact descriptions with read-only configuration on the lifecycle page, non-functional requirement grouping under owning groups, shared header branding, record references as links, and a concise glossary landing page.
+Design the approved clickable UI review package for the revised browser contract introduced by REQ-006.003 and REQ-006.006 through REQ-006.012: an editable configuration view, a consistent single record view layout, curated per-artifact descriptions with read-only configuration on the lifecycle page, non-functional requirement grouping under owning groups, shared header branding, record references as links, and a concise glossary landing page.
 
 This ticket is UI design work only. It does not change requirements, business rules, specifications, or implementation code; the revised browser contract is already specified in docs/specifications/browser-requirements.md (sections 4a-4d, 10a), docs/specifications/browser-managed-artifacts-and-lifecycles.md (section 4a), and docs/specifications/browser-glossary-terms.md (section 3a) by TASK-86. The feature specification is docs/specifications/browser-configuration-view-single-record-layout-and-lifecycle-configuration.md.
 
@@ -71,11 +69,11 @@ Downstream consumers (not dependencies of this ticket): TASK-93, TASK-94, TASK-9
 - [x] A new numbered mockup package exists under docs/specifications/ui/mockups/ with a review landing and clickable prototype covering the configuration view, the single record view layout, the lifecycle page per-artifact description and read-only configuration, non-functional requirement grouping, the shared header branding, dependency and reference links, and the glossary landing page.
 - [x] The package has a matching UI description document under docs/specifications/ui/ and is registered in the mockup registry with its status.
 - [x] The package is submitted for explicit user approval, and the registry records approved before the browser implementation tasks start.
-- [x] The approved design covers every REQ-06.003 and REQ-06.006 to REQ-06.012 surface listed above and reuses the existing wireframe styles.
+- [x] The approved design covers every REQ-006.003 and REQ-006.006 to REQ-006.012 surface listed above and reuses the existing wireframe styles.
 
 ## Definition of Done
 - [x] #1 Mockup package passes docs/specifications/ui/mockups/validate_mockups.sh with no errors for MOCK-0014
 - [ ] #2 UI description document exists and is registered in the mockup registry with status draft
 - [x] #3 Registry status updated to approved only after explicit user approval
-- [x] #4 Every REQ-06.003 and REQ-06.006 to REQ-06.012 surface is represented in the prototype and UI description
+- [x] #4 Every REQ-006.003 and REQ-006.006 to REQ-006.012 surface is represented in the prototype and UI description
 - [x] #5 Feature specification exists and links the MOCK id, UI description, and requirement/spec references

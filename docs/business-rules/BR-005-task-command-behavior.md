@@ -15,7 +15,7 @@ The papyrus task command performs the behavior stated in its Papyrus manpage ent
 
 ## Rationale
 
-Based on REQ-02.001 — Create and Describe Tasks and REQ-02.002 — View and Edit Tasks and REQ-02.003 — List and Filter Tasks and REQ-02.004 — Archive, Restore, and Delete Tasks, this rule exists because the documented task behavior is the contract for papyrus task; README.md is the sole behavior source.
+Based on REQ-002.001 — Create and Describe Tasks and REQ-002.002 — View and Edit Tasks and REQ-002.003 — List and Filter Tasks and REQ-002.004 — Archive, Restore, and Delete Tasks, this rule exists because the documented task behavior is the contract for papyrus task; README.md is the sole behavior source.
 
 ## Applicability
 

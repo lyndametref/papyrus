@@ -9,8 +9,8 @@ references:
   - ADR-0018
   - TECH-070
   - TECH-077
-  - REQ-07.002
-  - REQ-07.004
+  - REQ-007.002
+  - REQ-007.004
   - TC-102
   - TC-105
   - TC-106
@@ -49,7 +49,7 @@ Scope:
 
 Invariants:
 - Old configuration files must parse to the same effective document-type descriptor set: no entry's effective prefix, directory, enabled flag, statuses, default status, ID shape, verb set, section heading, or front-matter key changes in this task (MS-033 AC-1).
-- No CLI or browser behaviour changes in this milestone (MS-033 AC-7). In particular the user-defined reference-visibility rule is still hidden until MS-035 applies the seed default, which is the documented expected delta in REQ-06.019 and TC-185.
+- No CLI or browser behaviour changes in this milestone (MS-033 AC-7). In particular the user-defined reference-visibility rule is still hidden until MS-035 applies the seed default, which is the documented expected delta in REQ-006.019 and TC-185.
 
 Out of scope: parsing, validation messages, fill and merge, emission, selector paths, seed values, the document engine, and deleting the typed modules. Those belong to TASK-248, TASK-249, and MS-034. No dependency, ordinal, milestone, or assignee changes.
 
@@ -61,13 +61,13 @@ Assumptions:
 
 Definition of done: `cargo build`, `cargo test`, and `cargo clippy --all-targets -- -D warnings` are clean; `rg ContentModel src/` is empty; the new entry deserializes every documented key and rejects every unknown one; the eleven default slugs, prefixes, directories, and statuses are unchanged.
 ## Acceptance Criteria
-- [ ] `DocumentModel` has exactly `SingleMarkdown`, `GroupedMarkdown`, and `SingleHtmlMockup`, and no `ContentModel` identifier remains under the source tree (ADR-036 decision 5, REQ-07.004).
-- [ ] `FieldSpec` has exactly `key`, `heading`, `frontmatter_key`, `option`, `label`, `kind`, `required`, `verbs`, and `help`, and no `order`, `enabled`, or short-option member; a field item declaring `order` or `enabled` fails deserialization (ADR-036 decision 11, REQ-07.002).
-- [ ] `kind` accepts exactly `text`, `multiline`, and `list`; `verbs` defaults to `[create, edit]` and rejects any other verb; `reference_visibility` accepts exactly `visible` and `hidden` (ADR-036 decisions 17 and 19, REQ-07.002).
+- [ ] `DocumentModel` has exactly `SingleMarkdown`, `GroupedMarkdown`, and `SingleHtmlMockup`, and no `ContentModel` identifier remains under the source tree (ADR-036 decision 5, REQ-007.004).
+- [ ] `FieldSpec` has exactly `key`, `heading`, `frontmatter_key`, `option`, `label`, `kind`, `required`, `verbs`, and `help`, and no `order`, `enabled`, or short-option member; a field item declaring `order` or `enabled` fails deserialization (ADR-036 decision 11, REQ-007.002).
+- [ ] `kind` accepts exactly `text`, `multiline`, and `list`; `verbs` defaults to `[create, edit]` and rejects any other verb; `reference_visibility` accepts exactly `visible` and `hidden` (ADR-036 decisions 17 and 19, REQ-007.002).
 - [ ] `DocTypeEntry` deserializes `fields`, `group.fields`, `member.fields`, `group.reference_visibility`, `member.reference_visibility`, `statuses`, `default_status`, `slots`, `api_aliases`, `label`, `plural`, `order`, `summary`, `type_alias`, and `reference_visibility`; an absent key is `None` and `fields: []` is `Some([])`, so the two are distinguishable (ADR-036 decision 32, TC-107).
 - [ ] `DocTypeEntry` and `FieldSpec` reject unknown keys at deserialization, including entry-level `model`, `title`, `content`, and `id_shape` and field-level `order` and `enabled` (ADR-036 decision 34, TC-130).
-- [ ] The model is seed-only: `req` and `nfr` resolve to `GroupedMarkdown`, `ui-mockup` to `SingleHtmlMockup`, the other eight seed slugs to `SingleMarkdown`, and a slug with no seed entry to `SingleMarkdown` (ADR-036 decisions 6 and 31, REQ-07.004).
-- [ ] `Config::default()` still yields the eleven seed slugs with the prefix, directory, enabled flag, statuses, and default status of the start commit, and every existing `DocTypeEntry { .. }` construction site compiles (REQ-07.002).
+- [ ] The model is seed-only: `req` and `nfr` resolve to `GroupedMarkdown`, `ui-mockup` to `SingleHtmlMockup`, the other eight seed slugs to `SingleMarkdown`, and a slug with no seed entry to `SingleMarkdown` (ADR-036 decisions 6 and 31, REQ-007.004).
+- [ ] `Config::default()` still yields the eleven seed slugs with the prefix, directory, enabled flag, statuses, and default status of the start commit, and every existing `DocTypeEntry { .. }` construction site compiles (REQ-007.002).
 - [ ] Behaviour is unchanged for the former `Generic` call sites: the browser list hides references for a non-seed slug exactly as before and CLI dispatch routes a non-seed slug to the generic document module, both via `registry::is_builtin_document_slug` (MS-033 AC-7).
 - [ ] `cargo test` reports zero failures and `cargo clippy --all-targets -- -D warnings` is clean.
 ## Comments

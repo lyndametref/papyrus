@@ -15,7 +15,7 @@ The papyrus config command performs the behavior stated in its Papyrus manpage e
 
 ## Rationale
 
-Based on REQ-01.002 — Read and Edit Project Configuration, this rule exists because the documented config behavior is the contract for papyrus config; README.md is the sole behavior source.
+Based on REQ-001.002 — Read and Edit Project Configuration, this rule exists because the documented config behavior is the contract for papyrus config; README.md is the sole behavior source.
 
 ## Applicability
 

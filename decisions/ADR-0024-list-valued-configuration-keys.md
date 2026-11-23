@@ -16,7 +16,7 @@ accepted
 
 ## Context
 
-REQ-01.002 defines `papyrus config set <key> <value>` as persisting "the value as a YAML scalar". REQ-07.001/REQ-07.002 add list-valued keys — `document_types.<slug>.statuses` and the top-level `statuses` for tasks (REQ-01.002) — and REQ-01.002 states that `document_types.<slug>.statuses` and `document_types.<slug>.default_status` are ordinary configuration keys that `config get` reads and `config set` writes. Today the two statements cannot both hold: the current `config set` rejects a `yaml_serde::Value::Sequence` outright (`src/commands.rs`), so a status list can only be introduced by editing `papyrus.config.yml` by hand, which contradicts the configuration-edit surface the requirements promise.
+REQ-001.002 defines `papyrus config set <key> <value>` as persisting "the value as a YAML scalar". REQ-007.001/REQ-007.002 add list-valued keys — `document_types.<slug>.statuses` and the top-level `statuses` for tasks (REQ-001.002) — and REQ-001.002 states that `document_types.<slug>.statuses` and `document_types.<slug>.default_status` are ordinary configuration keys that `config get` reads and `config set` writes. Today the two statements cannot both hold: the current `config set` rejects a `yaml_serde::Value::Sequence` outright (`src/commands.rs`), so a status list can only be introduced by editing `papyrus.config.yml` by hand, which contradicts the configuration-edit surface the requirements promise.
 
 ADR-0019 makes configuration fail-closed with two repair surfaces, one of which is `config get|set|unset|list`. A user who needs to fix a status list in a broken configuration must be able to do it through that surface, or the repair path is incomplete for exactly the keys that are easiest to get wrong.
 
@@ -59,7 +59,7 @@ Forces: keep `config set`'s single value argument and its scalar semantics for e
 - A comma can never be part of a configured status through `config set`; a project that needs one must edit the file, and the limitation must be documented rather than discovered.
 - An empty list cannot be expressed through `config set`; only `config unset` (revert to defaults) or a file edit expresses it.
 - Trimming means a status with significant leading or trailing whitespace is unrepresentable through this surface.
-- REQ-01.002 still says "persists the value as a YAML scalar"; the requirement must be updated by `requirements-engineer` to record the owner's list exception (traceability follow-up, not a code question).
+- REQ-001.002 still says "persists the value as a YAML scalar"; the requirement must be updated by `requirements-engineer` to record the owner's list exception (traceability follow-up, not a code question).
 
 **Risks and mitigations:**
 
@@ -76,7 +76,7 @@ Forces: keep `config set`'s single value argument and its scalar semantics for e
 | Accept arbitrary YAML in the value and store it as parsed | Rejected | Turns `config set` into a second YAML entry point, lets a user write mappings where a scalar is expected, and changes error behaviour for every key. |
 | Add repeated `--append`/`--remove` options | Rejected | New surface and new semantics (ordering, duplicates) not requested; the owner chose the comma form. |
 | Require file editing for every list key | Rejected by the owner | Leaves the repair path and the documented `config set` promise incomplete. |
-| Keep `config set` scalar-only and exempt list keys | Rejected | Contradicts REQ-01.002's statement that these keys are written by `config set`. |
+| Keep `config set` scalar-only and exempt list keys | Rejected | Contradicts REQ-001.002's statement that these keys are written by `config set`. |
 
 ## Open Questions
 
@@ -93,9 +93,9 @@ Forces: keep `config set`'s single value argument and its scalar semantics for e
 
 ## References
 
-- `docs/requirements/business/REQ-01.002.md` — `config set`, list-valued keys, repair surfaces.
-- `docs/requirements/business/REQ-07.002.md` — `statuses`/`default_status` validation.
-- `docs/requirements/business/REQ-07.001.md` — custom document statuses.
+- `docs/requirements/business/REQ-001.002.md` — `config set`, list-valued keys, repair surfaces.
+- `docs/requirements/business/REQ-007.002.md` — `statuses`/`default_status` validation.
+- `docs/requirements/business/REQ-007.001.md` — custom document statuses.
 - `docs/architecture/adr/ADR-0019-fail-closed-document-type-configuration-validation.md` — validator, repair-mode load, status-list rules.
 - `docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md` — field map that consumes the configured status lists.
 - Implementation: `src/commands.rs` (`config_set`, `config_get`, `config_list`), `src/config.rs` (`LIST_VALUED_KEYS`, `validate`).

@@ -15,7 +15,7 @@ The `papyrus release` command manages releases with the verbs `create`, `list`, 
 
 ## Rationale
 
-Based on REQ-03.002 — Manage Releases and REQ-07.001 — Organize Artifacts into Three Categories, this rule exists because a release is a backlog artifact whose lifecycle is fixed by the category model rather than configurable: the state is stored in the front-matter `status` field, `close` is the single command that moves a release from `planned` to `released`, and document archive semantics never apply to a release.
+Based on REQ-003.002 — Manage Releases and REQ-007.001 — Organize Artifacts into Three Categories, this rule exists because a release is a backlog artifact whose lifecycle is fixed by the category model rather than configurable: the state is stored in the front-matter `status` field, `close` is the single command that moves a release from `planned` to `released`, and document archive semantics never apply to a release.
 
 ## Applicability
 

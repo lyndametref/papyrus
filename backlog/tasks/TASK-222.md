@@ -23,7 +23,7 @@ references:
   - ADR-0020
   - ADR-0027
   - ADR-0026
-  - REQ-07.004
+  - REQ-007.004
   - TECH-077
 status: Done
 assignee:

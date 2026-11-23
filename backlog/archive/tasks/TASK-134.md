@@ -15,8 +15,8 @@ dependencies:
   - TASK-132
   - TASK-133
 references:
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-01.004.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-001.004.md
   - >-
     docs/architecture/adr/ADR-0029-read-only-corpus-diagnostics-with-duplicate-id-repair.md
   - docs/specifications/project-diagnostics-check.md
@@ -31,7 +31,7 @@ ordinal: 41520
 
 
 ## Description
-**Why.** `check` is a built-in command name, so a configured document type must never take it (REQ-07.002), and the command needs a published surface that matches accepted ADR-0029 decision 1. TASK-137/138 landed the working command (`src/check/*`, `BuiltinCmd::Check { fix, force }`), but `check` is still missing from `cli::BUILTIN_COMMANDS` — so configuration validation still accepts a `check` document slug — and `papyrus check --help` still prints only the one-line `about` plus the flag list.
+**Why.** `check` is a built-in command name, so a configured document type must never take it (REQ-007.002), and the command needs a published surface that matches accepted ADR-0029 decision 1. TASK-137/138 landed the working command (`src/check/*`, `BuiltinCmd::Check { fix, force }`), but `check` is still missing from `cli::BUILTIN_COMMANDS` — so configuration validation still accepts a `check` document slug — and `papyrus check --help` still prints only the one-line `about` plus the flag list.
 
 **What.** Add `check` to the single reserved-name list, freeze the help text, and lock both with tests and goldens.
 
@@ -74,7 +74,7 @@ ordinal: 41520
 
 
 ## Implementation Notes
-Contract: `docs/specifications/project-diagnostics-check.md` §1.1 (frozen help text) and §8 (exit codes); REQ-07.002 (reserved names, case-insensitive); ADR-0029 decisions 1, 3, and 11. No requirement, ADR, README, or business-rule file is edited.
+Contract: `docs/specifications/project-diagnostics-check.md` §1.1 (frozen help text) and §8 (exit codes); REQ-007.002 (reserved names, case-insensitive); ADR-0029 decisions 1, 3, and 11. No requirement, ADR, README, or business-rule file is edited.
 
 1. Reserved name — `src/cli/builtin.rs`
    - Add `BuiltinEntry { name: "check" }` to `BUILTIN_COMMANDS`, after `config`, keeping the array in clap enum order.

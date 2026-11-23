@@ -17,20 +17,20 @@ references:
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/non-functional/NFR-04.004.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/non-functional/NFR-004.004.md
   - docs/specifications/papyrus-native-record-layout-and-single-id-space.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-01.007.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/business/REQ-03.001.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-001.007.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/business/REQ-003.001.md
   - docs/specifications/decision-records-management.md
   - docs/specifications/release-lifecycle.md
   - docs/specifications/browser-decision-records.md
   - docs/business-rules/BR-007-release-command-behavior.md
   - docs/business-rules/BR-008-decision-command-behavior.md
-  - docs/requirements/business/REQ-04.002.md
+  - docs/requirements/business/REQ-004.002.md
 priority: high
 type: feature
 ordinal: 39050
@@ -56,7 +56,7 @@ Out of scope: adding lifecycle commands (no release archive/restore, no mileston
 - [x] `record::identity` exposes only Papyrus ID parse, format, validate, and allocate; storage prefixes, offsets, `to_storage_id`, `to_display_id`, the `StorageInput` error variant, and all their call sites are gone.
 - [x] Descriptor directory values are configuration keys resolved through `Config` and the project directory; no module hardcodes `backlog/tasks`, `backlog/milestones`, `backlog/releases`, `archive/tasks`, `archive/milestones`, `archive/releases`, `docs/decisions`, or a concrete decision directory such as `docs/architecture/adr`; `descriptor.rs` contains no `concat!` path literals; every resolved read and write path passes `Context::ensure_within`.
 - [x] New records are written with native file names: tasks, milestones, releases, and document records as `<ID>.md`; decisions as `<ID>-<kebab-slug>.md` with the slug derived once from the creation title; no record-creation or native write path constructs or writes a Backlog.md stem, and no writer renames an existing file.
-- [x] Read resolution accepts `<PREFIX>-<digits>` optionally followed by `-<slug>` or ` - <slug>`, with case-insensitive prefix matching and optional leading zeros; document families match their full dotted ID before an optional slug so `REQ-01.001` and `REQ-01.002` stay distinct; Backlog-shaped stems (all-lowercase prefix matching a non-all-lowercase configured prefix with an unpadded number, e.g. `task-18`, `m-0`) resolve to no record; the front-matter `id` is authoritative, a stem mismatch flags the record invalid and refuses writes, and every reported ID is the canonical ID, never the slugged stem.
+- [x] Read resolution accepts `<PREFIX>-<digits>` optionally followed by `-<slug>` or ` - <slug>`, with case-insensitive prefix matching and optional leading zeros; document families match their full dotted ID before an optional slug so `REQ-001.001` and `REQ-001.002` stay distinct; Backlog-shaped stems (all-lowercase prefix matching a non-all-lowercase configured prefix with an unpadded number, e.g. `task-18`, `m-0`) resolve to no record; the front-matter `id` is authoritative, a stem mismatch flags the record invalid and refuses writes, and every reported ID is the canonical ID, never the slugged stem.
 - [x] Allocation scans every active, canonical archive, `archived/`, deprecated, and legacy-alias location of a family with no offset (tasks and milestones include the legacy alias; decisions include `archived/`; document records include `deprecated/`; releases use the active directory only); milestones start at 1; a prefix or `id_padding` change affects only records created afterwards.
 - [x] Task archive moves the file to `<backlog_directory>/archive/tasks/` and milestone archive to `<backlog_directory>/archive/milestones/`, keeping the file name and ID; task restore moves a record from the canonical archive or either legacy alias to the active directory; no milestone restore or unarchive command is added.
 - [x] The documented `papyrus decision archive` moves a decision file to `<decision_directory>/archived/`, keeping its slugged file name and ID; decision deprecation is the `## Status` line in place and never moves a file; no decision restore command is added.
@@ -68,7 +68,7 @@ Out of scope: adding lifecycle commands (no release archive/restore, no mileston
 - [x] No read or write path relocates or renames a record; `storage_target_path` and its call sites, tests, and fixtures are deleted; the legacy body conversion remains for TASK-89; `ensure_front_matter_canonical` returns the same path it was given.
 - [x] `backlog/config.yml` is no longer read; statuses come only from Papyrus configuration, and an unrecognised status is preserved verbatim and reported.
 - [x] Tests cover allocation, stem resolution including case-insensitive, slugged, and dotted-ID variants, decision slug creation and `list`/`view`/`archive` by canonical ID, document deprecate/restore with a legacy slugged name, release resolution, legacy-alias archive refusal and restore-only move, duplicate detection, and Backlog-shaped stems (`task-18`, `m-0`) resolving to no record.
-- [x] No lifecycle command is added or inferred: the milestone lifecycle remains create, list, view, edit, archive, and delete (REQ-03.001), releases remain `active -> released` with no archive (BR-007), and decisions have no restore (BR-008).
+- [x] No lifecycle command is added or inferred: the milestone lifecycle remains create, list, view, edit, archive, and delete (REQ-003.001), releases remain `active -> released` with no archive (BR-007), and decisions have no restore (BR-008).
 
 ## Definition of Done
 - [x] #1 All acceptance criteria are verified by code review and tests.

@@ -12,11 +12,11 @@ milestone: MS-005
 dependencies:
   - TASK-013
 references:
-  - docs/requirements/business/REQ-05.003.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.003.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
 documentation:
   - docs/specifications/glossary-terms-management.md
@@ -30,16 +30,16 @@ ordinal: 17000
 Implement the `glossary` commands so contributors can create, list, view, edit, deprecate, and restore glossary terms, with stable IDs and text-file persistence inside the project directory.
 
 Scope (in):
-- `papyrus glossary create --term <term> --definition <text>` (BR-011, REQ-05.003).
-- `papyrus glossary list` (BR-011, REQ-05.003).
-- `papyrus glossary view <id>` (BR-011, REQ-05.003).
-- `papyrus glossary edit <id> [--term <term>] [--definition <text>] [--editor]` (BR-011, REQ-05.003).
-- `papyrus glossary deprecate <id>` and `papyrus glossary restore <id>` (BR-011, REQ-05.007).
-- Stable IDs of the form <prefix>-<number> (default GLO-001) using configured document_types.glossary prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-05.003, REQ-05.007, BR-011, BR-016).
-- Glossary fields: term (title) and definition (REQ-05.003, BR-011).
-- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID (REQ-05.003, REQ-05.007, BR-011).
-- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-02.002, NFR-04.001, NFR-04.002).
-- Common CLI controls and outcomes inherited from TASK-2 (REQ-01.004).
+- `papyrus glossary create --term <term> --definition <text>` (BR-011, REQ-005.003).
+- `papyrus glossary list` (BR-011, REQ-005.003).
+- `papyrus glossary view <id>` (BR-011, REQ-005.003).
+- `papyrus glossary edit <id> [--term <term>] [--definition <text>] [--editor]` (BR-011, REQ-005.003).
+- `papyrus glossary deprecate <id>` and `papyrus glossary restore <id>` (BR-011, REQ-005.007).
+- Stable IDs of the form <prefix>-<number> (default GLO-001) using configured document_types.glossary prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-005.003, REQ-005.007, BR-011, BR-016).
+- Glossary fields: term (title) and definition (REQ-005.003, BR-011).
+- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID (REQ-005.003, REQ-005.007, BR-011).
+- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-002.002, NFR-004.001, NFR-004.002).
+- Common CLI controls and outcomes inherited from TASK-2 (REQ-001.004).
 
 Scope (out):
 - Search and browser access for glossary terms (TASK-31, TASK-23).

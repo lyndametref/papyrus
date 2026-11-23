@@ -14,7 +14,7 @@ dependencies: []
 documentation:
   - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
-  - docs/requirements/business/REQ-07.001.md
+  - docs/requirements/business/REQ-007.001.md
   - docs/architecture/adr/ADR-0016-runtime-config-derived-command-dispatch.md
   - docs/architecture/adr/ADR-0018-generic-document-content-model.md
   - >-
@@ -22,10 +22,10 @@ documentation:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-07.003.md
-  - docs/requirements/business/REQ-07.004.md
-  - docs/requirements/business/REQ-06.014.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-007.003.md
+  - docs/requirements/business/REQ-007.004.md
+  - docs/requirements/business/REQ-006.014.md
 priority: high
 ordinal: 41000
 ---
@@ -116,16 +116,16 @@ pub enum ArchivePolicy {
 pub const MAIN_DOCUMENT_STATUSES: [&'static str; 2] = ["active", "archived"];
 
 pub enum StatusModel {
-    /// Tasks only; mirrors top-level `statuses`/`default_status` (REQ-01.002).
+    /// Tasks only; mirrors top-level `statuses`/`default_status` (REQ-001.002).
     TaskConfigurable { statuses: Vec<String>, default: String },
-    /// Milestones, releases, decisions (REQ-07.001, REQ-04.001).
+    /// Milestones, releases, decisions (REQ-007.001, REQ-004.001).
     Fixed { states: &'static [&'static str] },
-    /// Every front-matter-backed document type (REQ-07.001, REQ-07.002).
+    /// Every front-matter-backed document type (REQ-007.001, REQ-007.002).
     /// `main` is always `MAIN_DOCUMENT_STATUSES`; `custom` is owned, ordered
     /// data taken from the validated configuration; `default` is
     /// `default_status` or `active`.
     DocumentMain { custom: Vec<String>, default: String },
-    /// UI mockups only: state lives in HTML metadata (REQ-05.008).
+    /// UI mockups only: state lives in HTML metadata (REQ-005.008).
     HtmlMetadata { states: &'static [&'static str] },
 }
 
@@ -161,7 +161,7 @@ pub struct TypedSchema {
 }
 
 pub enum ContentModel {
-    /// Config-defined document type (REQ-07.004, ADR-0018).
+    /// Config-defined document type (REQ-007.004, ADR-0018).
     Generic,
     Typed(&'static TypedSchema),
     HtmlMockup(&'static TypedSchema),
@@ -232,7 +232,7 @@ Lookup is exact and case-sensitive (clap matching is case-sensitive; ADR-0016 de
    - every entry in `document_types` produces exactly one descriptor (slug = key, prefix/directory/enabled from the entry);
    - when the key matches a template slug, the template supplies category/label/status model/verbs/content model/frontmatter keys/id shape/archive policy/create options, and the entry supplies prefix/directory/enabled and the document status list;
    - when the key matches no template, the generic descriptor of section 6 is used;
-   - a template slug missing from `document_types` produces no descriptor (removing an entry stops managing the type, REQ-07.002).
+   - a template slug missing from `document_types` produces no descriptor (removing an entry stops managing the type, REQ-007.002).
 
 `build(cfg)` = `assemble(cfg)`, then `check_invariants`, then build `by_slug`. `check_invariants` walks `descriptors` in order and fields in the order listed in section 8, so the returned error is deterministic. Errors are not aggregated here; the aggregated report belongs to `Config::validate` (ADR-0019 decision 1).
 
@@ -275,8 +275,8 @@ struct DescriptorTemplate {
 Notes:
 
 - Task verbs are the current family, including `archive`/`restore` (ADR-0022 decision 5 keeps them for tasks and milestones).
-- Milestones keep the verbs the current command family exposes; the milestone restore cycle required by REQ-01.005 is not implemented in today's code and is not added by this refactor.
-- Decisions declare no `Archive` verb and no archive policy: REQ-04.002 and ADR-0023 decision 3 state that decisions have no archive command or state.
+- Milestones keep the verbs the current command family exposes; the milestone restore cycle required by REQ-001.005 is not implemented in today's code and is not added by this refactor.
+- Decisions declare no `Archive` verb and no archive policy: REQ-004.002 and ADR-0023 decision 3 state that decisions have no archive command or state.
 - Releases declare no archive verb and `ArchivePolicy::None`; BR-007 states releases are never archived.
 
 ## 6. Exact mapping: the eleven document types
@@ -297,7 +297,7 @@ Every document descriptor carries `category = Document`; `enabled`, `prefix`, an
 | `test-case` | Test case | Typed(TestCase) | `## Description`, `## Applicability` | none | DocumentMain | baseline + Status | Plain | absent |
 | `test-report` | Test report | Typed(TestReport) | `## Description`, `## Applicability` | none | DocumentMain | baseline + Status | Plain | absent |
 
-`DOCUMENT_BASELINE_VERBS = [Create, List, View, Edit, Archive, Delete]` (REQ-07.003). `ui-mockup` archive policy is `ArchivedFolder { state_field: None }` because its state is written in HTML metadata, not front matter (ADR-0022 decision 2).
+`DOCUMENT_BASELINE_VERBS = [Create, List, View, Edit, Archive, Delete]` (REQ-007.003). `ui-mockup` archive policy is `ArchivedFolder { state_field: None }` because its state is written in HTML metadata, not front matter (ADR-0022 decision 2).
 
 Document status model rules (`DocumentMain`):
 
@@ -343,8 +343,8 @@ pub struct DocTypeEntry {
 - `Default for DocTypeEntry` gains `statuses: None`, `default_status: None`.
 - Backward compatible: the struct-level `#[serde(default)]` plus the field-level defaults decode a file that has only `prefix`/`directory`/`enabled`; no other field name changes and `DocTypeEntry` has no `deny_unknown_fields`.
 - Forward compatible: `skip_serializing_if` keeps an absent declaration absent, so `papyrus init` output and `config list`/`get` text are byte-identical until TASK-112 seeds statuses and TASK-111 exposes the keys.
-- `Option` is required, not `Vec::default`, because `statuses: []` (explicitly empty) must stay distinguishable from an absent list: only the former is invalid (REQ-07.002, ADR-0019 decision 7).
-- "Ordered" means the YAML sequence order is the semantic order. `serde` preserves it, the registry copies it, duplicate detection uses a set only for membership, and nothing sorts or de-duplicates the list. Order drives the browser status filter (REQ-06.014: `active` plus custom statuses in configured order) and is asserted by a test.
+- `Option` is required, not `Vec::default`, because `statuses: []` (explicitly empty) must stay distinguishable from an absent list: only the former is invalid (REQ-007.002, ADR-0019 decision 7).
+- "Ordered" means the YAML sequence order is the semantic order. `serde` preserves it, the registry copies it, duplicate detection uses a set only for membership, and nothing sorts or de-duplicates the list. Order drives the browser status filter (REQ-006.014: `active` plus custom statuses in configured order) and is asserted by a test.
 - Only the one struct literal in `Config::default()` and the `Default` impl change. `Config::flattened`, `Config::validate`, `merge_yaml`, `init`, and `commands` are untouched in this task.
 
 ## 8. Invariants, errors, and outcomes
@@ -453,7 +453,7 @@ Whole-suite checks: `cargo test` green, including `tests/no_drift.rs` unchanged 
 - **Assumption A6**: reserved-name scope in this task is the built-in registry slugs only. The command-name set is `cli::BUILTIN_COMMANDS` (ADR-0016 decision 2, ADR-0019 decision 3) and arrives with TASK-108; the registry must not create a second list.
 - **Encoding decision D1**: `req`/`nfr` use `IdShape::Grouped`, which covers group records and dotted member records. ADR-0020 decision 4 phrases the same field as `Dotted`; ADR-0018 decision 5 pairs `Dotted`/`Grouped` as req/nfr properties. `Dotted` stays defined as the member-only shape and is asserted by a unit test. No behaviour difference; wording confirmation requested (see open questions).
 - **Encoding decision D2**: `ArchivePolicy::None` for releases follows BR-007 ("releases are never archived") even though ADR-0023 decision 2 lists an archive location; no command writes it.
-- **Encoding decision D3**: `ArchivePolicy::None` for decisions follows REQ-04.002 and ADR-0023 decision 3.
+- **Encoding decision D3**: `ArchivePolicy::None` for decisions follows REQ-004.002 and ADR-0023 decision 3.
 
 ## 11. Out of scope (handoff)
 
@@ -467,7 +467,7 @@ Whole-suite checks: `cargo test` green, including `tests/no_drift.rs` unchanged 
 ## 12. Open questions
 
 - **Q1 (encoding wording)**: ADR-0020 decision 4 says `req`/`nfr` have `id_shape: Dotted`, while this plan uses `Grouped` to cover group plus dotted member records (ADR-0018 decision 5 pairs the two). Confirm the encoding, or have `@architect` amend ADR-0020's phrasing at the next touch. Does not block implementation.
-- **Q2 (ownership)**: REQ-04.002 states `papyrus decision archive` does not exist, and the descriptor therefore omits `Archive` for `adr`/`bdr`, but the static command still exists in `src/decision.rs` and no downstream task in this milestone lists its removal. Confirm which task owns that removal; until then the registry and the CLI disagree for decisions.
+- **Q2 (ownership)**: REQ-004.002 states `papyrus decision archive` does not exist, and the descriptor therefore omits `Archive` for `adr`/`bdr`, but the static command still exists in `src/decision.rs` and no downstream task in this milestone lists its removal. Confirm which task owns that removal; until then the registry and the CLI disagree for decisions.
 
 
 ## Comments
@@ -479,6 +479,6 @@ created: 2026-11-13T21:57:00Z
 Refinement open questions from the implementation plan:
 
 - Q1 (encoding, non-blocking): ADR-0020 decision 4 calls the req/nfr id shape `Dotted`, while the plan encodes it as `Grouped` (group records plus dotted member records; ADR-0018 decision 5 pairs the two). Implementation proceeds with `Grouped`; @architect should align ADR-0020 wording at the next touch.
-- Q2 (ownership, needs an owner): REQ-04.002 forbids `papyrus decision archive`, so the decision descriptors declare no `Archive` verb, but the static command still exists in `src/decision.rs` and no milestone task lists its removal. Assign the removal to a task, otherwise the registry and the CLI disagree for decisions.
+- Q2 (ownership, needs an owner): REQ-004.002 forbids `papyrus decision archive`, so the decision descriptors declare no `Archive` verb, but the static command still exists in `src/decision.rs` and no milestone task lists its removal. Assign the removal to a task, otherwise the registry and the CLI disagree for decisions.
 
 ---

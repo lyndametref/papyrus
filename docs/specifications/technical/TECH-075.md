@@ -10,14 +10,14 @@ references:
   - ADR-0026
   - ADR-0027
   - ADR-0028
-  - NFR-01.003
-  - NFR-02.002
-  - NFR-03.001
-  - NFR-05.001
-  - NFR-06.002
-  - REQ-06.004
-  - REQ-06.015
-  - REQ-06.017
+  - NFR-001.003
+  - NFR-002.002
+  - NFR-003.001
+  - NFR-005.001
+  - NFR-006.002
+  - REQ-006.004
+  - REQ-006.015
+  - REQ-006.017
   - TASK-141
   - TASK-143
   - TASK-144
@@ -33,7 +33,7 @@ status: verified
 ## Description
 ## 1. Purpose and scope
 
-REQ-06.017 requires the local browser to render math formulas in the curated prose fields that record views already display, fully offline, with all assets bundled, without arbitrary script execution, and with the source text as the fallback. ADR-0025 fixes the mechanism: a non-Markdown delimiter pre-pass on the server that emits placeholders, KaTeX rendering in the client, and a `font-src 'self'` CSP delta.
+REQ-006.017 requires the local browser to render math formulas in the curated prose fields that record views already display, fully offline, with all assets bundled, without arbitrary script execution, and with the source text as the fallback. ADR-0025 fixes the mechanism: a non-Markdown delimiter pre-pass on the server that emits placeholders, KaTeX rendering in the client, and a `font-src 'self'` CSP delta.
 
 This page is the canonical detail for the pre-pass, the delimiter contract, the placeholder markup, the conditional asset emission, the client pass, and the CSP delta. It is deliberately separate from `browser-shell-shared-list-layout-and-page-width.md` (TASK-141/TASK-144 own the shell and width contract and are being edited concurrently); this page references the shell contract and records its own delta to it in §5.3. TASK-148 ports the normative clauses into the browser requirement specifications; this page must then be cited and superseded, not duplicated.
 
@@ -47,7 +47,7 @@ Part II (§13–§20) is the diagram contract from ADR-0026 as amended: the `mer
 - Markdown interpretation of any kind (headings, lists, tables, emphasis, links, raw HTML) — ADR-0005, ADR-0025 decision 2.
 - Rendering in list cells, metadata rows, titles, IDs, labels, or form inputs.
 - Changes to `img-src`, `script-src`, `form-action`, `base-uri`, or `frame-ancestors`. `style-src` changes only for the diagram response class of §17.
-- Widening the `.text` 780 px measure, or introducing `.bleed` for math (REQ-06.015 full width is for diagrams, Part II).
+- Widening the `.text` 780 px measure, or introducing `.bleed` for math (REQ-006.015 full width is for diagrams, Part II).
 
 ## 2. Rendered field set
 
@@ -323,15 +323,15 @@ Recorded assumption: `docs/requirements/non-functional/` contains no accessibili
 
 | Source | Clause |
 |---|---|
-| REQ-06.017 AC 1–3, 7, 10–12, 14–17 | §2, §3, §4, §5.4, §7 |
+| REQ-006.017 AC 1–3, 7, 10–12, 14–17 | §2, §3, §4, §5.4, §7 |
 | ADR-0025 decisions 1–10 | §1, §2.1, §3, §4, §5, §6, §7, §8 |
 | ADR-0005 (CSP baseline, no Markdown) | §7.1, §8 |
 | ADR-0027 (vendored assets) | §5.1, §5.4 |
 | ADR-0028 (shell, width) | §5.3, §9 |
-| NFR-01.003, NFR-03.001 | §5.4, §8 |
-| NFR-02.002 | §8 |
-| NFR-05.001 | §9, TASK-149/TASK-150 |
-| NFR-06.002 | TASK-143 notices, unchanged here |
+| NFR-001.003, NFR-003.001 | §5.4, §8 |
+| NFR-002.002 | §8 |
+| NFR-005.001 | §9, TASK-149/TASK-150 |
+| NFR-006.002 | TASK-143 notices, unchanged here |
 
 # Part II — Diagrams (TASK-146)
 
@@ -586,12 +586,12 @@ Open questions: none for TASK-146.
 
 | Source | Clause |
 |---|---|
-| REQ-06.017 AC 5, 6, 7, 9, 11–17 | §13, §14, §16, §17, §18 |
-| REQ-06.015 (full width for diagrams) | §14.1, §19 |
+| REQ-006.017 AC 5, 6, 7, 9, 11–17 | §13, §14, §16, §17, §18 |
+| REQ-006.015 (full width for diagrams) | §14.1, §19 |
 | ADR-0026 decisions 1–12 | §13–§19, §20 |
 | ADR-0027 decisions 1–6 | §16.1, §16.2 |
 | ADR-0028 (width classes) | §19 |
-| NFR-01.003, NFR-03.001 | §16.1, §16.2, §20 |
-| NFR-02.002 | §16.4, §17.3, §20 |
-| NFR-05.001 | §18, §19, TASK-150 |
-| NFR-06.002 | §16.1 |
+| NFR-001.003, NFR-003.001 | §16.1, §16.2, §20 |
+| NFR-002.002 | §16.4, §17.3, §20 |
+| NFR-005.001 | §18, §19, TASK-150 |
+| NFR-006.002 | §16.1 |

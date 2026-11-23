@@ -29,22 +29,21 @@ references:
   - docs/specifications/search-browser-milestone-packaging-and-verification.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
-  - docs/requirements/business/REQ-06.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-05.001.md
-  - docs/requirements/business/REQ-05.002.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-01.003.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.001.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-006.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-005.001.md
+  - docs/requirements/business/REQ-005.002.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-001.003.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.001.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/architecture/adr/ADR-0002-distribution-format-amd64-deb-packages.md
   - docs/architecture/adr/ADR-0003-supported-debian-release-target-forky-only.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
   - docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html
   - docs/specifications/ui/browser-requirements-ui.md
@@ -79,7 +78,7 @@ Review must check, at minimum:
 - Context accuracy: the constraints attributed to ADR-0001, ADR-0004 and the TASK-6 specification.
 - Consequences and residual risks: stated risks still match reality; any risk not recorded in the ADR.
 - Module boundaries claimed in the ADR (`browser::http`, `browser::records`, `browser::render`, `browser::mod`, `config`, `context`) versus the actual layout.
-- Checkpoint follow-ups the review must either fold into the ADR or explicitly defer: config loading out of `commands`, per-record config re-reads, duplicate record parsing, template placeholder hardening, test temp-directory hygiene, manpage over-promising, NFR-01.002 scope, and NFR-05.001 real-browser verification.
+- Checkpoint follow-ups the review must either fold into the ADR or explicitly defer: config loading out of `commands`, per-record config re-reads, duplicate record parsing, template placeholder hardening, test temp-directory hygiene, manpage over-promising, NFR-001.002 scope, and NFR-005.001 real-browser verification.
 
 Follow-ups: this task may spawn separate follow-up tasks for any accepted gap. Do not create implementation tasks as part of this review unless the decision makes one necessary; capture them as follow-up items instead.
 
@@ -105,12 +104,12 @@ Acceptance of the ADR content is an explicit user decision: the ticket may only 
 ## Implementation Notes
 1. Read ADR-0005 end to end; record its Status (Proposed), Date, Context claims, Decision bullets, Consequences, Risks/mitigations, Alternatives, and References.
 2. Read the delivered m-1 implementation and tests: src/browser/{mod,http,records,render}.rs, src/browser/templates/{list,view,edit,error}.html, src/browser/{app.css,app.js}, src/config.rs, src/context.rs, Cargo.toml; tests/browser_cli.rs and tests/search_browser_smoke.rs; packaging spec and docs/packaging.md as needed.
-3. Read the cited specifications, requirements, business rules, and ADRs: docs/specifications/browser-requirements.md, docs/specifications/search-browser-milestone-packaging-and-verification.md, REQ-06, REQ-06.002, REQ-05.001, REQ-05.002, REQ-05.007, REQ-01.003, BR-004, BR-016, NFR-01.002, NFR-01.003, NFR-02.001, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001, ADR-0001, ADR-0002, ADR-0003, ADR-0004, and the approved UI package MOCK-0001 plus docs/specifications/ui/browser-requirements-ui.md.
+3. Read the cited specifications, requirements, business rules, and ADRs: docs/specifications/browser-requirements.md, docs/specifications/search-browser-milestone-packaging-and-verification.md, REQ-006, REQ-006.002, REQ-005.001, REQ-005.002, REQ-005.007, REQ-001.003, BR-004, BR-016, NFR-001.002, NFR-001.003, NFR-002.001, NFR-002.002, NFR-004.001, NFR-004.002, NFR-005.001, ADR-0001, ADR-0002, ADR-0003, ADR-0004, and the approved UI package MOCK-0001 plus docs/specifications/ui/browser-requirements-ui.md.
 4. Verify Decision vs delivered code point by point: blocking std::net HTTP/1.1 server; one request per connection with Connection: close; thread-per-connection; 16-connection cap with immediate 503 on the 17th; 5-second read/write timeouts; GET/HEAD/POST only; rejection of Transfer-Encoding, keep-alive, pipelining, TLS, HTTP/2, WebSocket, compression; fixed route table after single-pass percent-decoding; no filesystem path joining; ID validation and exact-match resolution against active directory listings; include_str! templates with {{name}} placeholders; include_str! CSS/JS with no remote references; optional JS; JSON API via serde_json; security posture (no auth/session/cookies/TLS, loopback default, non-loopback warning, Host/Origin validation, strict Content-Type, escaping, CSP and security headers, no outbound access, no absolute paths).
 5. Verify Context accuracy: constraints attributed to ADR-0001, ADR-0004, and the TASK-6 specification; TASK-6 spec forbids framework/async runtime/template engine/Markdown renderer/second crate/new dependency.
 6. Verify Consequences and residual risks against reality; list any risk not recorded in the ADR.
 7. Verify module boundaries (browser::http, browser::records, browser::render, browser::mod, config, context) against the actual layout.
-8. Review each checkpoint follow-up and decide fold into ADR or explicitly defer: config loading out of commands; per-record config re-reads; duplicate record parsing; template placeholder hardening; test temp-directory hygiene; manpage over-promising; NFR-01.002 scope; NFR-05.001 real-browser verification.
+8. Review each checkpoint follow-up and decide fold into ADR or explicitly defer: config loading out of commands; per-record config re-reads; duplicate record parsing; template placeholder hardening; test temp-directory hygiene; manpage over-promising; NFR-001.002 scope; NFR-005.001 real-browser verification.
 9. Record the decision (accepted/rejected/amend) in the ticket with rationale and evidence, using a claim-by-claim evidence table (ADR section | code/spec/test reference | match/discrepancy).
 10. If accepted or amended: update ADR-0005 Status and content, then regenerate docs/architecture/adr/index.html per the architecture-decision-record and adr-index-visualization skills; record the changed files.
 11. Capture follow-ups as ticket notes or new tickets (not implemented here), with owners implied by the affected area.
@@ -138,8 +137,8 @@ Checkpoint follow-ups to resolve or explicitly defer:
 - template placeholder hardening
 - test temp-directory hygiene
 - manpage over-promising
-- NFR-01.002 scope
-- NFR-05.001 real-browser verification
+- NFR-001.002 scope
+- NFR-005.001 real-browser verification
 
 Notes:
 - ADR-0005 is currently Proposed; ADR-0006 (optimistic concurrency and atomic record writes) is also Proposed and references ADR-0005. This ticket reviews ADR-0005 only; ADR-0006 is out of scope unless the review finds a dependency that must be recorded as a follow-up.
@@ -161,13 +160,13 @@ Claim-by-claim evidence (match unless noted):
 9. Module boundaries browser::http/records/render/mod + config + context -> src/browser/{http,records,render,mod}.rs; src/config.rs; src/context.rs -> match (deferred follow-up: config loading still in commands).
 10. Assets compiled into binary; .deb contains only binary + copyright -> packaging spec 1.7; tests -> match.
 11. Context: ADR-0001 Rust, ADR-0004 single crate; TASK-6 spec forbids framework/async/template/Markdown/second crate/new dep -> ADR-0001, ADR-0004; browser-requirements.md Out of scope -> match.
-12. Consequences: offline NFR-01.003; NFR-05.001 verified at markup/asset level only -> packaging spec OQ-1; ADR text -> match.
+12. Consequences: offline NFR-001.003; NFR-005.001 verified at markup/asset level only -> packaging spec OQ-1; ADR text -> match.
 13. Risks: protocol smuggling covered by tests/browser_cli.rs; XSS escaping + CSP; DNS rebinding/CSRF; resource exhaustion; future scale needs new ADR -> tests/browser_cli.rs; code -> match.
 
 Discrepancies / notes:
 - None blocking. Minor: browser::mod and browser::records import crate::commands::load_effective_config rather than a config-module loader; tracked as deferred follow-up (config loading out of commands). ADR amended to state key ownership vs call site.
 - ADR amended to state single-pass/no-re-scan substitution explicitly.
-- ADR amended to note incremental delivery toward NFR-01.002 (Context).
+- ADR amended to note incremental delivery toward NFR-001.002 (Context).
 - Deferred follow-ups captured below; not implemented in this ticket (DoD #6).
 
 Follow-up items (captured, not implemented):
@@ -176,8 +175,8 @@ Follow-up items (captured, not implemented):
 3. Template placeholder hardening - add tests/compile-time checks for placeholder allowlist; substitution already single-pass and non-re-scanning. (deferred)
 4. Test temp-directory hygiene - migrate older suites (cli.rs, req_cli.rs, search_cli.rs, milestone_smoke.rs) from std::env::temp_dir() to project-local ./.tmp/. (deferred)
 5. Manpage/README over-promising - README/BR-004 says browser serves both backlog and documentation stores; current increment serves documentation store only; update wording. (deferred)
-6. NFR-01.002 scope clarification - clarify all Papyrus content is delivered incrementally across TASK-11..TASK-27. (deferred; NFR edit by requirements-engineer)
-7. NFR-05.001 real-browser verification - schedule manual GUI pass in Firefox/Edge/Safari 100+; current verification is markup/asset level. (deferred)
+6. NFR-001.002 scope clarification - clarify all Papyrus content is delivered incrementally across TASK-11..TASK-27. (deferred; NFR edit by requirements-engineer)
+7. NFR-005.001 real-browser verification - schedule manual GUI pass in Firefox/Edge/Safari 100+; current verification is markup/asset level. (deferred)
 8. ADR-0006 (optimistic concurrency) remains Proposed and references ADR-0005; separate review ticket TASK-29 covers it.
 
 ADR index: regenerated docs/architecture/adr/index.html (6 decision records). ADR-0005 Status now Accepted.

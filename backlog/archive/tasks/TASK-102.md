@@ -18,10 +18,7 @@ references:
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
   - docs/specifications/refactor-record-layer-for-document-archive-and-status.md
 documentation:
-  - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
-  - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
-  - docs/specifications/refactor-record-layer-for-document-archive-and-status.md
 priority: high
 type: feature
 ordinal: 41010
@@ -38,7 +35,7 @@ Scope:
 - `src/record/identity.rs`: allocation scans active + archived only; deprecated inputs removed from helpers.
 - `src/record/resolve.rs` and `frontmatter.rs`: preserve non-conforming status verbatim and expose duplicate detection across active + archived.
 
-Authority: ADR-0022 (incl. decision 12), ADR-0023, REQ-05.007, REQ-05.010, REQ-05.011, REQ-07.001, REQ-07.002. Specification: `docs/specifications/refactor-record-layer-for-document-archive-and-status.md`.
+Authority: ADR-0022 (incl. decision 12), ADR-0023, REQ-005.007, REQ-005.010, REQ-005.011, REQ-007.001, REQ-007.002. Specification: `docs/specifications/refactor-record-layer-for-document-archive-and-status.md`.
 
 Assumptions:
 - Assumption: static `RecordDescriptor` remains until TASK-108/TASK-110; TASK-107 updates it to the new contract.

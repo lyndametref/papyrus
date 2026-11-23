@@ -16,28 +16,26 @@ dependencies:
   - TASK-092
   - TASK-098
 references:
-  - docs/requirements/non-functional/NFR-04.004.md
-  - docs/requirements/business/REQ-01.005.md
-  - docs/requirements/business/REQ-01.002.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/business/REQ-06.013.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-03.002.md
+  - docs/requirements/non-functional/NFR-004.004.md
+  - docs/requirements/business/REQ-001.005.md
+  - docs/requirements/business/REQ-001.002.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/business/REQ-006.013.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-003.002.md
   - >-
     docs/architecture/adr/ADR-0013-shared-record-envelope-without-a-storage-layer.md
   - docs/architecture/adr/ADR-0010-papyrus-native-on-disk-record-layout.md
   - docs/architecture/adr/ADR-0011-one-way-backlog-md-import.md
   - docs/architecture/adr/ADR-0012-papyrus-owned-front-matter-metadata.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
   - docs/architecture/adr/ADR-0003-supported-debian-release-target-forky-only.md
   - docs/specifications/release-1.0-native-layout-verification-and-packaging.md
   - docs/specifications/papyrus-native-record-layout-and-single-id-space.md
   - docs/specifications/import-backlog-md-records.md
-  - >-
     docs/specifications/remove-legacy-record-serializers-and-enforce-the-no-drift-rule.md
   - docs/specifications/search-complete-unified.md
   - docs/packaging.md
@@ -48,7 +46,7 @@ ordinal: 39150
 
 
 ## Description
-ADR-0013 stage 8 is the gate on any release that claims NFR-04.004, and the release also needs a package that installs. Each implementation task tested its own behaviour; nothing yet proves the combined properties the renunciation depends on: adoption that is idempotent and byte-identical, no Backlog-shaped write anywhere, one Papyrus identity on every surface, import fidelity against a real source store, relocation that never loses a folder, and search that still indexes whole persisted text now including front matter.
+ADR-0013 stage 8 is the gate on any release that claims NFR-004.004, and the release also needs a package that installs. Each implementation task tested its own behaviour; nothing yet proves the combined properties the renunciation depends on: adoption that is idempotent and byte-identical, no Backlog-shaped write anywhere, one Papyrus identity on every surface, import fidelity against a real source store, relocation that never loses a folder, and search that still indexes whole persisted text now including front matter.
 
 This ticket produces that evidence and the installable amd64 Debian package. Deliverables: an isolated sample Backlog.md project used as the only import source, automated and scripted verification of the ADR-0013 stage 8 properties, one new integration test (tests/release_native_layout_smoke.rs), the built papyrus_<version>_amd64.deb verified install/uninstall/smoke on Debian Forky amd64, and the evidence recorded in docs/packaging.md and the ticket notes.
 
@@ -114,9 +112,9 @@ Feature specification: docs/specifications/release-1.0-native-layout-verificatio
 ## Notes
 Scope note (planner, 2026-11-11): the user deferred the import of this repository own store out of Release 1.0. Verify the import against an isolated sample Backlog.md project fixture only; this repository store is not part of the verification evidence.
 
-Scope note (planner, 2026-11-11): TASK-103 adds the per-milestone kanban board with card status change (REQ-06.013) in m-16 at ordinal 39145, after TASK-97 and before this task. This task now depends on it, so the verification and the packaged release build include the board; board behaviour is covered by TASK-103's own tests, and this task's acceptance criteria are unchanged.
+Scope note (planner, 2026-11-11): TASK-103 adds the per-milestone kanban board with card status change (REQ-006.013) in m-16 at ordinal 39145, after TASK-97 and before this task. This task now depends on it, so the verification and the packaged release build include the board; board behaviour is covered by TASK-103's own tests, and this task's acceptance criteria are unchanged.
 
-Refinement (2026-11-13): execution-ready against ADR-0013 stage 8, ADR-0010/0011/0012, NFR-04.004, REQ-01.002, REQ-01.005, REQ-05.010/011, REQ-06.004, REQ-06.013, and the linked specifications. Feature specification written at docs/specifications/release-1.0-native-layout-verification-and-packaging.md. Scope boundaries confirmed by the caller: this repository own backlog store is out of scope and stays in the Backlog.md layout; the import is verified only against an isolated sample Backlog.md project fixture; the deliverable package is the Debian amd64 build. Acceptance criteria rewritten as 13 testable checks, Definition of Done added, implementation plan recorded, references expanded. Assumptions recorded: Debian Forky amd64 host with fakeroot/dpkg-deb/unshare; package version stays 0.1.0 (open question for release owner); upgrade notes (TASK-99) are cross-checked if present but are not a blocking dependency. No implementation performed.
+Refinement (2026-11-13): execution-ready against ADR-0013 stage 8, ADR-0010/0011/0012, NFR-004.004, REQ-001.002, REQ-001.005, REQ-005.010/011, REQ-006.004, REQ-006.013, and the linked specifications. Feature specification written at docs/specifications/release-1.0-native-layout-verification-and-packaging.md. Scope boundaries confirmed by the caller: this repository own backlog store is out of scope and stays in the Backlog.md layout; the import is verified only against an isolated sample Backlog.md project fixture; the deliverable package is the Debian amd64 build. Acceptance criteria rewritten as 13 testable checks, Definition of Done added, implementation plan recorded, references expanded. Assumptions recorded: Debian Forky amd64 host with fakeroot/dpkg-deb/unshare; package version stays 0.1.0 (open question for release owner); upgrade notes (TASK-99) are cross-checked if present but are not a blocking dependency. No implementation performed.
 
 TASK-98 verification evidence (2026-11-13 12:21 CET, Debian Forky amd64, glibc 2.43, rustc/cargo 1.99.1, clippy 0.1.99, dpkg 1.23.11).
 New test: tests/release_native_layout_smoke.rs, 9 tests, all PASS: t98_01 fixture inventory + repository-store protection; t98_02 adoption/no-op byte identity; t98_03 no Backlog-shaped write; t98_04 invisibility before import/readability after; t98_05 single ID space; t98_06 import fidelity; t98_07 documented upgrade path; t98_08 relocation atomicity/conflict/browser path; t98_09 front-matter search with no write.

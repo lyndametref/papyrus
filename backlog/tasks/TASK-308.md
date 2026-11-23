@@ -5,7 +5,7 @@ created_date: '2026-11-22T14:19:46Z'
 updated_date: '2026-11-22T14:37:49Z'
 labels: []
 references:
-  - REQ-05.011
+  - REQ-005.011
   - TECH-042
   - TC-138
 status: Done
@@ -30,7 +30,7 @@ type: implementation
 
 ## Description
 ## Context
-MS-034 execution found a requirement violation in the field-driven create path: a user-defined type writes a `status` front-matter key (the corpus `note` record has `status: active`), but seed types do not. The captured baseline has no `status` key in `expected/req/create/record.md`, `expected/rule/create/record.md`, or `expected/glossary/create/record.md`. REQ-05.011 and TECH-042 section 7.4 require a new document record to take the type's configured `default_status`, or `active` when none is declared; `SingleHtmlMockup` declares none and starts `pending`. TC-138 expects `status: active` on a created glossary record, and MS-034 AC-1 requires baseline verb behaviour, so the current baseline itself violates the requirement.
+MS-034 execution found a requirement violation in the field-driven create path: a user-defined type writes a `status` front-matter key (the corpus `note` record has `status: active`), but seed types do not. The captured baseline has no `status` key in `expected/req/create/record.md`, `expected/rule/create/record.md`, or `expected/glossary/create/record.md`. REQ-005.011 and TECH-042 section 7.4 require a new document record to take the type's configured `default_status`, or `active` when none is declared; `SingleHtmlMockup` declares none and starts `pending`. TC-138 expects `status: active` on a created glossary record, and MS-034 AC-1 requires baseline verb behaviour, so the current baseline itself violates the requirement.
 
 ## Scope
 - In the field-driven create and create-group path (`src/document.rs`, `src/record/document.rs`), write `status` into front matter for every Markdown model using the type's configured `default_status`, or `active` when the type declares none.
@@ -44,19 +44,19 @@ MS-034 execution found a requirement violation in the field-driven create path: 
 Status verb behaviour, archive and delete behaviour, config selectors (TASK-258), typed module deletion (TASK-259), help-golden regeneration (TASK-260), and migration of existing records.
 
 ## Grounding
-REQ-05.011; TECH-042 section 7.4; MS-034 AC-1; TC-138; corpus `expected/req|rule|glossary/create/record.md`.
+REQ-005.011; TECH-042 section 7.4; MS-034 AC-1; TC-138; corpus `expected/req|rule|glossary/create/record.md`.
 
 ## Definition of done
 Every create, create-group, and create-json fixture records the expected status; `list`, `view`, and `json` show the status written at create; the status verb still changes a document's status; the characterization replay passes with the updated expectations; `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` are clean; the delta is documented.
 ## Acceptance Criteria
-- [ ] Every create, create-group, and create-json case writes the expected status: the type's default_status, or active when none is declared, and pending for SingleHtmlMockup. (REQ-05.011; TECH-042 7.4)
-- [ ] list, view, and json show the status written at create. (REQ-05.011)
+- [ ] Every create, create-group, and create-json case writes the expected status: the type's default_status, or active when none is declared, and pending for SingleHtmlMockup. (REQ-005.011; TECH-042 7.4)
+- [ ] list, view, and json show the status written at create. (REQ-005.011)
 - [ ] The status verb still changes a document's status. (MS-034 AC-1)
 - [ ] The characterization suite replays with the updated expectations, and the delta is recorded in EXPECTED-DELTAS.md. (TECH-042 7.4)
 - [ ] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check are clean.
 ## Comments
 - **rust-dev**: -
-- **rust-dev**: Implementation (rust-dev) - status written at create (REQ-05.011; TECH-042 7.4).
+- **rust-dev**: Implementation (rust-dev) - status written at create (REQ-005.011; TECH-042 7.4).
 - **rust-dev**: SingleMarkdown (glossary, rule, ui-spec, audit, tech-spec, use-case, test-case, test-report, user-defined note): configured default_status, else active. Seed types write status active; note with default_status review writes review.
 - **rust-dev**: GroupedMarkdown (req, nfr): member create and create-group write the configured default_status, else active. A created group gains a front-matter block holding only status.
 - **rust-dev**: SingleHtmlMockup (ui-mockup): unchanged; keeps status pending in its HTML metadata. No create or create-group option sets status; existing records without status are not migrated.

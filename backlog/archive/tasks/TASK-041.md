@@ -19,19 +19,19 @@ references:
   - docs/specifications/ui/browser-ui-mockups-ui.md
   - docs/specifications/cli-milestone-packaging-and-verification.md
   - docs/packaging.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-05.008.md
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-005.008.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -40,15 +40,8 @@ references:
   - docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md
   - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
 documentation:
-  - docs/specifications/ui-mockups-management.md
-  - docs/specifications/search-ui-mockups.md
-  - docs/specifications/browser-ui-mockups.md
-  - docs/specifications/ui/browser-ui-mockups-ui.md
-  - docs/specifications/cli-milestone-packaging-and-verification.md
-  - docs/packaging.md
 priority: medium
 type: chore
 ordinal: 25400
@@ -68,7 +61,7 @@ Scope (in):
 
 Scope (out):
 - No new product behavior, commands, options, or UI changes; feature behavior delivered by TASK-38 (management), TASK-39 (search), TASK-40 (browser), TASK-41 (design review, MOCK-0006 approved).
-- No verification on Debian releases other than Forky (ADR-0003, NFR-03.002); no real-GUI browser checks (markup/asset-level only); no dependency-license audit re-run; no changes to requirements, business rules, ADRs, packaging scripts, or UI; product code changes only as a minimal bug fix found during verification.
+- No verification on Debian releases other than Forky (ADR-0003, NFR-003.002); no real-GUI browser checks (markup/asset-level only); no dependency-license audit re-run; no changes to requirements, business rules, ADRs, packaging scripts, or UI; product code changes only as a minimal bug fix found during verification.
 
 Milestone m-7 scope vs packaging: this ticket packages and verifies the m-7 UI-mockups increment only; it does not re-deliver management, search, browser, or design-review behavior.
 
@@ -78,11 +71,11 @@ Assumptions:
 - Assumption: scratch directories live under ./.tmp/ and are removed before the task ends.
 - Assumption: the package version stays 0.1.0 (open question OQ-4).
 - Assumption: scripts/build-deb.sh is used unchanged and does not force a rebuild; cargo build --release must run first.
-- Assumption: no new runtime dependency was added; the TASK-1/TASK-4 runtime dependency license audit remains valid (NFR-06.002).
+- Assumption: no new runtime dependency was added; the TASK-1/TASK-4 runtime dependency license audit remains valid (NFR-006.002).
 - Assumption: no UI change ships in this ticket; MOCK-0001 through MOCK-0006 approved baselines remain the layout references and no new mockup is produced.
 
 Open questions (non-blocking, each with a default in the specification):
-- OQ-1 (default: markup/asset-level verification only; no real-GUI browser run) - NFR-05.001 verification method.
+- OQ-1 (default: markup/asset-level verification only; no real-GUI browser run) - NFR-005.001 verification method.
 - OQ-2 (default: fakeroot dpkg --instdir/--admindir on the Forky build host) - container/VM isolation.
 - OQ-3 (default: new tests/ui_mockups_smoke.rs) - milestone test file location.
 - OQ-4 (default: keep version 0.1.0).
@@ -90,7 +83,7 @@ Open questions (non-blocking, each with a default in the specification):
 Specification: docs/specifications/cli-milestone-packaging-and-verification.md
 
 ## Acceptance Criteria
-- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides UI mockup management, search, and browser (ui-mockup category); Debian Trixie and other releases are not claimed or verified.
+- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides UI mockup management, search, and browser (ui-mockup category); Debian Trixie and other releases are not claimed or verified.
 - [x] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists ui-mockup (guards against packaging a stale binary).
 - [x] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [x] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

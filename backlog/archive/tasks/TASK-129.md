@@ -34,7 +34,7 @@ ordinal: 41400
 
 - `MILESTONE_TEMPLATE.archive` is `FRONTMATTER_ARCHIVE` in `src/registry.rs`.
 - `RecordDescriptor::resolve_archived_directory` returns the archive folder for `"task" | "milestone"` in `src/record/descriptor.rs`, so the record layer still exposes a milestone lifecycle archive destination.
-- `relocate_if_archived` in `src/record/store.rs` creates the archived folder and moves any active-folder record whose front-matter `status` is `archived`. A legacy active-folder milestone with `status: archived` is therefore silently moved, and a read/search path creates `backlog/archive/milestones/`, contradicting the close-only lifecycle (`papyrus milestone close <id>`, REQ-03.001, ADR-0022 decision 5) and the m-19 checkpoint.
+- `relocate_if_archived` in `src/record/store.rs` creates the archived folder and moves any active-folder record whose front-matter `status` is `archived`. A legacy active-folder milestone with `status: archived` is therefore silently moved, and a read/search path creates `backlog/archive/milestones/`, contradicting the close-only lifecycle (`papyrus milestone close <id>`, REQ-003.001, ADR-0022 decision 5) and the m-19 checkpoint.
 
 **What.** Align the descriptor and record layer with the accepted ADRs: the milestone template declares `ArchivePolicy::None`; `resolve_archived_directory` exposes no lifecycle archive location for milestones; the legacy/import folder stays readable and import-writable; `relocate_if_archived` preserves and reports an `archived` milestone instead of moving it; a regression test locks the invariant. No user-visible CLI change beyond preventing the invalid auto-archive.
 
@@ -47,7 +47,7 @@ ordinal: 41400
 - Update the `resolve_archived_directory` / read-directory documentation comments to state that the milestone folder is read/import-only and not a lifecycle archive destination.
 - Regression test: in a temporary project, place a milestone in `backlog/milestones/` with `status: archived`, run the read/search/edit path that previously relocated it, and assert the file is still in `backlog/milestones/` and `backlog/archive/milestones/` does not exist. Also assert both legacy locations still resolve for reads and that import still writes archived milestones to `backlog/archive/milestones/`.
 
-**Out of scope.** REQ-06.013 text (TASK-135), `docs/specifications/milestone-and-release-management.md` (TASK-136), ADRs, browser UI changes, new CLI options or verbs, deleting, migrating, or restoring legacy archived milestone files, the release lifecycle, and the task/document archive policies.
+**Out of scope.** REQ-006.013 text (TASK-135), `docs/specifications/milestone-and-release-management.md` (TASK-136), ADRs, browser UI changes, new CLI options or verbs, deleting, migrating, or restoring legacy archived milestone files, the release lifecycle, and the task/document archive policies.
 
 **Assumptions.** The accepted ADRs are authoritative and the close-only milestone lifecycle is already delivered by TASK-130/TASK-132. "Report" means exposing the preserved record condition to the calling path so it is not silent; it adds no new exit code, error, or output line. `archived` remains only a legacy stored value, never a reachable milestone lifecycle state. No new configuration key or record type is introduced.
 

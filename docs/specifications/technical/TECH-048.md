@@ -9,13 +9,13 @@ references:
   - ADR-0009
   - ADR-0012
   - ADR-0013
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-04.004
-  - REQ-01.005
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-06.004
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-004.004
+  - REQ-001.005
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-006.004
   - TASK-70
   - TASK-86
   - TASK-88
@@ -37,8 +37,8 @@ status: verified
 Deliver ADR-0013 Stage 7: delete every remaining legacy per-type record parser and writer and the
 browser's private record write path, then make the no-drift rule mechanically checkable so parsing,
 identity, projection, and writing each have exactly one implementation under `src/record/`. This is
-the removal and enforcement half of NFR-04.004 and implements REQ-05.011, REQ-06.004, NFR-04.001,
-and NFR-04.002 through ADR-0013 decisions 2–7.
+the removal and enforcement half of NFR-004.004 and implements REQ-005.011, REQ-006.004, NFR-004.001,
+and NFR-004.002 through ADR-0013 decisions 2–7.
 
 The ticket is a refactor with no intended change to command output, JSON shapes, browser pages,
 validation messages, HTTP status codes, or exit codes. It closes the release claim that Papyrus has
@@ -229,7 +229,7 @@ packaging stay in TASK-98.
    5. Normalization is implemented once, in a helper under `src/record/`, and is not reimplemented in
       `src/browser/`. CLI edits, import, and migration keep the shared byte-preserving contract.
 5. Reading or saving a managed record that lacks front matter adopts it through the shared writer
-   (REQ-05.011, ADR-0012 decision 9): the body is unchanged apart from the added block, adoption uses
+   (REQ-005.011, ADR-0012 decision 9): the body is unchanged apart from the added block, adoption uses
    the existing `record::migrate` semantics, and a subsequent read or save is idempotent. This
    replaces the browser's current non-migrating branch; an adoption write failure is reported and
    leaves the file byte-identical.
@@ -293,7 +293,7 @@ Rules for the checks:
 
 - Assumption: the browser's legacy non-migrating write branch exists only for pre-front-matter files
   and can be removed; routing saves through `record::store` makes browser saves adopt front matter as
-  REQ-05.011 requires. Adoption on browser read is therefore a documented behavior change from the
+  REQ-005.011 requires. Adoption on browser read is therefore a documented behavior change from the
   current code, not a new requirement.
 - Assumption: the browser view model may keep a `Record`-shaped struct as a render-only struct, but it
   must be populated from the shared document, front matter, and projection and must not contain
@@ -347,7 +347,7 @@ resolved by D2 in favor of normalization, matching the browser specifications. O
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-97 |
-| Requirements | REQ-05.010, REQ-05.011, REQ-06.004, REQ-01.005, NFR-04.001, NFR-04.002, NFR-04.004 |
+| Requirements | REQ-005.010, REQ-005.011, REQ-006.004, REQ-001.005, NFR-004.001, NFR-004.002, NFR-004.004 |
 | ADRs | ADR-0006, ADR-0012, ADR-0013 (Stage 7, decisions 2–7) |
 | Specifications | `browser-*.md` persistence and ID contracts (revised under TASK-86), `papyrus-native-record-layout-and-single-id-space.md`, `import-backlog-md-records.md` |
 | Related tickets | TASK-88, TASK-89, TASK-92, TASK-93, TASK-94, TASK-95, TASK-96, TASK-98 |

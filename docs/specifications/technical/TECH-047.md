@@ -19,16 +19,16 @@ references:
   - BR-018
   - BR-019
   - BR-020
-  - REQ-01.001
-  - REQ-01.002
-  - REQ-01.003
-  - REQ-01.006
-  - REQ-01.007
-  - REQ-05.008
-  - REQ-05.012
-  - REQ-05.013
-  - REQ-05.014
-  - REQ-07.002
+  - REQ-001.001
+  - REQ-001.002
+  - REQ-001.003
+  - REQ-001.006
+  - REQ-001.007
+  - REQ-005.008
+  - REQ-005.012
+  - REQ-005.013
+  - REQ-005.014
+  - REQ-007.002
   - TASK-104
   - TASK-112
   - TASK-127
@@ -43,11 +43,11 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the interactive walkthrough at `papyrus init <project_name>` required by REQ-01.006 (and REQ-01.001, REQ-01.002, REQ-01.007, BR-016): before writing `papyrus.config.yml`, present every available artifact in a single cursor-driven list, let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use sensible defaults without prompting. The generated configuration validates successfully, including the `id_padding` range.
+Deliver the interactive walkthrough at `papyrus init <project_name>` required by REQ-001.006 (and REQ-001.001, REQ-001.002, REQ-001.007, BR-016): before writing `papyrus.config.yml`, present every available artifact in a single cursor-driven list, let the user choose which to activate, and prompt for the ID prefix and storage folder of each activated artifact. Non-interactive/CI environments (no TTY) use sensible defaults without prompting. The generated configuration validates successfully, including the `id_padding` range.
 
-This specification was revised (TASK-85) so that the walkthrough matches REQ-01.006: a single artifact list with task, milestone, and release always active; per-activated-artifact prefix/folder prompts; shared roots prompted once; defaults in brackets; validation hints naming the default equivalent; inactive types written with `enabled: false`; and TTY-only execution with no new flag or environment variable. It was revised again (TASK-104) to fix the presentation contract: the list is cursor-driven (one highlighted selectable row, Up/Down and `k`/`j` navigation, Space toggle, Enter confirm, redraw on every keypress, clamped navigation, core rows never highlighted, typed token input rejected, end of input confirming and continuing) and the offered document-type set includes `use-case`, `test-case`, and `test-report`.
+This specification was revised (TASK-85) so that the walkthrough matches REQ-001.006: a single artifact list with task, milestone, and release always active; per-activated-artifact prefix/folder prompts; shared roots prompted once; defaults in brackets; validation hints naming the default equivalent; inactive types written with `enabled: false`; and TTY-only execution with no new flag or environment variable. It was revised again (TASK-104) to fix the presentation contract: the list is cursor-driven (one highlighted selectable row, Up/Down and `k`/`j` navigation, Space toggle, Enter confirm, redraw on every keypress, clamped navigation, core rows never highlighted, typed token input rejected, end of input confirming and continuing) and the offered document-type set includes `use-case`, `test-case`, and `test-report`.
 
-It was revised again (TASK-112) so that the offered document-type set is exactly the eleven-entry default set of REQ-07.002 — `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, with `deploy` removed — and so that the generated configuration seeds the document status model: `statuses: [active, archived]` for every front-matter-backed document type, no `statuses` for `ui-mockup`, and no `default_status` on any entry.
+It was revised again (TASK-112) so that the offered document-type set is exactly the eleven-entry default set of REQ-007.002 — `req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`, with `deploy` removed — and so that the generated configuration seeds the document status model: `statuses: [active, archived]` for every front-matter-backed document type, no `statuses` for `ui-mockup`, and no `default_status` on any entry.
 
 It was revised again (TASK-127) so that section 6 states the settled directory-creation contract: only the activated type's active directory is created, `archived/` appears on the first archive, and no `deprecated/` subfolder and no `backlog_directory/archive/` folder is pre-created (ADR-0022, ADR-0023 decision 2).
 
@@ -65,8 +65,8 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 - Storage folder prompting for shared roots and per-document-type directories, for activated artifacts only.
 - Activation flags written as the existing `enabled` field for decision and document types (BR-016); inactive types are written with `enabled: false`.
 - Non-interactive/CI default behavior (all artifacts activated, default prefixes/folders, `id_padding` 3).
-- Preservation of `--force` and `--no-git` behavior (REQ-01.001).
-- Final configuration validation before writing (REQ-01.007).
+- Preservation of `--force` and `--no-git` behavior (REQ-001.001).
+- Final configuration validation before writing (REQ-001.007).
 - README/manpage (`papyrus(1)` init section) and BR-002 wording update describing the walkthrough.
 - Directory creation limited to activated artifacts (core always; decision/document types only when activated) and to their active directories only: no `archived/`, no `deprecated/`, and no `backlog_directory/archive/` folder is pre-created by init.
 
@@ -75,7 +75,7 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 - New CLI flags or environment variables for non-interactive selection (defaults are used instead).
 - Configuration schema changes or removal of `enabled` flags (see Open Questions).
 - UI mockups (none for this ticket; CLI-only).
-- Typed-token artifact activation (for example space-separated artifact names on one text line): explicitly rejected by REQ-01.006.
+- Typed-token artifact activation (for example space-separated artifact names on one text line): explicitly rejected by REQ-001.006.
 - Mouse input, scrolling beyond the visible artifact set, search/filter inside the list, and coloured/highlight styling beyond a visible cursor marker.
 - Migration or re-padding of existing files.
 - Git workflows beyond invoking repository initialization when `--no-git` is absent.
@@ -86,7 +86,7 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 
 1. Interactive mode runs only when standard input is a terminal (TTY); otherwise the walkthrough is skipped and defaults are applied. No new CLI flag or environment variable is required or introduced.
 2. In interactive mode, the artifact list is driven by individual keypresses, not by text lines (section 2). The prefix and folder prompts that follow the list are read line-by-line from `stdin`. An unexpected end of input on a prefix/folder prompt uses that prompt's default value and continues; the walkthrough never hangs.
-3. `--force` and `--no-git` behave exactly as documented (REQ-01.001) regardless of mode.
+3. `--force` and `--no-git` behave exactly as documented (REQ-001.001) regardless of mode.
 
 ### 2. Artifact list presentation (single cursor-driven list)
 
@@ -99,7 +99,7 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 7. The whole list is redrawn after every keypress so the cursor position and every row's `[x]`/`[ ]` state are always visible; no keypress is acknowledged by silent re-prompting.
 8. End of input on the list (for example closed `stdin` or Ctrl-D) confirms the current state and continues with the remaining prompts, so the walkthrough never waits on closed input.
 9. The list accepts no typed artifact tokens: there is no prompt that reads artifact names from a text line, and characters other than Space, `k`, `j`, and Enter have no effect on activation (they may be ignored, or cause a redraw only).
-10. The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the eleven default document types of REQ-07.002 (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`). `deploy` is not offered; it remains available only as a user-added document type declared in configuration after init.
+10. The offered artifact set is task, milestone, release, the decision types (`adr`, `bdr`), and the eleven default document types of REQ-007.002 (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`). `deploy` is not offered; it remains available only as a user-added document type declared in configuration after init.
 11. The schema defaults are the default selections (all artifacts active).
 12. Rows are listed in the configuration key order (core rows first, then decision types, then document types in schema order).
 
@@ -126,8 +126,8 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 
 1. The walkthrough builds a `Config` with `project_name` set to the sanitized name and `id_padding` 3 (default), then applies the collected prefixes, folders, and `enabled` flags.
 2. Before writing, `Config::validate()` is called; a validation failure aborts `init` with exit code 4 and writes no configuration file.
-3. The YAML is serialized and written to `papyrus.config.yml`: if the file already exists and `--force` is absent, `init` fails with a conflict (exit code 4) and writes nothing; under `--force` the existing file is replaced in full, with no value from the previous file kept. `--force` never overwrites any other pre-existing file (REQ-01.001).
-4. Every default document type backed by front matter is written with `statuses: [active, archived]` in declared order; `ui-mockup` is written with no `statuses` key (its state lives in HTML metadata, REQ-05.008); no entry is written with `default_status`, so a new record starts at the effective default `active`.
+3. The YAML is serialized and written to `papyrus.config.yml`: if the file already exists and `--force` is absent, `init` fails with a conflict (exit code 4) and writes nothing; under `--force` the existing file is replaced in full, with no value from the previous file kept. `--force` never overwrites any other pre-existing file (REQ-001.001).
+4. Every default document type backed by front matter is written with `statuses: [active, archived]` in declared order; `ui-mockup` is written with no `statuses` key (its state lives in HTML metadata, REQ-005.008); no entry is written with `default_status`, so a new record starts at the effective default `active`.
 5. Deactivating a document type in the list writes `enabled: false` and keeps the entry's prefix, directory, and seeded status list; it removes the type from management without touching existing files.
 
 ### 6. Directory creation
@@ -180,7 +180,7 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 - Assumption: Only `ui-mockup` omits `statuses`; every other default document type is front-matter-backed and seeds `[active, archived]`.
 - Assumption: No UI mockups are required (CLI-only ticket).
 - Assumption: README/manpage init section and BR-002 are updated to describe the walkthrough; BR-016 and the enabled-flag model are unchanged.
-- Assumption: The cursor-driven list replaces the earlier per-artifact `Activate? [Y/n]` prompts and the interim typed-token toggle line (REQ-01.006); only the prefix/folder prompts remain line-based.
+- Assumption: The cursor-driven list replaces the earlier per-artifact `Activate? [Y/n]` prompts and the interim typed-token toggle line (REQ-001.006); only the prefix/folder prompts remain line-based.
 - Assumption: The cursor marker is rendered with plain terminal characters (for example a `>` prefix) so the selected row is identifiable in captured output without relying on colour.
 - Assumption: Terminal input handling stays dependency-free per ADR-0001/ADR-0004/ADR-0005 unless a new ADR approves otherwise (see TASK-104 architecture decision).
 
@@ -188,14 +188,14 @@ It was revised again (TASK-127) so that section 6 states the settled directory-c
 
 - OQ-1: The user expressed a preference for presence-based activation (an artifact is active when its configuration is present, with no `enabled` flag). This conflicts with BR-016 and with effective-config merge semantics (omitted types inherit default `enabled: true`). TASK-75 retains the existing `enabled` flags. If presence-based activation is required, it needs a separate task/ADR covering schema, loading, and command changes.
 - OQ-2 (resolved by TASK-104): the presentation is a single cursor-driven list, not per-artifact sequential prompts. Only the exact prompt wording and the exact cursor glyph remain implementation-defined.
-- OQ-3: Whether `id_padding` should also be prompted during the walkthrough is not specified; this spec keeps it at the default 3 (REQ-01.007) unless changed via `config set`.
+- OQ-3: Whether `id_padding` should also be prompted during the walkthrough is not specified; this spec keeps it at the default 3 (REQ-001.007) unless changed via `config set`.
 
 ## Traceability
 
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-75, TASK-85, TASK-104 |
-| Requirements | REQ-01.006, REQ-01.001, REQ-01.002, REQ-01.003, REQ-01.007, REQ-05.012, REQ-05.013, REQ-05.014 |
+| Requirements | REQ-001.006, REQ-001.001, REQ-001.002, REQ-001.003, REQ-001.007, REQ-005.012, REQ-005.013, REQ-005.014 |
 | Business rule | BR-016, BR-002, BR-018, BR-019, BR-020 |
 | ADR | ADR-0001, ADR-0004, ADR-0005 (dependency baseline), ADR-0010 decision 8 (shared relocation routine), ADR-0013 stage 5, ADR-0022 (archive location and no restore), ADR-0023 decision 2 (active and archive locations) |
 | Related tickets | TASK-2 (config foundation), TASK-74 (id_padding constraint), TASK-85 (spec revision), TASK-104 (cursor-driven list revision) |

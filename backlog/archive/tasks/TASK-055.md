@@ -15,37 +15,31 @@ dependencies:
   - TASK-061
   - TASK-071
 references:
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.004.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-006.004.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - docs/specifications/ui/browser-front-matter-and-lifecycle-ui.md
   - docs/specifications/ui/browser-agent-skills-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0010-browser-front-matter-and-lifecycle-review.html
   - docs/specifications/ui/mockups/MOCK-0011-browser-agent-skills-review.html
-  - >-
     docs/specifications/ui/mockups/MOCK-0012-browser-final-cross-type-review.html
   - docs/specifications/ui/mockups/README.md
   - docs/specifications/ui/browser-final-cross-type-ui.md
 documentation:
-  - docs/specifications/ui/browser-final-cross-type-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0012-browser-final-cross-type-review.html
-  - docs/specifications/ui/mockups/README.md
 priority: medium
 type: task
 ordinal: 30095
@@ -68,10 +62,10 @@ Out of scope: backend/CLI implementation (TASK-19, TASK-67, TASK-72, TASK-77), p
 - [ ] Mockup package MOCK-0012 created under docs/specifications/ui/mockups/ and registered in mockups/README.md for the final cross-type browser navigation/inventory.
 - [ ] UI description document docs/specifications/ui/browser-final-cross-type-ui.md records layout, complete sidebar inventory (all 12 document types in final order), screen map, inventory hub, front-matter metadata display, lifecycle page, agent skills page, active elements, open questions OQ-1..OQ-5, assumptions, approval status.
 - [ ] Mockup and UI description receive explicit user approval (status approved) before implementation of TASK-19.
-- [ ] Navigation entries and ordering are consistent with REQ-06.003 and prior approved mockups (MOCK-0010, MOCK-0011).
+- [ ] Navigation entries and ordering are consistent with REQ-006.003 and prior approved mockups (MOCK-0010, MOCK-0011).
 - [ ] Front-matter metadata display covers id, title, created_date, updated_date, labels, references, and type-specific keys on a representative subset (task, milestone, release, technical specification), with read-only timestamps in edit forms.
 - [ ] Lifecycle page has one section per fixed record type (12) with task states from configured statuses and documented lifecycles for other types; excludes Backlog.md docs, drafts, and project configuration files.
-- [ ] Agent skills page is included (read-only, config-parameterized) per REQ-06.005.
+- [ ] Agent skills page is included (read-only, config-parameterized) per REQ-006.005.
 - [ ] Mockup is self-contained, clickable, consistent with approved MOCK-0001 shell; validate_mockups.sh reports no new errors attributable to MOCK-0012.
 - [ ] Approved MOCK-0001..MOCK-0011 are not modified in place.
 - [ ] No implementation code, new dependencies, crates, or ADRs introduced.

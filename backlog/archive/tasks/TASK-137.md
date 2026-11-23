@@ -16,8 +16,8 @@ milestone: MS-022
 dependencies:
   - TASK-136
 references:
-  - docs/requirements/business/REQ-06.016.md
-  - docs/requirements/business/REQ-06.014.md
+  - docs/requirements/business/REQ-006.016.md
+  - docs/requirements/business/REQ-006.014.md
   - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - src/browser/render.rs
@@ -27,14 +27,14 @@ references:
   - src/browser/routes.rs
   - src/browser/mod.rs
   - tests/fixtures/characterization/lists/README.md
-  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-005.007.md
 priority: high
 ordinal: 41550
 ---
 
 
 ## Description
-**Why.** REQ-06.016 forbids a bespoke list view for any family, and ADR-0028 downstream constraint 1 requires that `document_list.html` and every per-family list builder not survive. TASK-141 landed the shell, `PageWidth`, `browser::list`, and migrated the milestone list as the reference. Every other family still renders through `document_list.html` (config-defined types) or the per-family builders `render::list_section` / `render::backlog_list_section`, so the prohibition is not yet met.
+**Why.** REQ-006.016 forbids a bespoke list view for any family, and ADR-0028 downstream constraint 1 requires that `document_list.html` and every per-family list builder not survive. TASK-141 landed the shell, `PageWidth`, `browser::list`, and migrated the milestone list as the reference. Every other family still renders through `document_list.html` (config-defined types) or the per-family builders `render::list_section` / `render::backlog_list_section`, so the prohibition is not yet met.
 
 **What.** Move every remaining family onto `ListPlan`, delete the second list path, and replay the TASK-141 characterization fixtures (schema `papyrus.list-characterization/1`, producing commit `d60f71c`) with every accepted difference recorded in this ticket.
 
@@ -45,7 +45,7 @@ ordinal: 41550
 
 | Family | Slug(s) | Declared slots, in order | List status filter |
 |---|---|---|---|
-| Task | `task` | Milestone `milestone`, Assignee `assignee` | none - no list route; REQ-06.013 board |
+| Task | `task` | Milestone `milestone`, Assignee `assignee` | none - no list route; REQ-006.013 board |
 | Milestone | `milestone` | Release `release` (already shared) | none |
 | Release | `release` | none (status is the structural Status column) | none |
 | Decision | `decision` aggregate; `adr`/`bdr` aliases | Type `type`, Superseded by `superseded_by` | none |
@@ -63,11 +63,11 @@ ordinal: 41550
 | Config-defined document types | any (e.g. `note`) | none | yes |
 
 3. **Grouped families (every family whose descriptor id shape is grouped: requirements, NFRs).** Rows are emitted one group at a time in ascending group ID: the group row, then one child row per member in ascending ID, all in one `<tbody>`; each child carries `data-child-of="{group id}"`. A group with no members renders as a group row with no children. A member whose group row is absent from the indexed set (unresolved reference, or a group row removed by a status filter) renders as a top-level row in ID order, with no `data-child-of`, and is never dropped, duplicated, or attached to a synthesised group. The Group slot shows the stored reference verbatim.
-4. **Status filter (REQ-06.014).** Every enabled document type keeps today's single filter form and its 400 validation (`active` plus declared custom statuses in configured order; `archived` never offered), rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filtered list with no matches shows the shared empty block (filter-specific empty copy is out of scope).
+4. **Status filter (REQ-006.014).** Every enabled document type keeps today's single filter form and its 400 validation (`active` plus declared custom statuses in configured order; `archived` never offered), rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filtered list with no matches shows the shared empty block (filter-specific empty copy is out of scope).
 5. **Count note.** Flat families: `list::count_note(slug, record count)` (`3 milestones`, `1 milestone`, `0 releases`; a config-defined type uses its own noun, `2 notes`). Grouped families: `N group(s) · M requirement(s)` computed from the rows actually emitted - the group rows shown and the member rows shown, orphan members rendered top-level included - never from a synthesised group (`1 group · 3 requirements`, `0 groups · 0 requirements`).
 6. **Empty state.** One shared pair for every family: message `No {noun} in this project.` and help `Records are created from the command line; this browser does not create records.`, with `{noun}` the same singular/plural noun the count note uses. Legacy per-family empty wording (requirement cross-family hint and group messages, the "were found in the configured directory" wording, "Archived ... are hidden") does not survive; it is an accepted difference owned by TASK-148.
 7. **Heading, subheading, count noun, and slots resolve through the presentation.** `list_page` resolves them via the descriptor's representative navigation slug, so `?type=adr`, `?type=bdr`, and `?type=decision` all render the Decisions heading and the `Type` slot. Requirement and NFR lists therefore show `Business requirements` / `Non-functional requirements` instead of the shared legacy `Requirements`, and every list subheading is the presentation inventory note rather than the legacy per-family `<Family> records in this project.` sentence.
-8. **Task family.** `/?type=task` stays the REQ-06.013 board: no shared table, no Actions cell, no status filter, per-milestone grouping unchanged. The task slots stay declared but unused.
+8. **Task family.** `/?type=task` stays the REQ-006.013 board: no shared table, no Actions cell, no status filter, per-milestone grouping unchanged. The task slots stay declared but unused.
 9. **One path.** `ListLayout`, `routes::list_layout`, `Presentation::list_layout`, `with_layout`, `list_section`, `backlog_list_section`, `document_list_page`, and `document_list.html` are deleted in this change; no slug or handler match selects a list builder, and no per-family list template remains. Config-defined types (no presentation entry) migrate by deleting the `document_list_page` branch. The board's empty-project fallback keeps its own markup and copy inside `board_page`; it is board copy, not a list.
 10. **`document_list.html` deletion is safe.** No route changes: `/?type=<slug>` already resolves to the list handler, and the generic branch now calls the shared builder. The template is referenced only by `DOCUMENT_LIST_TEMPLATE`, which is deleted with it.
 11. **Fixture normalization.** Captured `""` or `"(none)"` status/date/slot values are the shared muted `(none)`; non-empty status stays verbatim. Captured `actions` (`[]`), `baseline_columns`, and `baseline_row_shape` are evidence only.
@@ -111,7 +111,7 @@ ordinal: 41550
 **UI gate.** No new mockup is produced: TASK-142 adds no visual contract beyond the one MOCK-0016 (draft) already defines for the shared list. The refiner records a no-mockup waiver naming MOCK-0016 and the 32 characterization fixtures; every visual difference is recorded above as A1-A8.
 
 ## Acceptance Criteria
-- [x] Every enabled artifact family and every enabled config-defined document type renders its list view through the shared layout; a disabled type has no list route (404). The task family has no list view and keeps the REQ-06.013 board.
+- [x] Every enabled artifact family and every enabled config-defined document type renders its list view through the shared layout; a disabled type has no list route (404). The task family has no list view and keeps the REQ-006.013 board.
 - [x] Every such list view renders the same header sequence - ID, Title, Status, the declared family slot(s) in order, Created, Updated, Actions - with the same row, column, and action placement; View then Edit (then any existing family action) are the last cell, and family-specific values appear only in the declared slot cells and the Title cell labels/references.
 - [x] document_list.html, document_list_page, list_section, backlog_list_section, ListLayout, routes::list_layout, Presentation::list_layout, and with_layout are deleted; no slug or handler match selects a list builder, no per-family list template remains, and ListPlan is the only list path.
 - [x] Requirements and NFRs render one group row followed by its member rows in the same tbody, each member carrying data-child-of; a group with no members renders as a group row with no children; for every grouped family, a member whose group row is absent from the indexed set renders as a top-level row with no data-child-of and is never dropped, duplicated, or attached to a synthesised group; the grouped count note reflects the records actually shown.
@@ -140,7 +140,7 @@ ordinal: 41550
 
 | Family | Slug(s) | Declared slots, in order | List status filter |
 |---|---|---|---|
-| Task | `task` | Milestone `milestone`, Assignee `assignee` | none (REQ-06.013 board) |
+| Task | `task` | Milestone `milestone`, Assignee `assignee` | none (REQ-006.013 board) |
 | Milestone | `milestone` | Release `release` | none |
 | Release | `release` | none | none |
 | Decision | `decision`; `adr`/`bdr` aliases | Type `type`, Superseded by `superseded_by` | none |
@@ -207,7 +207,7 @@ created: 2026-11-15T18:31:00Z
 
 ---
 
-Coordination from TASK-141 refinement. Fixture contract: tests/fixtures/characterization/lists/{project,expected/<family>.json} plus a README naming the producing commit and schema. Each fixture captures the semantic row model (row_order, per-record title/status/created/updated/slot values/href, grouped group->children, excluded archived ids, heading, count_note, empty) so it survives the header change; baseline_columns and baseline_row_shape are pre-change evidence and are not replayed. Two facts affect this task: (1) the task family has no list route (/?type=task is the REQ-06.013 board), so pick the reference family in TASK-141 before starting; (2) ADR-0028 declares release -> family slot Status, which duplicates the Status column - confirm or drop it here. Feature specification: docs/specifications/browser-shell-shared-list-layout-and-page-width.md.
+Coordination from TASK-141 refinement. Fixture contract: tests/fixtures/characterization/lists/{project,expected/<family>.json} plus a README naming the producing commit and schema. Each fixture captures the semantic row model (row_order, per-record title/status/created/updated/slot values/href, grouped group->children, excluded archived ids, heading, count_note, empty) so it survives the header change; baseline_columns and baseline_row_shape are pre-change evidence and are not replayed. Two facts affect this task: (1) the task family has no list route (/?type=task is the REQ-006.013 board), so pick the reference family in TASK-141 before starting; (2) ADR-0028 declares release -> family slot Status, which duplicates the Status column - confirm or drop it here. Feature specification: docs/specifications/browser-shell-shared-list-layout-and-page-width.md.
 
 ---
 
@@ -220,7 +220,7 @@ Refinement (TASK-142) - pinned decisions and UI waiver.
 
 - Slot table confirmed: task->Milestone/Assignee; milestone->Release; release->none; decision->Type; req/nfr->Group; rule->Applicability; audit->Audit type; ui-mockup->Task/Specs; generic->none. `status` stays structural and is never a slot.
 - Grouped families: group row then its children in one `<tbody>`, children carry `data-child-of`; an empty group renders as a group row; a member whose group row is filtered out renders top-level. The fixture pseudo-group `other` replays as top-level rows.
-- Filter (REQ-06.014): kept unchanged for every document type (form above the shared section, same 400 rules); milestone/release/decision/task have none. `ListPlan` never filters.
+- Filter (REQ-006.014): kept unchanged for every document type (form above the shared section, same 400 rules); milestone/release/decision/task have none. `ListPlan` never filters.
 - Count note: flat `list::count_note`; grouped `N group(s) · M requirement(s)` (preserves the fixture note).
 - Empty state: one shared message/help pair for all families; legacy per-family empty copy is an accepted difference, reconciled by TASK-148.
 - Heading: presentation heading; req/nfr move from `Requirements` to `Business requirements` / `Non-functional requirements` (accepted difference). Decision aliases (`?type=adr`, `?type=bdr`) resolve to the Decisions presentation.

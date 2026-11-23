@@ -24,7 +24,7 @@ ADR-0025 and ADR-0026 require third-party browser assets (KaTeX with its font fi
 - The package contains exactly three entries under `usr/share/doc/papyrus/`: the `copyright` file. `scripts/build-deb.sh` copies one copyright file and one control file.
 - Several existing packaging specifications and tests assert that **no** served CSS contains `url(`, and that no page references a web font. KaTeX CSS contains 60 `url(fonts/…)` references and 20 `@font-face` blocks, so those criteria must change.
 
-Forces: single binary and no runtime asset directory (ADR-0002, ADR-0005); no new Rust crate and no Node/npm build step (ADR-0001, ADR-0004); offline determinism; GPLv3-or-later compatibility for every bundled licence (NFR-06.002, NFR-06.001); an auditable supply chain for files that become Papyrus bugs when they become Papyrus CVEs; and Debian's requirement that `usr/share/doc/<pkg>/copyright` carry every licence and copyright notice of the distributed files.
+Forces: single binary and no runtime asset directory (ADR-0002, ADR-0005); no new Rust crate and no Node/npm build step (ADR-0001, ADR-0004); offline determinism; GPLv3-or-later compatibility for every bundled licence (NFR-006.002, NFR-006.001); an auditable supply chain for files that become Papyrus bugs when they become Papyrus CVEs; and Debian's requirement that `usr/share/doc/<pkg>/copyright` carry every licence and copyright notice of the distributed files.
 
 The total new weight is ≈4.0 MiB (Mermaid 3,572,661 B; KaTeX 275,414 B + 23,335 B + ≈259,792 B of woff2). The current binary is 4,197,544 B.
 
@@ -49,7 +49,7 @@ The total new weight is ≈4.0 MiB (Mermaid 3,572,661 B; KaTeX 275,414 B + 23,33
 
 4. **Integrity and update procedure.** `src/browser/vendor/MANIFEST.md` lists, per asset: package, version, licence, upstream URL, byte size, and SHA-256. A unit test recomputes the digest of every embedded asset and fails on a mismatch. Updating an asset is a task that updates the version directory, the manifest, the notices, and re-runs the browser test suite. There is no automatic updater, no lockfile fetch, and no network in the build.
 
-5. **Licence notices ship in the package.** `packaging/deb/usr/share/doc/papyrus/copyright` gains one section per bundled asset (name, version, licence identifier, full licence text or a `debian/copyright`-style reference to the on-disk text), in addition to the existing Papyrus GPL-3.0-or-later statement. The package keeps exactly one documentation file so `scripts/build-deb.sh` and the packaging verification tests keep their shape. The licence inventory is a release gate: an asset whose licence cannot be shown compatible with GPLv3-or-later (NFR-06.002) does not ship.
+5. **Licence notices ship in the package.** `packaging/deb/usr/share/doc/papyrus/copyright` gains one section per bundled asset (name, version, licence identifier, full licence text or a `debian/copyright`-style reference to the on-disk text), in addition to the existing Papyrus GPL-3.0-or-later statement. The package keeps exactly one documentation file so `scripts/build-deb.sh` and the packaging verification tests keep their shape. The licence inventory is a release gate: an asset whose licence cannot be shown compatible with GPLv3-or-later (NFR-006.002) does not ship.
 
    Current inventory to be recorded: KaTeX 0.16.11 — code MIT, fonts SIL OFL-1.1; Mermaid 11.x — MIT.
 
@@ -120,8 +120,8 @@ The total new weight is ≈4.0 MiB (Mermaid 3,572,661 B; KaTeX 275,414 B + 23,33
 
 ## References
 
-- `docs/requirements/non-functional/NFR-01.003.md`, `NFR-03.001.md`, `NFR-05.001.md`, `NFR-06.001.md`, `NFR-06.002.md`.
-- `docs/requirements/business/REQ-06.017.md` — bundled, offline rendering assets.
+- `docs/requirements/non-functional/NFR-001.003.md`, `NFR-003.001.md`, `NFR-005.001.md`, `NFR-006.001.md`, `NFR-006.002.md`.
+- `docs/requirements/business/REQ-006.017.md` — bundled, offline rendering assets.
 - `docs/architecture/adr/ADR-0001-implementation-language-rust.md`, `ADR-0004-repository-root-single-crate-layout.md`.
 - `docs/architecture/adr/ADR-0002-distribution-format-amd64-deb-packages.md`, `ADR-0003-supported-debian-release-target-forky-only.md` — one binary per package.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — asset, transport, CSP, and header baseline (partially amended here).

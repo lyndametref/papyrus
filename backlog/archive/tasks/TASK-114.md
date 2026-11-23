@@ -22,23 +22,20 @@ references:
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
 documentation:
   - docs/specifications/descriptor-driven-typed-document-command-dispatch.md
-  - docs/architecture/adr/ADR-0016-runtime-config-derived-command-dispatch.md
-  - >-
     docs/architecture/adr/ADR-0017-artifact-category-registry-and-type-descriptors.md
   - docs/architecture/adr/ADR-0018-generic-document-content-model.md
-  - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - src/cli/tree.rs
   - src/cli/dispatch.rs
   - src/document.rs
   - src/registry.rs
-  - docs/requirements/business/REQ-07.001.md
-  - docs/requirements/business/REQ-07.003.md
-  - docs/requirements/business/REQ-07.004.md
-  - docs/requirements/business/REQ-01.004.md
-  - docs/requirements/business/REQ-05.001.md
-  - docs/requirements/business/REQ-05.002.md
-  - docs/requirements/business/REQ-05.008.md
+  - docs/requirements/business/REQ-007.001.md
+  - docs/requirements/business/REQ-007.003.md
+  - docs/requirements/business/REQ-007.004.md
+  - docs/requirements/business/REQ-001.004.md
+  - docs/requirements/business/REQ-005.001.md
+  - docs/requirements/business/REQ-005.002.md
+  - docs/requirements/business/REQ-005.008.md
   - docs/business-rules/BR-001-papyrus-command-behavior.md
   - docs/business-rules/BR-009-req-command-behavior.md
   - docs/business-rules/BR-010-nfr-command-behavior.md
@@ -106,7 +103,7 @@ ordinal: 41210
 ## Implementation Notes
 # Implementation Plan
 
-Canonical design: `docs/specifications/descriptor-driven-typed-document-command-dispatch.md`. Requirements: REQ-07.001/002/003/004, REQ-05.001/002/007/008/010, REQ-01.004/005. Rules: BR-001, BR-009–BR-014, BR-017–BR-020. ADRs: 0016, 0017, 0018, 0022.
+Canonical design: `docs/specifications/descriptor-driven-typed-document-command-dispatch.md`. Requirements: REQ-007.001/002/003/004, REQ-005.001/002/007/008/010, REQ-001.004/005. Rules: BR-001, BR-009–BR-014, BR-017–BR-020. ADRs: 0016, 0017, 0018, 0022.
 
 ## 0. Capture the contract first
 

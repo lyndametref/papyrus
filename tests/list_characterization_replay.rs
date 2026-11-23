@@ -5,7 +5,7 @@
 //! the heading/count contract are asserted from the pre-change capture. The
 //! shared header sequence and row actions are asserted separately because the
 //! shared layout is the intended change (feature specification §6). The task
-//! fixture is replayed against the REQ-06.013 board.
+//! fixture is replayed against the REQ-006.013 board.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};

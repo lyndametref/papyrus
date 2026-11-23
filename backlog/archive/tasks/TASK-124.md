@@ -14,12 +14,11 @@ labels:
 milestone: MS-020
 dependencies: []
 references:
-  - NFR-02.001
-  - NFR-02.002
+  - NFR-002.001
+  - NFR-002.002
 documentation:
   - src/sanitize.rs
 modified_files:
-  - src/sanitize.rs
 priority: low
 ordinal: 41340
 ---
@@ -32,7 +31,7 @@ ordinal: 41340
 
 **Decisions.**
 - **Predicate.** Reuse the existing control-character predicate that `sanitize_name` and `sanitize_path_string` already share; it matches the Unicode `Cc` category, which is exactly C0 (U+0000-U+001F), DEL (U+007F), and C1 (U+0080-U+009F). Do not add a second range check or a parallel helper.
-- **Evaluation point.** Check the component as provided, before the function's existing surrounding-whitespace trim. NFR-02.002 requires failing input to be rejected rather than silently cleaned, and a check applied only after trimming would silently accept `"a\n"`, `"\ta"`, or `"a\u{85}"` (U+0085 is Unicode whitespace) as `"a"`. This deliberately differs from `sanitize_name`, which accepts `"Title\t"` as `"Title"`; that asymmetry is accepted and out of scope.
+- **Evaluation point.** Check the component as provided, before the function's existing surrounding-whitespace trim. NFR-002.002 requires failing input to be rejected rather than silently cleaned, and a check applied only after trimming would silently accept `"a\n"`, `"\ta"`, or `"a\u{85}"` (U+0085 is Unicode whitespace) as `"a"`. This deliberately differs from `sanitize_name`, which accepts `"Title\t"` as `"Title"`; that asymmetry is accepted and out of scope.
 - **Redundancy.** Once the predicate is applied, the existing explicit NUL check in `sanitize_path_component` is redundant. It may be removed or kept; observable behavior must be identical either way.
 - **Traversal guards unchanged.** `sanitize_path_component` continues to reject `.`, `..`, `/`, and `\`. AC #3's CurDir wording refers only to `sanitize_path`, which continues to skip `Component::CurDir`, reject `Component::ParentDir`, and reject components that are not valid UTF-8.
 - **No partial output.** `sanitize_path` returns `None` on the first failing component, so a partially sanitized path is never returned to a caller and nothing is written to disk.
@@ -44,7 +43,7 @@ ordinal: 41340
 **Assumptions.**
 - "Control character" means the Unicode `Cc` category (C0, DEL, C1) only; format characters such as U+200B and U+202E stay accepted, consistent with the existing predicate.
 - `sanitize_path_component`'s existing trimming of surrounding whitespace (`" title "` -> `"title"`) is retained; only control characters must be rejected rather than trimmed.
-- Windows `Component::Prefix` handling is unchanged and untested here; the target platform is Debian amd64 (NFR-03.002).
+- Windows `Component::Prefix` handling is unchanged and untested here; the target platform is Debian amd64 (NFR-003.002).
 
 **Dependencies.** None beyond TASK-123 (already complete), which introduced the shared predicate.
 

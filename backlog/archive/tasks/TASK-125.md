@@ -16,8 +16,8 @@ labels:
 milestone: MS-020
 dependencies: []
 references:
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-07.001.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-007.001.md
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
 documentation:
@@ -25,9 +25,6 @@ documentation:
   - src/registry.rs
   - src/browser/render.rs
 modified_files:
-  - src/milestone.rs
-  - src/registry.rs
-  - src/browser/render.rs
   - README.md
 priority: high
 ordinal: 41302
@@ -35,7 +32,7 @@ ordinal: 41302
 
 
 ## Description
-**Why.** REQ-03.001 fixes the milestone lifecycle to `open -> closed`, transitioned only by `papyrus milestone close <id>`, with no restore command (REQ-07.001, backlog category). The code does not match: `src/registry.rs` `MILESTONE_VERBS` exposes `Verb::Archive` and no `close`; `src/milestone.rs` has `MilestoneCmd::Archive` with an `archive()` implementation and no close variant; `README.md` line 281 and the browser help text still advertise `papyrus milestone archive <id>`. A milestone therefore can never reach `closed` through the documented command, and the removed verb is still offered. ADR-0022 decision 5 still claims milestones keep archive/restore; TASK-131 amends the ADR, this task delivers the behavior the amendment describes. TASK-127 cites the same lifecycle and depends on both.
+**Why.** REQ-003.001 fixes the milestone lifecycle to `open -> closed`, transitioned only by `papyrus milestone close <id>`, with no restore command (REQ-007.001, backlog category). The code does not match: `src/registry.rs` `MILESTONE_VERBS` exposes `Verb::Archive` and no `close`; `src/milestone.rs` has `MilestoneCmd::Archive` with an `archive()` implementation and no close variant; `README.md` line 281 and the browser help text still advertise `papyrus milestone archive <id>`. A milestone therefore can never reach `closed` through the documented command, and the removed verb is still offered. ADR-0022 decision 5 still claims milestones keep archive/restore; TASK-131 amends the ADR, this task delivers the behavior the amendment describes. TASK-127 cites the same lifecycle and depends on both.
 
 **What.** Add the `close` verb end to end for milestones and delete archive/restore from the milestone command surface.
 
@@ -67,7 +64,7 @@ ordinal: 41302
 - [x] Registry: MILESTONE_VERBS is exactly create, list, view, edit, close, delete; Verb::Close is registered for milestones; registry tests assert the new set and the absence of archive, restore, and status
 - [x] Browser help/lifecycle text and README name papyrus milestone close <id> and the open -> closed lifecycle, and no milestone archive/restore instruction remains in either
 - [x] Integration tests cover close success, close-of-closed, unknown ID, and rejected archive/restore; cargo test passes
-- [x] Behavior matches REQ-03.001 and REQ-07.001 and the TASK-131 amendment of ADR-0022 decision 5
+- [x] Behavior matches REQ-003.001 and REQ-007.001 and the TASK-131 amendment of ADR-0022 decision 5
 - [x] No task, release, or document behavior changes; only the milestone command surface and create/close lifecycle change
 
 ## Final Summary

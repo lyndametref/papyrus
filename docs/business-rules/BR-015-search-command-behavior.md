@@ -15,7 +15,7 @@ The papyrus search command performs the behavior stated in its Papyrus manpage e
 
 ## Rationale
 
-Based on REQ-06.001 — Search Project Records, this rule exists because the documented search behavior is the contract for papyrus search; README.md is the sole behavior source.
+Based on REQ-006.001 — Search Project Records, this rule exists because the documented search behavior is the contract for papyrus search; README.md is the sole behavior source.
 
 ## Applicability
 

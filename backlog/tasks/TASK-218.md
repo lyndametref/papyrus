@@ -8,12 +8,12 @@ references:
   - ADR-0017
   - ADR-0018
   - ADR-0019
-  - REQ-07.002
-  - REQ-07.004
+  - REQ-007.002
+  - REQ-007.004
   - TECH-070
   - TECH-077
-  - REQ-07.001
-  - REQ-07.003
+  - REQ-007.001
+  - REQ-007.003
   - TECH-068
   - TECH-071
   - TECH-072

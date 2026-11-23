@@ -14,18 +14,18 @@ references:
   - BR-005
   - BR-016
   - MOCK-0002
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-05.001
-  - REQ-01.002
-  - REQ-02.001
-  - REQ-02.002
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.013
-  - REQ-06.020
-  - REQ-06.021
-  - REQ-06.022
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-005.001
+  - REQ-001.002
+  - REQ-002.001
+  - REQ-002.002
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.013
+  - REQ-006.020
+  - REQ-006.021
+  - REQ-006.022
   - RE-008
   - ADR-0022
   - ADR-0032
@@ -42,7 +42,7 @@ status: draft
 ## Description
 ## Purpose
 
-Revise the browser specification corpus so that it states the new backlog view contract introduced by REQ-06.013: milestones remain expandable and collapsible, an expanded milestone shows its tasks as a kanban board with one column per configured task status, milestones are grouped by release with a bold named separator, tasks without a milestone get their own section after all milestones, cards are ordered by ascending task ID and link to the task record view, and a task's status is changed either by dragging its card or with an equivalent non-drag control, persisting immediately through the existing browser write contract. The revisions also remove any wording that still describes releases as separators between a flat milestone list or status change as drag-only.
+Revise the browser specification corpus so that it states the new backlog view contract introduced by REQ-006.013: milestones remain expandable and collapsible, an expanded milestone shows its tasks as a kanban board with one column per configured task status, milestones are grouped by release with a bold named separator, tasks without a milestone get their own section after all milestones, cards are ordered by ascending task ID and link to the task record view, and a task's status is changed either by dragging its card or with an equivalent non-drag control, persisting immediately through the existing browser write contract. The revisions also remove any wording that still describes releases as separators between a flat milestone list or status change as drag-only.
 
 This ticket is documentation/specification work only. It does not change requirements, business rules, implementation code, or UI mockups. The mockup revision is delivered by TASK-102; the implementation is delivered by TASK-103.
 
@@ -53,7 +53,7 @@ This ticket is documentation/specification work only. It does not change require
 - Revising `docs/specifications/browser-tasks-milestones-and-releases.md` so its list-page section states the per-milestone kanban board, release grouping, the tasks-without-milestone section, card order and contents, and the status-change contract.
 - Revising `docs/specifications/ui/browser-backlog-records-ui.md` section 4 (Backlog view) so it states the same contract and no longer describes releases as separators between a flat milestone list or status change as drag-only.
 - Recording which mockup package requires revision (MOCK-0002, via TASK-102) and that it must be approved before implementation.
-- Updating traceability sections in the revised specifications to cite REQ-06.013, ADR-0006, and ADR-0013.
+- Updating traceability sections in the revised specifications to cite REQ-006.013, ADR-0006, and ADR-0013.
 
 ### Out of scope
 
@@ -69,7 +69,7 @@ This ticket is documentation/specification work only. It does not change require
 ### 1. Board layout (AC #1)
 
 1. The Backlog view keeps milestones as expandable and collapsible sections (existing behavior, retained).
-2. Expanding a milestone renders that milestone's tasks as a kanban board: one column per configured task status (REQ-01.002), laid out horizontally within the milestone.
+2. Expanding a milestone renders that milestone's tasks as a kanban board: one column per configured task status (REQ-001.002), laid out horizontally within the milestone.
 3. Columns appear in configured status order exactly; no reordering, no omission.
 4. A status that has no tasks for that milestone keeps its column visible (empty column with an explicit empty state).
 5. The board is nested inside the milestone section; milestones remain the grouping unit of the view.
@@ -79,7 +79,7 @@ This ticket is documentation/specification work only. It does not change require
 1. Milestones assigned to a release appear under that release.
 2. Milestones assigned to no release are grouped together before the first release.
 3. Each release boundary is marked by a bold separator that names the release and does not rely on colour alone.
-4. Ordering follows REQ-06.020: milestones within a release and in the no-release group are ordered by the lowest ordinal among their non-archived tasks ascending (milestones with no non-archived task after all others, by milestone ID ascending; ties by milestone ID ascending); releases are ordered by the lowest ordinal among the non-archived tasks in their milestones ascending (releases with no such task after all others, by release ID ascending; ties by release ID ascending). The no-release group precedes all releases.
+4. Ordering follows REQ-006.020: milestones within a release and in the no-release group are ordered by the lowest ordinal among their non-archived tasks ascending (milestones with no non-archived task after all others, by milestone ID ascending; ties by milestone ID ascending); releases are ordered by the lowest ordinal among the non-archived tasks in their milestones ascending (releases with no such task after all others, by release ID ascending; ties by release ID ascending). The no-release group precedes all releases.
 
 ### 3. Tasks without a milestone (AC #3)
 
@@ -125,7 +125,7 @@ These are resolved by TASK-102 (mockup revision) and recorded in the UI descript
 
 | Specification | Required change |
 |---|---|
-| `docs/specifications/browser-tasks-milestones-and-releases.md` | Section 3 (List page) revised to the per-milestone kanban board, release grouping, tasks-without-milestone section, card order and contents, and status-change contract; no flat per-category task rows; traceability cites REQ-06.013, ADR-0006, ADR-0013. |
+| `docs/specifications/browser-tasks-milestones-and-releases.md` | Section 3 (List page) revised to the per-milestone kanban board, release grouping, tasks-without-milestone section, card order and contents, and status-change contract; no flat per-category task rows; traceability cites REQ-006.013, ADR-0006, ADR-0013. |
 | `docs/specifications/ui/browser-backlog-records-ui.md` | Section 4 (Backlog view) revised to state empty columns, release grouping, no-milestone section, card order and contents, and the non-drag status control; no wording that describes releases as separators between a flat milestone list or status change as drag-only; mockup registry note updated. |
 | `docs/specifications/ui/mockups/README.md` | Note that MOCK-0002 requires revision and re-approval (delivered by TASK-102); no renumbering. |
 
@@ -149,7 +149,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 ## Assumptions
 
-- Assumption: Release and milestone ordering follows REQ-06.020 (lowest contained non-archived task ordinal ascending, with no-task records last ordered by ID ascending, and ties by ID ascending); the no-release group precedes all releases. Lifecycle markers (REQ-06.021) and milestone/release cleanup controls (REQ-06.022) are specified in TECH-011 and do not change this board contract.
+- Assumption: Release and milestone ordering follows REQ-006.020 (lowest contained non-archived task ordinal ascending, with no-task records last ordered by ID ascending, and ties by ID ascending); the no-release group precedes all releases. Lifecycle markers (REQ-006.021) and milestone/release cleanup controls (REQ-006.022) are specified in TECH-011 and do not change this board contract.
 - Assumption: Task ordering within a column is ascending task ID, consistent with the existing browser list ordering.
 - Assumption: The `?type=` category selector and the sidebar Backlog entry remain; the combined Backlog view's task presentation becomes the board. The flat per-category task row list is replaced by the board surface.
 - Assumption: The board reuses the existing browser write contract (ADR-0006 version token, ADR-0013 single write path); no new endpoint, crate, module, or ADR is introduced.
@@ -166,7 +166,7 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06.013; REQ-06.002; REQ-06.003; REQ-01.002; REQ-02.001; REQ-02.002; NFR-01.002; NFR-01.003; NFR-05.001 |
+| Requirement | REQ-006.013; REQ-006.002; REQ-006.003; REQ-001.002; REQ-002.001; REQ-002.002; NFR-001.002; NFR-001.003; NFR-005.001 |
 | Business rule | BR-004 (browser command behavior); BR-005 (task command behavior); BR-016 (configuration keys and precedence) |
 | ADR | ADR-0005; ADR-0006; ADR-0010; ADR-0012; ADR-0013 |
 | Ticket | TASK-86 (dependency); TASK-101; downstream TASK-102 (mockup revision), TASK-103 (implementation) |

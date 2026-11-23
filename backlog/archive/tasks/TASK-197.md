@@ -9,7 +9,7 @@ references:
   - AUD-108
   - ADR-034
   - TECH-080
-  - REQ-06.018
+  - REQ-006.018
 status: Done
 assignee:
   - rust-dev

@@ -14,22 +14,22 @@ references:
   - MOCK-0010
   - MOCK-0011
   - MOCK-0012
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-05.001
-  - REQ-02.001
-  - REQ-02.002
-  - REQ-03.001
-  - REQ-03.002
-  - REQ-04.001
-  - REQ-04.002
-  - REQ-05.001
-  - REQ-05.007
-  - REQ-06.002
-  - REQ-06.004
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-005.001
+  - REQ-002.001
+  - REQ-002.002
+  - REQ-003.001
+  - REQ-003.002
+  - REQ-004.001
+  - REQ-004.002
+  - REQ-005.001
+  - REQ-005.007
+  - REQ-006.002
+  - REQ-006.004
   - TASK-11
   - TASK-15
   - TASK-18
@@ -51,18 +51,18 @@ references:
   - TASK-76
   - TASK-77
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
 # TECH-053 Complete Browser Access for All Papyrus Content
 
-> **Revised (TASK-201, 2026-11-18):** the Managed artifacts & lifecycles and Agent skills & workflows sidebar entries, their `/lifecycle` and `/skills` routes and `?type=` aliases, and their two inventory cards are retired per ADR-034 and REQ-06.018; the browser now serves the twelve record categories only. See TECH-080.
+> **Revised (TASK-201, 2026-11-18):** the Managed artifacts & lifecycles and Agent skills & workflows sidebar entries, their `/lifecycle` and `/skills` routes and `?type=` aliases, and their two inventory cards are retired per ADR-034 and REQ-006.018; the browser now serves the twelve record categories only. See TECH-080.
 
 ## Description
 ## Purpose
 
-Final integration increment of the offline, project-local web interface: one navigation (the sidebar) and one content inventory (the landing view at `GET /`) expose every record type Papyrus manages, reusing the per-type list/view/edit views delivered by TASK-6, TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25, TASK-26, TASK-57, TASK-72, and TASK-77. This task does not re-implement per-type rendering; it consolidates those increments into a single entry point and verifies cross-type consistency. It completes NFR-01.002 (display all Papyrus content in the local browser) and advances NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, and NFR-05.001 for the browser as a whole. The transport, asset delivery, rendering, security, configuration, and accessibility baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged.
+Final integration increment of the offline, project-local web interface: one navigation (the sidebar) and one content inventory (the landing view at `GET /`) expose every record type Papyrus manages, reusing the per-type list/view/edit views delivered by TASK-6, TASK-11, TASK-15, TASK-23, TASK-24, TASK-40, TASK-25, TASK-26, TASK-57, TASK-72, and TASK-77. This task does not re-implement per-type rendering; it consolidates those increments into a single entry point and verifies cross-type consistency. It completes NFR-001.002 (display all Papyrus content in the local browser) and advances NFR-001.003, NFR-002.002, NFR-004.001, NFR-004.002, and NFR-005.001 for the browser as a whole. The transport, asset delivery, rendering, security, configuration, and accessibility baseline of TASK-6 and ADR-0005/ADR-0006 are reused unchanged.
 
 ## Scope
 
@@ -76,8 +76,8 @@ Final integration increment of the offline, project-local web interface: one nav
 - Deprecated records of every document type are hidden from lists, counts, and the inventory, and are unreachable by URL, consistently with the per-type increments.
 - Disabled or absent document types contribute no records and no error to the inventory or to any list; their sidebar entry is omitted.
 - Empty states for every category, including the inventory when no records exist.
-- Front-matter metadata projection (REQ-06.004) is reused on every per-type list/detail view and on the inventory cards where applicable; `created_date` and `updated_date` remain read-only in the browser.
-- Embedded assets from the static asset table, the CSP response classes fixed in `browser-requirements.md` §9.7, security headers, Host/Origin validation, request limits, timeouts, offline operation, browser baseline (Firefox 115+; NFR-05.001), accessibility, and the 320 CSS-pixel responsive layout, all reused unchanged.
+- Front-matter metadata projection (REQ-006.004) is reused on every per-type list/detail view and on the inventory cards where applicable; `created_date` and `updated_date` remain read-only in the browser.
+- Embedded assets from the static asset table, the CSP response classes fixed in `browser-requirements.md` §9.7, security headers, Host/Origin validation, request limits, timeouts, offline operation, browser baseline (Firefox 115+; NFR-005.001), accessibility, and the 320 CSS-pixel responsive layout, all reused unchanged.
 - Unit and integration tests extending `tests/browser_cli.rs` (and siblings) for the inventory hub and for cross-type consistency, including a cross-type test that creates one record of every supported type and verifies it is reachable through the inventory and its per-type view.
 
 ### Out of scope
@@ -86,7 +86,7 @@ Final integration increment of the offline, project-local web interface: one nav
 - Adding a new record type, configuration key, `?type=` value, or API endpoint.
 - Cross-type search in the browser UI; search remains CLI-only (TASK-18).
 - Creating, deprecating, restoring, archiving, or deleting records from the browser; these remain CLI-only.
-- Real-browser GUI rendering verification in Firefox, Edge, or Safari; only markup-, asset-, and protocol-level verification is performed (consistent with sibling increments; NFR-05.001 real-browser verification is deferred).
+- Real-browser GUI rendering verification in Firefox, Edge, or Safari; only markup-, asset-, and protocol-level verification is performed (consistent with sibling increments; NFR-005.001 real-browser verification is deferred).
 - Packaging and release verification — TASK-20 / TASK-73.
 - New dependencies, a web framework, an async runtime, a templating engine, a second crate, or a new ADR. ADR-0005/ADR-0006/ADR-0009 remain the baseline.
 - Changes to approved mockups (MOCK-0001…MOCK-0012) or to any UI description document.
@@ -96,7 +96,7 @@ Final integration increment of the offline, project-local web interface: one nav
 ### 1. Route and navigation
 
 1. `GET /` serves the inventory hub. `GET /?type=req`, `GET /?type=nfr`, and every other documented `?type=` value continue to serve their existing per-type list page. The baseline rule that `GET /` and `GET /?type=req` render the same page is superseded by this increment: `GET /` now renders the inventory hub, and `GET /?type=req` renders the requirements list.
-2. `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` are retired per ADR-034 and REQ-06.018: each returns `404` and nothing is relocated. The managed-artifacts-and-lifecycles and agent-skills documentation remains outside the browser (TASK-72, TASK-77).
+2. `GET /lifecycle`, `GET /?type=lifecycle`, `GET /skills`, and `GET /?type=skills` are retired per ADR-034 and REQ-006.018: each returns `404` and nothing is relocated. The managed-artifacts-and-lifecycles and agent-skills documentation remains outside the browser (TASK-72, TASK-77).
 3. Any method other than `GET`/`HEAD` on a known path is `405` with an `Allow: GET, HEAD` header; an unknown path is `404`.
 4. The sidebar is rendered on every page, including the inventory hub, using the final order in Scope. The active entry carries `aria-current="page"` and the non-colour cue; on the inventory hub no document-type entry is active.
 5. The navigation is expanded by default at every width; the header toggle collapses and expands it, and the reader's choice persists in `papyrus.nav`, matching the baseline.
@@ -126,7 +126,7 @@ Final integration increment of the offline, project-local web interface: one nav
 5. Every category's empty state uses the documented empty-state wording for that type and renders without horizontal scrolling for long unbreakable tokens.
 6. Optimistic concurrency, atomic writes, path boundary enforcement, HTML escaping, and the version token contract are reused unchanged from the baseline and the per-type increments.
 
-### 5. Metadata projection (REQ-06.004)
+### 5. Metadata projection (REQ-006.004)
 
 1. List and detail views for every record type read `id`, `title`, `created_date`, `updated_date`, `labels`, `references`, and the type-specific keys from the YAML front matter, exactly as in the per-type increments and ADR-0009's single projection.
 2. The browser's editable field set is unchanged; `created_date` and `updated_date` are read-only. A save writes the changed values to the front matter, refreshes `updated_date`, preserves every other front-matter key and the rest of the file, and never copies metadata into the body.
@@ -161,9 +161,9 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 - Assumption: The inventory hub replaces the previous default `GET /` → requirements-list behavior; `GET /?type=req` becomes the canonical requirements list route. This follows the approved MOCK-0012 route table (`GET /` = inventory). Existing tests that call `GET /` expecting the requirements list are updated as part of this increment; no product behavior other than the landing route changes.
 - Assumption: The inventory card counts are active-record counts computed by the same store reads as the per-type lists; they are not cached and not persisted.
 - Assumption: "Represented types" in the approved MOCK-0012 are the twelve record categories, because every category already has a per-type list view delivered by earlier increments; the two virtual pages shown by the mockup are retired per ADR-034 (TASK-201). Cards for disabled document types are omitted rather than shown as disabled.
-- Assumption: Real-browser verification in Firefox, Edge, and Safari (NFR-05.001) remains a deferred follow-up, consistent with sibling increments.
+- Assumption: Real-browser verification in Firefox, Edge, and Safari (NFR-005.001) remains a deferred follow-up, consistent with sibling increments.
 - Assumption: No new dependencies, crates, or ADRs are introduced; the change is confined to the existing `src/browser/` module and its tests.
-- Assumption: The metadata projection (REQ-06.004, ADR-0009) is already implemented by the per-type increments; this increment adds no new metadata keys and changes no editable field set.
+- Assumption: The metadata projection (REQ-006.004, ADR-0009) is already implemented by the per-type increments; this increment adds no new metadata keys and changes no editable field set.
 
 ## Open questions
 
@@ -175,8 +175,8 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-02.001, REQ-02.002, REQ-03.001, REQ-03.002, REQ-04.001, REQ-04.002, REQ-05.001–REQ-05.007, REQ-06.002, REQ-06.004 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
+| Requirement | REQ-002.001, REQ-002.002, REQ-003.001, REQ-003.002, REQ-004.001, REQ-004.002, REQ-005.001–REQ-005.007, REQ-006.002, REQ-006.004 |
+| Non-functional | NFR-001.002, NFR-001.003, NFR-002.002, NFR-004.001, NFR-004.002, NFR-005.001 |
 | Business rule | BR-004 (browser command behavior) |
 | ADR | ADR-0005, ADR-0006, ADR-0007, ADR-0009 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-25, TASK-26, TASK-40, TASK-57, TASK-58, TASK-60 (UI design), TASK-66, TASK-67, TASK-72, TASK-76, TASK-77, TASK-19 |
@@ -196,7 +196,7 @@ Integration tests extend `tests/browser_cli.rs` (and siblings) with at least the
 | AC-5 | Deprecated records are absent from inventory counts and unreachable by URL with the per-type `404` page. |
 | AC-6 | Disabled/absent document types contribute no card, no records, and no error. |
 | AC-7 | Empty states render for every category and for the inventory. |
-| AC-8 | Metadata projection (REQ-06.004) is reused unchanged on every list/detail view. |
+| AC-8 | Metadata projection (REQ-006.004) is reused unchanged on every list/detail view. |
 | AC-9 | The interface remains offline-capable with embedded same-origin assets, escaped content, the documented CSP response classes and security headers, and keyboard-operable controls. |
 | AC-10 | The interface works without JavaScript and keeps controls labelled and stacked at 320 CSS pixels. |
 | AC-11 | Build, tests, clippy, and formatting pass with existing dependencies only. |
@@ -226,8 +226,8 @@ UI mockups are required before any UI implementation work and must be approved b
 
 ## Related artifacts
 
-- Requirement: `docs/requirements/business/REQ-02.001.md`, `REQ-02.002.md`, `REQ-03.001.md`, `REQ-03.002.md`, `REQ-04.001.md`, `REQ-04.002.md`, `REQ-05.001.md`–`REQ-05.007.md`, `REQ-06.002.md`, `REQ-06.004.md`
-- Non-functional: `docs/requirements/non-functional/NFR-01.002.md`, `NFR-01.003.md`, `NFR-02.002.md`, `NFR-04.001.md`, `NFR-04.002.md`, `NFR-05.001.md`
+- Requirement: `docs/requirements/business/REQ-002.001.md`, `REQ-002.002.md`, `REQ-003.001.md`, `REQ-003.002.md`, `REQ-004.001.md`, `REQ-004.002.md`, `REQ-005.001.md`–`REQ-005.007.md`, `REQ-006.002.md`, `REQ-006.004.md`
+- Non-functional: `docs/requirements/non-functional/NFR-001.002.md`, `NFR-001.003.md`, `NFR-002.002.md`, `NFR-004.001.md`, `NFR-004.002.md`, `NFR-005.001.md`
 - Business rule: `docs/business-rules/BR-004-browser-command-behavior.md`
 - ADR: `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md`, `docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md`, `docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md`, `docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md`
 - Milestone: m-12

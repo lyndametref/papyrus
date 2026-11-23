@@ -11,14 +11,14 @@ references:
   - ADR-0004
   - BR-012
   - BR-016
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-01.003
-  - REQ-01.004
-  - REQ-05
-  - REQ-05.004
-  - REQ-05.007
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-001.003
+  - REQ-001.004
+  - REQ-005
+  - REQ-005.004
+  - REQ-005.007
   - TASK-2
   - TASK-24
   - TASK-30
@@ -34,24 +34,24 @@ status: verified
 ## Description
 ## Purpose
 
-Deliver the `ui-spec` commands so a project contributor can create, list, view, edit, deprecate, and restore UI specifications, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-05.004 and the lifecycle part of REQ-05.007, together with the documented command contract in BR-012. It provides the records that later tickets search (TASK-35) and expose in the browser (TASK-24).
+Deliver the `ui-spec` commands so a project contributor can create, list, view, edit, deprecate, and restore UI specifications, with stable IDs and text-file persistence inside the project directory. This ticket implements REQ-005.004 and the lifecycle part of REQ-005.007, together with the documented command contract in BR-012. It provides the records that later tickets search (TASK-35) and expose in the browser (TASK-24).
 
 ## Scope
 
 ### In scope
 
-- `papyrus ui-spec create <title> --view <view> --description <text>` (BR-012, REQ-05.004).
-- `papyrus ui-spec list` (BR-012, REQ-05.004).
-- `papyrus ui-spec view <id>` (BR-012, REQ-05.004).
-- `papyrus ui-spec edit <id> [--view <view>] [--description <text>] [--editor]` (BR-012, REQ-05.004).
-- `papyrus ui-spec deprecate <id>` and `papyrus ui-spec restore <id>` (BR-012, REQ-05.007).
-- UI-specification identity: stable IDs of the form `<prefix>-<number>` (for example `UI-001`), using the configured `document_types.ui-spec` prefix and `id_padding` (REQ-05.004, BR-012, BR-016).
-- UI-specification fields: title, view, description (REQ-05.004, BR-012, domain glossary term "UI Specification").
-- Deprecation moving a specification to its type's `deprecated/` subfolder and hiding it from lists, search, and the web UI (REQ-05.007, BR-012).
-- Restoration returning a deprecated specification to its original folder with the same ID (REQ-05.007, BR-012).
-- Persistence as UTF-8 text only inside the project directory (NFR-04.001, NFR-04.002).
-- Input sanitization by normalization/escaping before use (NFR-02.002).
-- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-01.004).
+- `papyrus ui-spec create <title> --view <view> --description <text>` (BR-012, REQ-005.004).
+- `papyrus ui-spec list` (BR-012, REQ-005.004).
+- `papyrus ui-spec view <id>` (BR-012, REQ-005.004).
+- `papyrus ui-spec edit <id> [--view <view>] [--description <text>] [--editor]` (BR-012, REQ-005.004).
+- `papyrus ui-spec deprecate <id>` and `papyrus ui-spec restore <id>` (BR-012, REQ-005.007).
+- UI-specification identity: stable IDs of the form `<prefix>-<number>` (for example `UI-001`), using the configured `document_types.ui-spec` prefix and `id_padding` (REQ-005.004, BR-012, BR-016).
+- UI-specification fields: title, view, description (REQ-005.004, BR-012, domain glossary term "UI Specification").
+- Deprecation moving a specification to its type's `deprecated/` subfolder and hiding it from lists, search, and the web UI (REQ-005.007, BR-012).
+- Restoration returning a deprecated specification to its original folder with the same ID (REQ-005.007, BR-012).
+- Persistence as UTF-8 text only inside the project directory (NFR-004.001, NFR-004.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
+- Common CLI controls and outcomes inherited from TASK-2: `--json`, `--no-color`/`NO_COLOR`, help/version, exit statuses 0/1/2/3/4 (REQ-001.004).
 
 ### Out of scope
 
@@ -67,8 +67,8 @@ Deliver the `ui-spec` commands so a project contributor can create, list, view, 
 
 ### 1. Project and configuration context
 
-1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-01.003, NFR-04.002).
-2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-04.002).
+1. Project directory and configuration file selection follow the precedence and canonicalization rules delivered by TASK-2 (REQ-001.003, NFR-004.002).
+2. For every command in this ticket, reads and writes stay within the canonicalized project directory (NFR-004.002).
 3. The effective configuration supplies `document_types.ui-spec.prefix` (default `UI`), `document_types.ui-spec.directory` (default `specifications/ui/`), `document_types.ui-spec.enabled`, plus `doc_directory` and `id_padding` (BR-016).
 4. The active directory is `<project>/<doc_directory>/<document_types.ui-spec.directory>`; the deprecated directory is `<active>/deprecated/`.
 5. If `document_types.ui-spec.enabled` is false, `create` and `list` report a validation error (exit code 4) and no records are created or shown, matching the behavior delivered for the other document types (BR-016, TASK-30).
@@ -77,8 +77,8 @@ Deliver the `ui-spec` commands so a project contributor can create, list, view, 
 
 1. `papyrus ui-spec create <title> --view <view> --description <text>` creates a UI specification.
 2. `<title>`, `--view`, and `--description` are all required; a missing argument is a usage error (exit code 2).
-3. `title`, `view`, and `description` are sanitized before use (NFR-02.002).
-4. The ID is generated as `<prefix>-<number>`, padded to `id_padding` digits (for example `UI-001`), where `<number>` is one greater than the highest existing number found for that prefix in both the active and `deprecated/` folders. IDs are never reused (REQ-05.004, BR-012).
+3. `title`, `view`, and `description` are sanitized before use (NFR-002.002).
+4. The ID is generated as `<prefix>-<number>`, padded to `id_padding` digits (for example `UI-001`), where `<number>` is one greater than the highest existing number found for that prefix in both the active and `deprecated/` folders. IDs are never reused (REQ-005.004, BR-012).
 5. The active directory and its `deprecated/` subfolder are created if absent.
 6. `create` prints the generated ID; in `--json` mode it returns `{"id": "<ID>"}`.
 7. If any supplied value cannot be sanitized, creation fails with exit code 4 and no file is written.
@@ -88,7 +88,7 @@ Deliver the `ui-spec` commands so a project contributor can create, list, view, 
 1. `papyrus ui-spec list` lists active UI specifications only (not deprecated).
 2. Each row shows at least the ID and the title, ordered by ID ascending.
 3. Only regular `*.md` files directly inside the active directory whose file stem matches `<prefix>-<digits>` are records. Subdirectories are not scanned and files with other names (for example `mockups/`, MOCK files, or UI description documents) are ignored.
-4. Deprecated specifications are hidden from `list` (REQ-05.007, BR-012).
+4. Deprecated specifications are hidden from `list` (REQ-005.007, BR-012).
 5. `--json` returns a JSON array of objects with `id` and `title`.
 
 ### 4. View
@@ -101,7 +101,7 @@ Deliver the `ui-spec` commands so a project contributor can create, list, view, 
 ### 5. Edit
 
 1. `papyrus ui-spec edit <id> [--view <view>] [--description <text>] [--editor]` updates the supplied fields.
-2. Only fields explicitly supplied on the command line are changed; omitted fields retain their previous values (REQ-05.004).
+2. Only fields explicitly supplied on the command line are changed; omitted fields retain their previous values (REQ-005.004).
 3. `--view` replaces the associated view text; `--description` replaces the description text.
 4. `--editor` opens the persisted file in `$VISUAL`, falling back to `$EDITOR` per effective configuration. Content saved by the editor is the new record content; the file name (ID) is never changed by an edit.
 5. The title has no dedicated option (`--title` is not part of the command and is rejected as an unknown argument with exit code 2). A title can only be changed by rewriting the heading through `--editor`.
@@ -115,26 +115,26 @@ Deliver the `ui-spec` commands so a project contributor can create, list, view, 
 1. `papyrus ui-spec deprecate <id>` moves the specification file from the active folder to `deprecated/`.
 2. Deprecating an already-deprecated specification fails with exit code 4.
 3. Deprecating an unknown ID fails with exit code 3.
-4. Deprecated specifications are hidden from lists, search, and the web UI (REQ-05.007, BR-012).
+4. Deprecated specifications are hidden from lists, search, and the web UI (REQ-005.007, BR-012).
 5. `papyrus ui-spec restore <id>` moves a deprecated specification back to the active folder.
 6. Restoring an already-active specification fails with exit code 4.
 7. Restoring an unknown ID fails with exit code 3.
-8. Restoration preserves the specification's ID and its file content (REQ-05.007, BR-012).
+8. Restoration preserves the specification's ID and its file content (REQ-005.007, BR-012).
 9. `--json` returns `{"status": "ok", "id": "<ID>"}` for both commands.
 
 ### 7. Persistence and sanitization
 
-1. Records are UTF-8 Markdown files named `<ID>.md` in the active directory or its `deprecated/` subfolder (NFR-04.001).
+1. Records are UTF-8 Markdown files named `<ID>.md` in the active directory or its `deprecated/` subfolder (NFR-004.001).
 2. File content uses this template: a top-level heading `# <ID> <title>`, then `## View` containing the view text, then `## Description` containing the description text. All three fields are required, so all three are always present. The file ends with a single trailing newline.
 3. `view` and `description` values are stored as their section bodies; multi-line bodies are preserved when the file is edited through `--editor`.
-4. All user-controlled input (`<title>`, `--view`, `--description`, `<id>`) is normalized/escaped before use: values are trimmed, and empty values, control characters (NUL, CR, LF in single-line inputs), and path separators are rejected (NFR-02.002).
-5. Values that cannot be normalized fail with exit code 4 and leave the filesystem unchanged (NFR-02.002).
-6. `<id>` is resolved by exact, case-sensitive match of the file stem; request values are never concatenated into a path without resolution, and every read/write path is checked against the canonicalized project directory (NFR-04.002).
-7. No binary data is written (NFR-04.001).
+4. All user-controlled input (`<title>`, `--view`, `--description`, `<id>`) is normalized/escaped before use: values are trimmed, and empty values, control characters (NUL, CR, LF in single-line inputs), and path separators are rejected (NFR-002.002).
+5. Values that cannot be normalized fail with exit code 4 and leave the filesystem unchanged (NFR-002.002).
+6. `<id>` is resolved by exact, case-sensitive match of the file stem; request values are never concatenated into a path without resolution, and every read/write path is checked against the canonicalized project directory (NFR-004.002).
+7. No binary data is written (NFR-004.001).
 
 ### 8. Common CLI controls and outcomes
 
-1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-01.004).
+1. `--version`, `-h`/`--help`, `--json`, `--no-color`/`NO_COLOR`, and exit statuses 0/1/2/3/4 behave as delivered by TASK-2 (REQ-001.004).
 2. Missing required arguments (missing title, `--view`, or `--description`) and unknown options (`--title`) exit 2 (usage).
 3. Unknown specification ID exits 3.
 4. Filesystem/IO failure, missing editor, or project-directory boundary violation exits 1.
@@ -178,8 +178,8 @@ Deliver the `ui-spec` commands so a project contributor can create, list, view, 
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.004, REQ-05.007 |
-| Non-functional | NFR-02.002, NFR-04.001, NFR-04.002 |
+| Requirement | REQ-005, REQ-005.004, REQ-005.007 |
+| Non-functional | NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-012, BR-016 |
 | Domain | `docs/domain-model/business-glossary/ui-specification.md`, `docs/domain-model/object-model/business-object-model.md` |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0004 (single-crate layout) |

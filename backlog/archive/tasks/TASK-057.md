@@ -18,11 +18,11 @@ dependencies:
   - TASK-050
   - TASK-056
 references:
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
@@ -51,14 +51,14 @@ Assumptions:
 - scripts/build-deb.sh is used unchanged and does not force a rebuild; cargo build --release must run first (stale binary hazard).
 - No new runtime dependency; TASK-1/TASK-4 license audit remains valid.
 - No UI change; MOCK-0001/MOCK-0002/MOCK-0003 remain authoritative.
-- NFR-05.001 verified at markup/asset level only (OQ-1).
+- NFR-005.001 verified at markup/asset level only (OQ-1).
 - Search/browser coverage for the six new record types is deferred to later milestones; this ticket verifies their management lifecycles only.
 - Disabled document types rejected by create and hidden from list per BR-016.
 
 Open questions (non-blocking, defaults specified in the spec): OQ-1 GUI browser pass, OQ-2 container vs fakeroot isolation, OQ-3 test file placement, OQ-4 version bump, OQ-5 smoke scope (resolved: management-only).
 
 ## Acceptance Criteria
-- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides glossary, UI specification, UI mockup, business rule, audit record, and technical specification management commands; Debian Trixie and other releases are not claimed or verified.
+- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides glossary, UI specification, UI mockup, business rule, audit record, and technical specification management commands; Debian Trixie and other releases are not claimed or verified.
 - [ ] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists the m-4 CLI commands (glossary, ui-spec, ui-mockup, rule, audit, tech-spec) alongside the earlier commands (guards against packaging a stale binary).
 - [ ] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [ ] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

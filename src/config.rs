@@ -262,7 +262,7 @@ pub const RESERVED_OPTION_NAMES: [&str; 15] = [
 ];
 
 /// The entry keys that select behaviour and are not configuration keys
-/// (ADR-036 decision 6, REQ-07.004).
+/// (ADR-036 decision 6, REQ-007.004).
 pub const RESERVED_ENTRY_KEYS: [&str; 4] = ["model", "title", "content", "id_shape"];
 
 /// Every key a document-type entry may declare (ADR-036 decision 34,
@@ -526,13 +526,13 @@ pub struct DocTypeEntry {
     pub prefix: String,
     pub directory: String,
     pub enabled: bool,
-    /// Custom document statuses, in declared order (REQ-07.001).
+    /// Custom document statuses, in declared order (REQ-007.001).
     ///
     /// `None` means the entry declares no status list; `Some(vec![])` is an
     /// explicit empty declaration and stays distinguishable from an absent one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub statuses: Option<Vec<String>>,
-    /// Initial status of a new record; falls back to `active` (REQ-07.001).
+    /// Initial status of a new record; falls back to `active` (REQ-007.001).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_status: Option<String>,
     /// Presentation label; filled from the seed when absent.
@@ -2071,7 +2071,7 @@ fn fill_entry_from_seed(
 /// Resolve a declared `document_types` mapping against the seed.
 ///
 /// Every seed slug stays effective even when the file declares only some of
-/// them (REQ-01.002, TC-114): a declared seed entry is filled from its seed,
+/// them (REQ-001.002, TC-114): a declared seed entry is filled from its seed,
 /// while an undeclared seed entry is supplied by the seed table unchanged.
 /// A user-defined slug is effective only when the file declares it, and its
 /// decision-33 defaults are projected here so `config list` and `config get`
@@ -2272,7 +2272,7 @@ impl Default for Config {
 
         // One seed table is the only definition of the built-in document
         // types (ADR-036 decision 28). `ui-mockup` seeds no status list
-        // (REQ-05.008).
+        // (REQ-005.008).
         let mut document_types = BTreeMap::new();
         for seed in &SEED_DOCUMENT_TYPES {
             document_types.insert(seed.slug.to_string(), seed_entry(seed));
@@ -2641,7 +2641,7 @@ impl Config {
     /// Build the value written by `init`: the full configuration with each
     /// document entry reduced to the keys that are never filled from the seed
     /// (`prefix`, `directory`, plus `enabled` only when disabled)
-    /// (REQ-07.002, RE-010 D14).
+    /// (REQ-007.002, RE-010 D14).
     pub fn init_value(&self) -> Result<yaml_serde::Value, String> {
         let mut value = yaml_serde::to_value(self).map_err(|error| error.to_string())?;
         let yaml_serde::Value::Mapping(root) = &mut value else {
@@ -6037,7 +6037,7 @@ mod tests {
         assert_eq!(entries.len(), 12, "eleven seeds plus the declared note");
         assert!(
             resolve_selector(&resolved, "document_types.req.prefix").is_ok(),
-            "an undeclared seed slug stays effective (REQ-01.002, TC-114)"
+            "an undeclared seed slug stays effective (REQ-001.002, TC-114)"
         );
         assert!(resolve_selector(&resolved, "document_types.note.prefix").is_ok());
         assert!(

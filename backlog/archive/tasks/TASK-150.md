@@ -16,17 +16,16 @@ dependencies:
   - TASK-148
   - TASK-149
 references:
-  - docs/requirements/business/REQ-01.008.md
-  - docs/requirements/business/REQ-06.015.md
-  - docs/requirements/business/REQ-06.016.md
-  - docs/requirements/business/REQ-06.017.md
-  - docs/requirements/business/REQ-06.013.md
+  - docs/requirements/business/REQ-001.008.md
+  - docs/requirements/business/REQ-006.015.md
+  - docs/requirements/business/REQ-006.016.md
+  - docs/requirements/business/REQ-006.017.md
+  - docs/requirements/business/REQ-006.013.md
   - docs/architecture/adr/ADR-0003-supported-debian-release-target-forky-only.md
   - docs/architecture/adr/ADR-0025-bundled-katex-client-side-math-rendering.md
   - docs/architecture/adr/ADR-0026-mermaid-only-offline-diagram-rendering.md
   - >-
     docs/architecture/adr/ADR-0027-vendored-embedded-browser-assets-and-packaging-notices.md
-  - >-
     docs/architecture/adr/ADR-0028-browser-shell-shared-list-layout-content-width-and-collapsible-navigation.md
   - docs/packaging.md
   - docs/specifications/browser-shell-shared-list-layout-and-page-width.md
@@ -34,8 +33,8 @@ references:
   - docs/specifications/browser-shell-ui.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/project-diagnostics-check.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-03.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-003.002.md
   - README.md
   - docs/business-rules/BR-001-papyrus-command-behavior.md
   - docs/business-rules/BR-005-task-command-behavior.md
@@ -69,7 +68,7 @@ Browser behaviour is required by AC #3–#6 and cannot be replaced by HTTP asser
 | ID | Browser | Role | Widths | States |
 |---|---|---|---|---|
 | M1 | Firefox 153.5.1esr (current installed `firefox`) | full checklist | 320, 480, 481, 500, 600, 720, 1440 | expanded, collapsed; cleared/preset `papyrus.nav` |
-| M2 | Firefox 100 (NFR-05.001 floor) or the oldest supported ESR obtainable | full width/nav matrix, math and diagram smoke | same | same |
+| M2 | Firefox 100 (NFR-005.001 floor) or the oldest supported ESR obtainable | full width/nav matrix, math and diagram smoke | same | same |
 | M3 | Edge 130 (Chromium 130) | **owner manual check**, same checklist | same | same |
 | M4 | Safari 18.x | **owner manual check**, same checklist | same | same |
 
@@ -99,10 +98,10 @@ Fixes or features beyond reporting a defect; release notes; a formal security au
 ## Assumptions
 
 - ADR-0026 is `Accepted` and TASK-137–149 have landed; their status finalization does not block this gate.
-- The verification host is Debian Forky amd64 with `dpkg`, `dpkg-deb`, `fakeroot`, `unshare`, `ip`, `curl`, and the Firefox WebDriver BiDi harness. Any other host is recorded as an unsupported deviation, not a pass (ADR-0003, NFR-03.002).
+- The verification host is Debian Forky amd64 with `dpkg`, `dpkg-deb`, `fakeroot`, `unshare`, `ip`, `curl`, and the Firefox WebDriver BiDi harness. Any other host is recorded as an unsupported deviation, not a pass (ADR-0003, NFR-003.002).
 - The 12 MiB ceiling (`12,582,912` B) is final and is not adjusted here (ADR-0027 decision 6).
 - A rebuilt artifact invalidates TASK-149's recorded SHAs by design; the new values supersede them in the evidence section, while TASK-149's dated section is left intact.
-- The browser floor is Firefox 100+, Edge 130+, Safari 18+ (NFR-05.001); a browser that cannot be run is a recorded limitation, not a silent pass.
+- The browser floor is Firefox 100+, Edge 130+, Safari 18+ (NFR-005.001); a browser that cannot be run is a recorded limitation, not a silent pass.
 
 ## Open questions
 
@@ -116,13 +115,13 @@ Fixes or features beyond reporting a defect; release notes; a formal security au
 <!-- AC:BEGIN -->
 - [x] #1 The diagnostics loop passes end to end: a fresh project prints no findings and exits 0; after a duplicate-ID copy and a dangling milestone are introduced, check exits 4 and names both findings with sorted locations; check --fix in a terminal repairs only the duplicate, lists every affected reference, leaves the referring file byte-identical, and exits 4; after the dangling reference is corrected the next check exits 0; a deliberately broken configuration is reported as config-invalid while the static-family findings still run; and check --fix with piped stdin and no --force exits 2 with the documented refusal.
 - [x] #2 While the configuration is invalid, other commands fail closed (task list, browser, and search exit non-zero without writing), while config set and init --force remain the repair paths and check --help exits 0.
-- [x] #3 Every family list route renders exactly one shared list table with ID and Title first and Actions last, and a count note matching the rendered rows; the board alone renders app--full and reaches the viewport width at 1440 px; both are verified from the installed package in Firefox 115 and later (the only supported browser under NFR-05.001 as amended 2026-11-16).
+- [x] #3 Every family list route renders exactly one shared list table with ID and Title first and Actions last, and a count note matching the rendered rows; the board alone renders app--full and reaches the viewport width at 1440 px; both are verified from the installed package in Firefox 115 and later (the only supported browser under NFR-005.001 as amended 2026-11-16).
 - [x] #4 The navigation collapses and expands at every width in its matrix row, persists across navigation and reload through papyrus.nav, defaults to expanded when the key is cleared, invalid, or storage throws, and is expanded and usable with JavaScript disabled; verified in Firefox 115 and later. Edge 130 and Safari 18 are no longer in scope.
 - [x] #5 Math renders offline with the bundled fonts, a MathML annotation equal to data-tex, and an aria-hidden .katex-html tree; display and inline forms differ; an aborted or throwing KaTeX asset keeps the source and sets data-render-error=math; malformed math shows KaTeX error output; all nine promised Mermaid types render, while PlantUML, literal, unknown, and over-limit input keep the source with the specified note; per-figure isolation and the missing-bundle branch pass; verified in Firefox 115 and later.
 - [x] #6 The final CSP matches the accepted literals per response class, with script-src 'self' and font-src 'self' and the accepted style-src; browser enforcement blocks no required asset, and the hostile math and diagram fixtures produce no script, handler, or remote reference and execute nothing; verified in Firefox 115 and later.
 - [x] #7 The rebuilt package contains exactly the binary and the copyright file, the four notices and 26/26 asset digests hold (or TASK-149 is cited for an identical binary), the binary is within 12,582,912 B, the installed package renders offline, and no runtime asset directory, config file, or man page exists.
 - [x] #8 README and BR-001/BR-005/BR-016 describe the shipped check surface, the shell/width, math/diagram, shell-UI, and requirements section 9.7 specifications match the observed contract, and a dated TASK-150 evidence section exists in docs/packaging.md without rewriting earlier sections.
-- [x] #9 Browser versions and binary SHA-256 values, binary and .deb sizes, and headroom are recorded; no release milestone or release ticket was created by m-21; the release-vehicle decision is reported to the owner through @orchestrator; and the DEF-1 Mermaid-on-Firefox-100 finding is recorded as obsolete under the amended NFR-05.001 (Firefox 115 floor) rather than as an open defect.
+- [x] #9 Browser versions and binary SHA-256 values, binary and .deb sizes, and headroom are recorded; no release milestone or release ticket was created by m-21; the release-vehicle decision is reported to the owner through @orchestrator; and the DEF-1 Mermaid-on-Firefox-100 finding is recorded as obsolete under the amended NFR-005.001 (Firefox 115 floor) rather than as an open defect.
 <!-- AC:END -->
 
 ## Definition of Done
@@ -155,7 +154,7 @@ firefox --version
 FB="$(readlink -f "$(command -v firefox)")"; echo "$FB"; sha256sum "$(dirname "$FB")/firefox-bin"
 ```
 
-Any host other than Debian Forky amd64 is a recorded deviation, not a pass (ADR-0003, NFR-03.002). M3/M4 owner results record `msedge --version`/Safari version and `sha256sum`/`shasum -a 256` of the browser binary.
+Any host other than Debian Forky amd64 is a recorded deviation, not a pass (ADR-0003, NFR-003.002). M3/M4 owner results record `msedge --version`/Safari version and `sha256sum`/`shasum -a 256` of the browser binary.
 
 **S2 — Shared fixture base.** Copy the characterization project and prove it is unchanged:
 
@@ -552,7 +551,7 @@ Wait for `figure[data-diagram="mermaid"] svg` or a 5-second timeout before judgi
 
 ### Failures, defects, limitations
 
-- **DEF-1 / TASK-146 / High:** Firefox 100.0 renders **0/10** Mermaid figures; `mermaid.render` rejects `TypeError: Illegal constructor` at `mermaid.min.js:3582:1657`; Firefox 102.0esr renders 10/10. NFR-05.001 Firefox 100 floor violated. Repro/evidence in TASK-146 comment and `docs/packaging.md`. No fix made.
+- **DEF-1 / TASK-146 / High:** Firefox 100.0 renders **0/10** Mermaid figures; `mermaid.render` rejects `TypeError: Illegal constructor` at `mermaid.min.js:3582:1657`; Firefox 102.0esr renders 10/10. NFR-005.001 Firefox 100 floor violated. Repro/evidence in TASK-146 comment and `docs/packaging.md`. No fix made.
 - **M3 Edge 130 / M4 Safari 18.x:** pending owner-manual; never recorded as passing. Exact commands/routes/viewports in `docs/packaging.md`.
 - **M2 320 px:** Firefox/geckodriver minimum window width exposes 438 px client width; 8 M2 matrix samples recorded at 438 px. M1 covers exact 320 px.
 - **M2 pre-load storage throw:** geckodriver cannot inject a pre-page stub; M2 verifies in-session fallback, M1 verifies pre-load.
@@ -560,7 +559,7 @@ Wait for `figure[data-diagram="mermaid"] svg` or a 5-second timeout before judgi
 
 All 67 items were executed; sections A–H pass apart from the recorded limitations and DEF-1. AC #3–#6 and #9 remain unchecked pending M3/M4 owner results.
 
-Amendment re-run 2026-11-16: NFR-05.001 now Firefox 115+ only. Packaging.md TASK-150 section updated: deb 2,379,448 B / SHA 874d03de...; HEAD 4a54cc1; DEF-1 obsolete; M3/M4 and Firefox 100 probe out of scope. AC #3-#6,#9 and DoD #2,#8 checked. cargo test 1048 passed, clippy 0, fmt clean.
+Amendment re-run 2026-11-16: NFR-005.001 now Firefox 115+ only. Packaging.md TASK-150 section updated: deb 2,379,448 B / SHA 874d03de...; HEAD 4a54cc1; DEF-1 obsolete; M3/M4 and Firefox 100 probe out of scope. AC #3-#6,#9 and DoD #2,#8 checked. cargo test 1048 passed, clippy 0, fmt clean.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -622,7 +621,7 @@ Release-vehicle report for @orchestrator: `backlog milestone list --plain` shows
 
 Owner-manual matrix still pending: M3 Edge 130 and M4 Safari 18.x were not available on this host and are recorded as pending, not passed. AC #3–#6 and #9 remain unchecked until the owner returns version, binary SHA-256, and per-item results. M2 is Firefox 102.0esr (oldest supported ESR); Firefox 100.0 was also tested and fails Mermaid rendering (DEF-1, reported to TASK-146).
 
-DEF-1 (High, TASK-146): Firefox 100.0 renders 0/10 Mermaid figures; `mermaid.render` rejects with `TypeError: Illegal constructor` at `mermaid.min.js:3582:1657`. Firefox 102.0esr renders 10/10. NFR-05.001's Firefox 100 floor is therefore not met for diagrams. No fix was made in TASK-150.
+DEF-1 (High, TASK-146): Firefox 100.0 renders 0/10 Mermaid figures; `mermaid.render` rejects with `TypeError: Illegal constructor` at `mermaid.min.js:3582:1657`. Firefox 102.0esr renders 10/10. NFR-005.001's Firefox 100 floor is therefore not met for diagrams. No fix was made in TASK-150.
 
 The dated evidence section is in `docs/packaging.md` (`## TASK-150 — Browser runtime verification (2026-11-16)`), including artifacts, browser SHAs, results by section, limitations, DEF-1, and the release-vehicle decision.
 
@@ -633,7 +632,7 @@ created: 2026-11-16T11:14:00Z
 
 ---
 
-Status Refined (blocked, not done). AC #1, #2, #7, #8 and DoD #1, #3-#7 are satisfied with evidence in the notes and docs/packaging.md. Unresolved: (a) M3 Edge 130 and M4 Safari 18.x owner-manual results are missing, so AC #3, #4, #5, #6, #9 stay unchecked; (b) DEF-1 on TASK-146: Firefox 100.0 fails 0/10 Mermaid diagrams with TypeError: Illegal constructor (NFR-05.001 floor); (c) M2 320 px samples are clamped to 438 px by the Firefox/geckodriver minimum window width and are recorded as a limitation. No product fix was made in TASK-150.
+Status Refined (blocked, not done). AC #1, #2, #7, #8 and DoD #1, #3-#7 are satisfied with evidence in the notes and docs/packaging.md. Unresolved: (a) M3 Edge 130 and M4 Safari 18.x owner-manual results are missing, so AC #3, #4, #5, #6, #9 stay unchecked; (b) DEF-1 on TASK-146: Firefox 100.0 fails 0/10 Mermaid diagrams with TypeError: Illegal constructor (NFR-005.001 floor); (c) M2 320 px samples are clamped to 438 px by the Firefox/geckodriver minimum window width and are recorded as a limitation. No product fix was made in TASK-150.
 
 ---
 
@@ -642,7 +641,7 @@ created: 2026-11-16T15:24:00Z
 
 ---
 
-Planning correction 2026-11-16: NFR-05.001 now requires Firefox 115+ only; Edge 130, Safari 18, and the Firefox 100 floor are withdrawn, and the Mermaid CSSStyleSheet shim (ADR-0026 decision 13) is removed. Consequences: the M3 (Edge 130) and M4 (Safari 18.x) owner-manual matrix rows and the Firefox 100 probe are out of scope; DEF-1 on TASK-146 is no longer a defect against the amended NFR; TASK-150 AC #3-#6 and #9 and DoD #2/#8 need wording changes to Firefox 115+ only, and the browser-matrix section (M2) should target Firefox 115+ (or the oldest ESR at/above 115) rather than Firefox 100. No milestone, dependency, ordinal, or priority change: TASK-150 remains the sole open task in m-21 at ordinal 41620 with dependencies TASK-140, TASK-146, TASK-148, TASK-149. Follow-ups: task-refiner to reword TASK-150 AC/DoD; architect to align ADR-0026 and other specs that still cite Firefox 100/Edge 130/Safari 18; business-analyst to align browser specifications; rust-dev to update packaging.md evidence (Firefox 115+ only) and record the shim removal/DEF-1 resolution.
+Planning correction 2026-11-16: NFR-005.001 now requires Firefox 115+ only; Edge 130, Safari 18, and the Firefox 100 floor are withdrawn, and the Mermaid CSSStyleSheet shim (ADR-0026 decision 13) is removed. Consequences: the M3 (Edge 130) and M4 (Safari 18.x) owner-manual matrix rows and the Firefox 100 probe are out of scope; DEF-1 on TASK-146 is no longer a defect against the amended NFR; TASK-150 AC #3-#6 and #9 and DoD #2/#8 need wording changes to Firefox 115+ only, and the browser-matrix section (M2) should target Firefox 115+ (or the oldest ESR at/above 115) rather than Firefox 100. No milestone, dependency, ordinal, or priority change: TASK-150 remains the sole open task in m-21 at ordinal 41620 with dependencies TASK-140, TASK-146, TASK-148, TASK-149. Follow-ups: task-refiner to reword TASK-150 AC/DoD; architect to align ADR-0026 and other specs that still cite Firefox 100/Edge 130/Safari 18; business-analyst to align browser specifications; rust-dev to update packaging.md evidence (Firefox 115+ only) and record the shim removal/DEF-1 resolution.
 
 ---
 
@@ -651,7 +650,7 @@ created: 2026-11-16T15:29:00Z
 
 ---
 
-Amendment (2026-11-16): NFR-05.001 now Firefox 115+ only; Edge 130/Safari 18/Firefox 100 out of scope; DEF-1 obsolete; shim removed (4a54cc1). Rebuilt deb 2,379,448 B / 874d03de...; binary unchanged 8,323,296 B / f306d222...; cargo test 1048 passed. AC #3-#6,#9 and DoD #2,#8 checked. Release vehicle unchanged: no release milestone/ticket by m-21; owner decides.
+Amendment (2026-11-16): NFR-005.001 now Firefox 115+ only; Edge 130/Safari 18/Firefox 100 out of scope; DEF-1 obsolete; shim removed (4a54cc1). Rebuilt deb 2,379,448 B / 874d03de...; binary unchanged 8,323,296 B / f306d222...; cargo test 1048 passed. AC #3-#6,#9 and DoD #2,#8 checked. Release vehicle unchanged: no release milestone/ticket by m-21; owner decides.
 
 ---
 <!-- COMMENTS:END -->

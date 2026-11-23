@@ -5,8 +5,8 @@ created_date: '2026-11-20T17:41:41Z'
 updated_date: '2026-11-22T12:21:28Z'
 labels: []
 references:
-  - REQ-07.002
-  - REQ-07.004
+  - REQ-007.002
+  - REQ-007.004
   - TECH-077
   - ADR-036
   - TC-103
@@ -51,7 +51,7 @@ Inputs: MS-033 AC-1 to AC-7; the implementation of TASK-246 to TASK-251; the pre
 
 Scope:
 1. Check every MS-033 acceptance criterion and record pass or fail with an evidence pointer. Record the outcome in a quality audit record created with `papyrus audit create --audit-type quality --reference MS-033 --reference TASK-252`, stored under `docs/audits/`, and in a task comment, exactly as AUD-134 and AUD-138 do.
-2. AC-1: for the live configuration and all five fixture configurations, load without editing and diff the effective descriptor projection (`tests/descriptor_equivalence.rs`) against the pre-refactor facts: prefix, directory, enabled, statuses, default status, model, ID shape, verb set, and per-role heading, frontmatter key, option, kind, required, and verbs. Confirm the only projected difference is the documented user-defined reference-visibility delta (REQ-06.019, TC-185), and confirm the configuration and corpus files are byte-identical after the load.
+2. AC-1: for the live configuration and all five fixture configurations, load without editing and diff the effective descriptor projection (`tests/descriptor_equivalence.rs`) against the pre-refactor facts: prefix, directory, enabled, statuses, default status, model, ID shape, verb set, and per-role heading, frontmatter key, option, kind, required, and verbs. Confirm the only projected difference is the documented user-defined reference-visibility delta (REQ-006.019, TC-185), and confirm the configuration and corpus files are byte-identical after the load.
 3. AC-2: run the fill and replace tests and record the seed-fill, collection-replace, `fields: []`, independent `group`/`member`, absent-slug, and never-filled `prefix`/`directory` results.
 4. AC-3: run every rejected configuration case and confirm each diagnostic uses `document_types.<slug>.<path>`, names the field key when present, is collected in one pass in deterministic order, and exits 4; include the reserved-key, duplicate-key, unknown-key, unknown-enum, and `model`/`title`/`content`/`id_shape` cases.
 5. AC-4: re-emit every fixture configuration and confirm the output reparses to an equal value, mapping sequences are block sequences, flat string lists stay inline, and `"## User Story"` is preserved.

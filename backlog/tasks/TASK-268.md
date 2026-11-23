@@ -9,11 +9,11 @@ references:
   - ADR-035
   - ADR-036
   - ADR-041
-  - REQ-06.019
-  - REQ-06.014
+  - REQ-006.019
+  - REQ-006.014
   - TECH-068
   - TC-184
-  - REQ-06.004
+  - REQ-006.004
 status: Done
 assignee:
   - rust-dev
@@ -44,7 +44,7 @@ type: implementation
 - Do not add a route, dependency, asset, template, client script, or configuration key. Do not change the Backlog or Decision surfaces.
 
 ## Grounding
-ADR-039 decisions 29-33; ADR-036 decisions 29 and 32-33; ADR-041 decision 4; REQ-06.014, REQ-06.019, and REQ-06.004; TECH-068 sections 2.1, 3.1, and 8. Symbols: `src/registry.rs` (`TypeDescriptor`, `document_descriptor`, `resolved_document_entry`), `src/config.rs` (`SEED_DOCUMENT_TYPES`, `SeedDocumentType`, `DocTypeEntry`, `merge_entry`, `user_defined_entry`), `src/browser/routes.rs` (`PRESENTATION`, `BrowserRoutes::build`, `presentation`, `list_slots`, `label`, `heading`, `short`, `noun`, `inventory_note`, `legacy_url_key`, `api_aliases`, `inventory_order`), `src/browser/list.rs` (`ListPlan::for_descriptor`, `Row`, `render_row`), and `src/browser/mod.rs` (`inventory_page`).
+ADR-039 decisions 29-33; ADR-036 decisions 29 and 32-33; ADR-041 decision 4; REQ-006.014, REQ-006.019, and REQ-006.004; TECH-068 sections 2.1, 3.1, and 8. Symbols: `src/registry.rs` (`TypeDescriptor`, `document_descriptor`, `resolved_document_entry`), `src/config.rs` (`SEED_DOCUMENT_TYPES`, `SeedDocumentType`, `DocTypeEntry`, `merge_entry`, `user_defined_entry`), `src/browser/routes.rs` (`PRESENTATION`, `BrowserRoutes::build`, `presentation`, `list_slots`, `label`, `heading`, `short`, `noun`, `inventory_note`, `legacy_url_key`, `api_aliases`, `inventory_order`), `src/browser/list.rs` (`ListPlan::for_descriptor`, `Row`, `render_row`), and `src/browser/mod.rs` (`inventory_page`).
 
 ## Definition of done
 Every document presentation fact and every document reference-visibility value comes from the descriptor seed; `PRESENTATION` holds no document entry; document list slots and rows use descriptor data; req and nfr hide references in both roles while labels still render; other seed types and user-defined types behave per ADR-039; Backlog and Decision output is unchanged; tests, clippy -D warnings, and fmt are clean.

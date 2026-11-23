@@ -17,14 +17,12 @@ dependencies:
   - TASK-085
   - TASK-089
 references:
-  - docs/requirements/business/REQ-06.003.md
-  - docs/requirements/business/REQ-06.008.md
+  - docs/requirements/business/REQ-006.003.md
+  - docs/requirements/business/REQ-006.008.md
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - >-
     docs/specifications/ui/mockups/MOCK-0014-browser-configuration-view-single-record-layout-and-lifecycle-configuration-review.html
-  - >-
     docs/specifications/browser-configuration-view-single-record-layout-and-lifecycle-configuration.md
-  - >-
     docs/specifications/ui/browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md
 priority: high
 type: feature
@@ -33,7 +31,7 @@ ordinal: 39120
 
 
 ## Description
-REQ-06.003 requires each lifecycle section to describe its artifact and present the configuration attached to it, read-only, with edits confined to the configuration view (REQ-06.008). TASK-95 extends the existing lifecycle page (TASK-72) so every one of the twelve fixed sections carries curated description text and its effective enabled state, ID prefix, and storage folder; the task section also shows configured statuses. Values are display-only and the page links to /config for changes.
+REQ-006.003 requires each lifecycle section to describe its artifact and present the configuration attached to it, read-only, with edits confined to the configuration view (REQ-006.008). TASK-95 extends the existing lifecycle page (TASK-72) so every one of the twelve fixed sections carries curated description text and its effective enabled state, ID prefix, and storage folder; the task section also shows configured statuses. Values are display-only and the page links to /config for changes.
 
 Scope:
 - In scope: curated descriptions for all twelve fixed types; read-only effective configuration per section; task statuses reuse existing derivation; link to configuration view; tests/fixtures for disabled type, renamed prefix/folder, and custom task statuses.
@@ -51,11 +49,11 @@ Assumptions:
 - Curated descriptions are the static strings established by MOCK-0014/TASK-87.
 - Tasks, milestones, and releases are always enabled; decisions are enabled when at least one decision type is enabled.
 - A missing document type entry reports enabled=false and an empty prefix/folder rather than failing.
-- REQ-06.009 branding and REQ-06.008 config view are already delivered (TASK-93, TASK-94).
+- REQ-006.009 branding and REQ-006.008 config view are already delivered (TASK-93, TASK-94).
 
 References:
-- docs/requirements/business/REQ-06.003.md
-- docs/requirements/business/REQ-06.008.md
+- docs/requirements/business/REQ-006.003.md
+- docs/requirements/business/REQ-006.008.md
 - docs/specifications/browser-managed-artifacts-and-lifecycles.md (section 4a)
 - docs/specifications/browser-spec-revisions-task-86.md (section 8)
 - docs/specifications/browser-configuration-view-single-record-layout-and-lifecycle-configuration.md

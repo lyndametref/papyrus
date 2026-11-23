@@ -20,18 +20,18 @@ references:
   - BR-018
   - BR-019
   - BR-020
-  - REQ-01.004
-  - REQ-01.005
-  - REQ-05.001
-  - REQ-05.002
-  - REQ-05.007
-  - REQ-05.008
-  - REQ-05.010
-  - REQ-05.011
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-001.004
+  - REQ-001.005
+  - REQ-005.001
+  - REQ-005.002
+  - REQ-005.007
+  - REQ-005.008
+  - REQ-005.010
+  - REQ-005.011
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
   - ADR-042
 status: verified
 ---
@@ -242,7 +242,7 @@ set from its own field sequence and role.
 ### Behaviour
 
 - Exit codes 0/1/2/3/4 and the `--json` error object are unchanged
-  (REQ-01.004).
+  (REQ-001.004).
 - Record files, JSON output, and status codes are strict; rendered HTML is
   semantically equivalent. A seed type keeps its field set, section layout, ID
   shape, file path, archive location, list/view text, and JSON keys.

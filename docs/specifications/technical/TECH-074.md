@@ -13,20 +13,20 @@ references:
   - MOCK-0002
   - MOCK-0016
   - MOCK-0018
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-05.001
-  - REQ-05.007
-  - REQ-06.003
-  - REQ-06.004
-  - REQ-06.009
-  - REQ-06.012
-  - REQ-06.013
-  - REQ-06.014
-  - REQ-06.015
-  - REQ-06.016
-  - REQ-07.001
-  - REQ-07.002
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-005.001
+  - REQ-005.007
+  - REQ-006.003
+  - REQ-006.004
+  - REQ-006.009
+  - REQ-006.012
+  - REQ-006.013
+  - REQ-006.014
+  - REQ-006.015
+  - REQ-006.016
+  - REQ-007.001
+  - REQ-007.002
   - TASK-141
   - TASK-142
   - TASK-144
@@ -37,10 +37,10 @@ references:
   - TASK-149
   - TASK-150
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
   - ADR-035
-  - REQ-06.019
+  - REQ-006.019
   - RE-006
   - TASK-178
 status: draft
@@ -49,7 +49,7 @@ status: draft
 
 > **Revised (TASK-170, 2026-11-18):** browser surfaces removed per ADR-034; this building block no longer provides the removed Configuration, Managed artifacts and lifecycles, or Agent skills and workflows surfaces. See ADR-034.
 
-> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-06.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
+> **Revised (TASK-178, 2026-11-19):** reference visibility in the shared browser list is per artifact family per ADR-035 and REQ-006.019 (source RE-006). `ContentModel::Generic` (config-defined document types) renders no reference list in any list row; `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep it; labels render for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
 
 ## Description
 ## 1. Purpose and scope
@@ -66,17 +66,17 @@ This specification is the delivery record and implementation detail for the shel
 
 - Migrating the other families (releases, decisions, document types, requirements, NFRs) — the milestone list is the reference family (§5.6); the rest is TASK-142 (delivered).
 - Deleting `document_list.html` or the per-family list builders (TASK-142, delivered).
-- Kanban board changes (REQ-06.013; TASK-147 owns the board action). TASK-144 changes only the board's **width class**, not its card content.
+- Kanban board changes (REQ-006.013; TASK-147 owns the board action). TASK-144 changes only the board's **width class**, not its card content.
 - Math and diagram rendering (TASK-145, TASK-146). TASK-144 ships the `.bleed` mechanism those tickets consume; it ships no rendering.
 - A mockup preview route or endpoint (ADR-0028 decision 7; needs its own ADR).
-- Detail, edit, and error page *content* changes (REQ-06.016 mandates a uniform list layout only).
+- Detail, edit, and error page *content* changes (REQ-006.016 mandates a uniform list layout only).
 - Any change to `script-src`, `style-src`, or the CSP constant (ADR-0028 decision 5; §4.5).
 
 ## 2. Scope boundary against the ticket's premise
 
 The ticket as filed says the task family is the reference implementation and that no visual change happens. Both statements fail against the current code:
 
-- `GET /?type=task` renders the per-milestone kanban board (`render::board_page`, REQ-06.013, approved mockup MOCK-0002). The task family's only table-shaped list is the empty-project fallback inside `board_page` (`backlog_list_section` when no tasks and no milestones). There is no task list route to migrate, and replacing the board with a table would contradict REQ-06.013.
+- `GET /?type=task` renders the per-milestone kanban board (`render::board_page`, REQ-006.013, approved mockup MOCK-0002). The task family's only table-shaped list is the empty-project fallback inside `board_page` (`backlog_list_section` when no tasks and no milestones). There is no task list route to migrate, and replacing the board with a table would contradict REQ-006.013.
 - No list route currently renders an actions cell. Every list shows a status text, an `ID` + title link, and Created/Updated values (`document_list_page` as `<table>` columns `Status, ID, Title, Created, Updated`; `backlog_list_section` and `list_section` as `<ul class="req-list">` rows). ADR-0028 decision 2 as amended adds a trailing `Actions` cell in the order `View`, `Edit`, then a family action, and fixes the order `ID, Title, Status, family slot(s), Created, Updated, Actions`. That reorders Status, converts `<ul>` rows to a table, adds the labels/references line in the Title cell, and adds two links per row. That is a visible change on every migrated list.
 
 Resolved in §8: milestone is the reference family (§5.6); `created_date` stays as a structural Created column (§5.5).
@@ -279,7 +279,7 @@ Rules:
 - Reserved keys: `id`, `title`, `status`, `created`, `updated`, and `actions` are structural and may not be declared as a slot, must not be repeated inside one family, and may not be reordered (ADR-0028 decision 2 and downstream constraint 10).
 - `Row.cells.len() == columns.len() - 3` (ID, Title, and Actions are structural). `ListPlan::render` asserts this and the column-shape rules; a violation is a programming error, not a 500.
 - `title` is not duplicated inside `cells`; it is required because the ADR row sketch has no title field and the ID/Title cells are structural.
-- `labels` and `references` are general front-matter metadata, not family data. `labels` render in the Title cell below the link for every family. `references` render in the Title cell only for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` (config-defined document type) row renders no reference block at all, omitted rather than emptied (ADR-035, REQ-06.019). Visibility is resolved from the descriptor content model, never from a slug, a presentation override, or a per-family template. `Row.references` still carries the `RecordView` projection for every family; only the list rendering omits it for `Generic`. `list.rs` escapes the values, because `Row` carries values, not markup. `href` is a route the builder computes, never a stored value, so a stored `href` key cannot reach the cell.
+- `labels` and `references` are general front-matter metadata, not family data. `labels` render in the Title cell below the link for every family. `references` render in the Title cell only for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` (config-defined document type) row renders no reference block at all, omitted rather than emptied (ADR-035, REQ-006.019). Visibility is resolved from the descriptor content model, never from a slug, a presentation override, or a per-family template. `Row.references` still carries the `RecordView` projection for every family; only the list rendering omits it for `Generic`. `list.rs` escapes the values, because `Row` carries values, not markup. `href` is a route the builder computes, never a stored value, so a stored `href` key cannot reach the cell.
 - `empty` is `Some` when the filtered index has no records for the family; the table is then replaced by the empty block. TASK-142 pins one shared pair for every family: message `No {noun} in this project.` and help `Records are created from the command line; this browser does not create records.` `{noun}` is the same singular/plural noun the count note uses (`business requirements`; `notes` for a config-defined type). The legacy per-family variants (requirement group wording and the cross-family hint, the technical-specification/use-case/test-case/test-report "were found in the configured directory" wording, the "Archived … are hidden" sentence) are recorded as accepted differences in TASK-142 and reconciled by the specification port owned by TASK-148. Empty copy never lives behind per-family builder code (AC3).
 - `count_note` is supplied by the caller and is the only other variable string. Flat families use `list::count_note(slug, record count)` (`3 milestones`, `1 milestone`, `0 releases`); grouped families use the group/member note (`1 group · 3 requirements`, `0 groups · 0 requirements`), counted from the rows actually emitted. A config-defined type falls back to its lower-case slug (`2 notes`).
 - Cell values are rendered HTML built from escaped values; `render` applies no further escaping to `cells`, `actions`, or `children`.
@@ -315,7 +315,7 @@ Rules:
 </section>
 ```
 
-The header carries seven cells for the reference family. A family with two slots carries eight and a family with no slot carries six: only the slot cells vary, the six structural cells are fixed in place. The `row-tags` list renders for every family; the `row-refs` list and its `<ul>` element are omitted entirely for `ContentModel::Generic` families, while `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep them (ADR-035, REQ-06.019).
+The header carries seven cells for the reference family. A family with two slots carries eight and a family with no slot carries six: only the slot cells vary, the six structural cells are fixed in place. The `row-tags` list renders for every family; the `row-refs` list and its `<ul>` element are omitted entirely for `ContentModel::Generic` families, while `ContentModel::Typed` and `ContentModel::HtmlMockup` families keep them (ADR-035, REQ-006.019).
 
 Stable test hooks, independent of styling: `data-list-layout="shared"`, `data-column="{key}"`, `data-row-id`, `data-child-of`. Exact classes and spacing remain design decisions and are fixed by the approved mockup (§7), not by this document.
 
@@ -335,14 +335,14 @@ Stable test hooks, independent of styling: `data-list-layout="shared"`, `data-co
 - Actions are always the last cell, in the order `View`, `Edit`, then the family action if one exists today. `View` links to `/doc/{id}` and `Edit` to `/doc/{id}/edit`; both exist for every record today through the detail and edit routes, so no new route is implied. Each action link carries a record-specific accessible name (`aria-label="View {id}"`, `aria-label="Edit {id}"`), because repeated `View`/`Edit` labels are ambiguous to screen-reader and voice users (ADR-0028 decision 8 and downstream constraint 14).
 - Archived records never reach `ListPlan`: the index is built enabled-only and active-only (ADR-0020 decision 7). No list code filters archive state, and no list code may add an archive filter.
 
-### 5.5 List parity contract (REQ-06.004)
+### 5.5 List parity contract (REQ-006.004)
 
-REQ-06.004 is a must-have requirement: the browser list must show the same front-matter values as the CLI for the same record. REQ-06.019 qualifies that parity for list views only: a `ContentModel::Generic` (config-defined document type) list row omits the reference list, while CLI list and view output keep it (ADR-035). The shared list therefore guarantees, for every family including config-defined types:
+REQ-006.004 is a must-have requirement: the browser list must show the same front-matter values as the CLI for the same record. REQ-006.019 qualifies that parity for list views only: a `ContentModel::Generic` (config-defined document type) list row omits the reference list, while CLI list and view output keep it (ADR-035). The shared list therefore guarantees, for every family including config-defined types:
 
 - `created` and `updated` are fixed cells in fixed positions, never slots and never optional.
 - `labels` render in the Title cell, below the link, for every family, from escaped values.
-- `references` render in the Title cell, below the labels, for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` family omits the reference block entirely (ADR-035, REQ-06.019). The value is unchanged in front matter, `RecordView`, the JSON API, the single-document view, and CLI list and view.
-- `status` renders verbatim as stored, including a custom status declared for the type; the list never renames or maps it to a display label (REQ-07.001, REQ-07.002).
+- `references` render in the Title cell, below the labels, for `ContentModel::Typed` and `ContentModel::HtmlMockup` families; a `ContentModel::Generic` family omits the reference block entirely (ADR-035, REQ-006.019). The value is unchanged in front matter, `RecordView`, the JSON API, the single-document view, and CLI list and view.
+- `status` renders verbatim as stored, including a custom status declared for the type; the list never renames or maps it to a display label (REQ-007.001, REQ-007.002).
 - No family may drop, rename, or relocate any of these values, and no slot may stand in for one of them. The only declared variations are the family slot(s), their labels, the empty copy, and reference visibility by content model.
 
 A family that needs another front-matter value declares it as a family slot, and a slot may not displace a structural column (ADR-0028 downstream constraints 10 and 11).
@@ -354,9 +354,9 @@ The reference family is the milestone list (`/?type=milestone`, ADR-0028 decisio
 - It is a real list route with a populated state and an empty state.
 - It carries one family slot (`Release`), so the slot mechanism is exercised before TASK-142 spreads it.
 - It is a `<ul>` row list that becomes a table, which is the largest structural change any family makes; a family already using a table would not prove the conversion.
-- It is the browser side of the REQ-06.004 parity surface, so §5.5 is proven on the first migration.
+- It is the browser side of the REQ-006.004 parity surface, so §5.5 is proven on the first migration.
 
-The task family cannot be the reference: `GET /?type=task` is the REQ-06.013 kanban board and the task family has no list route to migrate (§2).
+The task family cannot be the reference: `GET /?type=task` is the REQ-006.013 kanban board and the task family has no list route to migrate (§2).
 
 TASK-141 introduced the transitional dispatch `list_layout: ListLayout { Shared, Legacy }` in the presentation table. TASK-142 retired it: every family is `Shared`, and `ListLayout`, `routes::list_layout`, `Presentation::list_layout`, `with_layout`, the `Legacy` builders (`list_section`, `backlog_list_section`, `document_list_page`), and `document_list.html` are deleted in the same change, so no transitional branch, slug match, or per-family list template survives (ADR-0028 downstream constraints 1, 2, and 12). `list_page` always builds a `ListPlan`. The board's empty-project fallback keeps its own markup and copy inside `board_page`, because `/?type=task` is not a list route.
 
@@ -368,7 +368,7 @@ TASK-142's migration order is fixed by ADR-0028 (each step keeps the build green
 4. Decisions — the aggregate list, and its `?type=adr`/`?type=bdr` aliases resolve to the same presentation (heading and `Type` slot) as `?type=decision`.
 5. Config-defined types last — they have no presentation entry and never had a `list_layout` value; they migrate when the dispatch and the generic `document_list_page` branch are deleted.
 
-The task family is a board-regression check, not a list migration: its fixtures prove the REQ-06.013 board is unchanged.
+The task family is a board-regression check, not a list migration: its fixtures prove the REQ-006.013 board is unchanged.
 
 ### 5.7 Post-migration list contract (TASK-142)
 
@@ -376,12 +376,12 @@ The following is the settled behaviour once every family renders through `ListPl
 
 - **One path.** `list_page` (route) resolves the descriptor, applies the optional status filter, builds the index, and calls the shared builder. `ContentModel::Generic` no longer selects a different page.
 - **Presentation slug.** The heading, subheading, count noun, and declared slots are resolved through the list's representative presentation slug (`BrowserRoutes::list_slug_for`: decision aliases share the aggregate presentation; every other family keeps its own), so decision descriptor aliases render the decisions presentation (heading and subheading `Decisions`, `Type` slot) rather than an empty slot set.
-- **Status filter (REQ-06.014).** Every enabled document type keeps the single status filter (`active` plus declared custom statuses, configured order, `archived` never offered) rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filter value outside the offered set stays a 400. A filtered list with no matches shows the shared empty block; filter-specific empty copy is out of scope.
+- **Status filter (REQ-006.014).** Every enabled document type keeps the single status filter (`active` plus declared custom statuses, configured order, `archived` never offered) rendered above the shared section. Milestone, release, decision, and task views have no filter. The filter decides the index; `ListPlan` never filters. A filter value outside the offered set stays a 400. A filtered list with no matches shows the shared empty block; filter-specific empty copy is out of scope.
 - **Grouped rows.** As in §5.4; the group-aware count note is `N group(s) · M requirement(s)` computed from the rows actually emitted — the group rows shown and the member rows shown, orphan members included — never from a synthesised group.
 - **Empty state.** One shared message and help pair (see §5.1), one muted `(none)` for an unset status, date, or slot value, and the count note for zero records.
 - **Actions.** `View` then `Edit` in the last cell, each with a record-specific accessible name; the title cell carries the record's labels for every family and its references for Typed and HtmlMockup families only.
-- **Reference visibility (REQ-06.019, ADR-035).** The shared renderer omits the reference block for `ContentModel::Generic` (config-defined document type) rows and keeps it for `ContentModel::Typed` and `ContentModel::HtmlMockup` families. The decision is read from the descriptor content model; no slug match, presentation override, per-family template, or new presentation field is added. Labels stay for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
-- **Task family.** `/?type=task` is still the REQ-06.013 board: no shared table, no `Actions` cell, no status filter, and the per-milestone grouping unchanged.
+- **Reference visibility (REQ-006.019, ADR-035).** The shared renderer omits the reference block for `ContentModel::Generic` (config-defined document type) rows and keeps it for `ContentModel::Typed` and `ContentModel::HtmlMockup` families. The decision is read from the descriptor content model; no slug match, presentation override, per-family template, or new presentation field is added. Labels stay for every family. Single-document view, CLI list and view, JSON API, `RecordView`, and front matter are unchanged.
+- **Task family.** `/?type=task` is still the REQ-006.013 board: no shared table, no `Actions` cell, no status filter, and the per-milestone grouping unchanged.
 
 ## 6. Characterization fixtures (AC5)
 
@@ -404,7 +404,7 @@ Fixtures guard TASK-142, so they must be produced from the **pre-change** binary
   - **A8 Config-defined count noun.** `note` count note changes from `2 records` to `2 notes` (a config-defined type uses its own noun), and every empty fixture's count note (`No records`, `No groups`, `""`) becomes `0 <noun>` (or `0 groups · 0 requirements`).
 - **Producer:** `tests/list_characterization_capture.rs`, an `#[ignore]`d test that boots the current browser against `project/`, parses the pre-change markup (document table rows, `req-list` rows, board cards), and writes `expected/*.json`. It is run once on the pre-change commit and then kept for audit only.
 - **Format decision:** JSON with `serde_json` (already a dev-dependency); no HTML golden files, because the header and cell markup is exactly what changes and byte-comparison would encode the old markup as the target.
-- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` in every Title cell, `references` in the Title cell for Typed and HtmlMockup families and absent for the `note` Generic family (ADR-035, REQ-06.019), the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The task fixture is replayed against the board (heading, count note, milestone grouping/card order, archived exclusion; no shared table or header). The reference family is covered by this same loop: the dedicated `reference_family_replays_its_characterization_fixture` test was folded into it, so coverage is preserved and no milestone-specific test remains.
+- **Replay (TASK-142):** `tests/list_characterization_replay.rs` gains one loop over every populated and empty fixture (`expected/*.json`, 32 files). For each fixture it asserts the shared layout shows the same record set, the same relative row order, `created` and `updated` as cells, `labels` in every Title cell, `references` in the Title cell for Typed and HtmlMockup families and absent for the `note` Generic family (ADR-035, REQ-006.019), the same status/slot values, the same group→child nesting, the recorded archived IDs absent, the heading and count note where §6 keeps them, and — for the empty fixtures — no table plus the shared empty message, help, and zero count. It asserts the shared header sequence and the `View`/`Edit` actions separately, because those are the intended change. The task fixture is replayed against the board (heading, count note, milestone grouping/card order, archived exclusion; no shared table or header). The reference family is covered by this same loop: the dedicated `reference_family_replays_its_characterization_fixture` test was folded into it, so coverage is preserved and no milestone-specific test remains.
 - **New contract tests (TASK-142):** a new `tests/list_shared_layout.rs` asserts (a) every enabled descriptor, resolved through its representative navigation route, returns `data-list-layout="shared"` and exactly the fixed `data-column` sequence including its declared slots (the task descriptor is excluded and asserted on the board instead; a disabled type stays 404), and (b) every archived ID recorded in every fixture is absent from its list, or from the board's `data-task` cards for the task family. The grouped-row proof (one `<tbody>`, group row before its `data-child-of` children, unresolved member as a top-level row) lives in the replay file beside the requirement and NFR fixtures.
 
 ## 7. UI gate
@@ -434,13 +434,13 @@ It updates `docs/specifications/ui/browser-shell-and-shared-list-ui.md` (its §1
 
 All three open questions and the ticket's task-family premise are settled by the ADR-0028 amendment (2026-11-15). Nothing on the contract remains open; only the MOCK id is pending (§7.3).
 
-**OQ-1 — Which family is the reference implementation? Resolved: the milestone list.** `/?type=milestone` is the only family that is simultaneously a real list route with a populated and an empty state, a family slot carrier (`Release`), a `<ul>` → `<table>` migration, and the browser side of the REQ-06.004 parity surface (§5.6). The task family is not eligible: `GET /?type=task` is the REQ-06.013 board and no task list route exists (§2).
+**OQ-1 — Which family is the reference implementation? Resolved: the milestone list.** `/?type=milestone` is the only family that is simultaneously a real list route with a populated and an empty state, a family slot carrier (`Release`), a `<ul>` → `<table>` migration, and the browser side of the REQ-006.004 parity surface (§5.6). The task family is not eligible: `GET /?type=task` is the REQ-006.013 board and no task list route exists (§2).
 
-**OQ-2 — Does `created_date` survive in the shared list? Resolved: yes, as a structural column.** The fixed order is `ID, Title, Status, family slot(s), Created, Updated, Actions`, so the parity rule from ADR-0028 resolved question 3 is satisfied structurally instead of by ad-hoc per-family slots. `labels` and `references`, which today survive only in an ad-hoc row metadata, move into the Title cell. Dropping `created_date` would have relaxed REQ-06.004, a must-have requirement, which is a business-requirement change rather than an architecture decision (§5.5).
+**OQ-2 — Does `created_date` survive in the shared list? Resolved: yes, as a structural column.** The fixed order is `ID, Title, Status, family slot(s), Created, Updated, Actions`, so the parity rule from ADR-0028 resolved question 3 is satisfied structurally instead of by ad-hoc per-family slots. `labels` and `references`, which today survive only in an ad-hoc row metadata, move into the Title cell. Dropping `created_date` would have relaxed REQ-006.004, a must-have requirement, which is a business-requirement change rather than an architecture decision (§5.5).
 
 **OQ-3 — Release family slot `Status`. Resolved: release declares no family slot.** `Status` is structural for every family and the slot table now reads release → none (§5.3), so the release list shows one status cell. Reserved-key validation prevents the class of error, not just this instance.
 
-**Task-family premise. Resolved: the task family has no shared-list surface.** REQ-06.016 governs list views and the task family's browser view is the REQ-06.013 board. TASK-142 treats tasks as a board-regression check, not a list migration; the declared task slots stay declared for a future task list, which needs its own decision (§5.6).
+**Task-family premise. Resolved: the task family has no shared-list surface.** REQ-006.016 governs list views and the task family's browser view is the REQ-006.013 board. TASK-142 treats tasks as a board-regression check, not a list migration; the declared task slots stay declared for a future task list, which needs its own decision (§5.6).
 
 **MOCK id — resolved: MOCK-0016.** `docs/specifications/ui/mockups/MOCK-0016-browser-shell-and-shared-list-layout-review.html` is registered in `docs/specifications/ui/mockups/README.md` and in `docs/specifications/ui/browser-shell-and-shared-list-ui.md` with status `draft` (approval pending). The package shows the seven-column amended order, the Title-cell tag line, and the record-specific accessible names on the row actions. This implementation run operates in no-approval mode: the explicit owner-approval step is waived by the orchestrator, the implementation follows the settled contract, and the registry status stays `draft` until owner review.
 
@@ -448,8 +448,8 @@ All three open questions and the ticket's task-family premise are settled by the
 
 | Artifact | Reference |
 | --- | --- |
-| Requirements | REQ-06.016; REQ-06.015 (width **and** navigation visibility); REQ-06.004 (browser list parity, qualified for Generic list rows by REQ-06.019); REQ-06.019 (per-family reference visibility; source RE-006); REQ-06.013 (board, now `Full`); REQ-05.007 (archive exclusion); REQ-06.003, REQ-06.009, REQ-06.012, REQ-06.014 (shell, header, list routes) |
-| NFRs | NFR-01.002; NFR-01.003; NFR-05.001 (Firefox 115+ at 320/480/720 px) |
+| Requirements | REQ-006.016; REQ-006.015 (width **and** navigation visibility); REQ-006.004 (browser list parity, qualified for Generic list rows by REQ-006.019); REQ-006.019 (per-family reference visibility; source RE-006); REQ-006.013 (board, now `Full`); REQ-005.007 (archive exclusion); REQ-006.003, REQ-006.009, REQ-006.012, REQ-006.014 (shell, header, list routes) |
+| NFRs | NFR-001.002; NFR-001.003; NFR-005.001 (Firefox 115+ at 320/480/720 px) |
 | ADRs | ADR-0028 (decisions 1, 2, 3, 4, 5, 6, 7, 8, 9; downstream constraints 4–9 and 15; decision 2 and constraint 11 amended by ADR-035 for Generic lists); ADR-035 (per-family reference visibility); ADR-0005 (templates, CSP, progressive enhancement, no cookies); ADR-0017; ADR-0020 (decision 5 amended by ADR-0028 constraint 9) |
 | Domain model | `docs/domain-model/` — requirement group and member requirement (grouped rows) |
 | Business rules | `docs/business-rules/` — archive and lifecycle rules cited by the existing list pages |

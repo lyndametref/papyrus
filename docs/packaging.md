@@ -4,10 +4,10 @@
 
 - Architecture: `amd64`.
 - Supported Debian release: **Debian Forky only** (per ADR-0003, which supersedes
-  ADR-0002, and NFR-03.002).
+  ADR-0002, and NFR-003.002).
 - Debian Trixie and any other Debian release are **not claimed or verified** as
   supported. Adding a release to the supported set requires an explicit verification
-  pass and a follow-up ADR/requirement update (ADR-0003, NFR-03.002).
+  pass and a follow-up ADR/requirement update (ADR-0003, NFR-003.002).
 - The package declares `Depends: libc6 (>= 2.34)`; the verified environment is Forky
   with glibc 2.43.
 
@@ -415,11 +415,11 @@ Environment: isolated `dpkg --instdir/--admindir` under `fakeroot` on the build 
 
 - **OQ-1 — no real-GUI browser run.** This headless verification checks served
   markup, asset set, viewport hooks, and the absence of forbidden features. Firefox,
-  Edge, and Safari 100+ were not driven in a GUI. NFR-05.001 browser support remains
+  Edge, and Safari 100+ were not driven in a GUI. NFR-005.001 browser support remains
   covered by TASK-6 (`tests/browser_cli.rs`) and the approved MOCK-0001; schedule a
   manual GUI pass if required.
 - **Forky only.** No Debian Trixie or other release was installed or verified, and
-  none is claimed (ADR-0003, NFR-03.002).
+  none is claimed (ADR-0003, NFR-003.002).
 - **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
   unchanged (TASK-7 scope). The stale-binary hazard is mitigated by the mandatory
   explicit `cargo build --release` plus the `--help` assertion documented above and
@@ -484,11 +484,11 @@ Environment: isolated `dpkg --instdir/--admindir` under `fakeroot` on the build 
 
 - **OQ-1 — no real-GUI browser run.** This headless verification checks served
   markup, asset set, viewport hooks, and the absence of forbidden features. Firefox,
-  Edge, and Safari 100+ were not driven in a GUI. NFR-05.001 browser support remains
+  Edge, and Safari 100+ were not driven in a GUI. NFR-005.001 browser support remains
   covered by TASK-6/TASK-11 (`tests/browser_cli.rs`) and the approved MOCK-0001/
   MOCK-0002; schedule a manual GUI pass if required.
 - **Forky only.** No Debian Trixie or other release was installed or verified, and
-  none is claimed (ADR-0003, NFR-03.002).
+  none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed from
   prior work; the isolated verification did not modify it. The host entry is recorded
   as unchanged rather than absent.
@@ -502,7 +502,7 @@ Reference: TASK-1 license audit (unchanged). TASK-2 to TASK-12 introduced no new
 runtime dependencies beyond those already audited. Audit re-run not required.
 
 Scope: runtime dependencies only (crates linked into the distributed binary).
-Build-time/proc-macro dependencies are excluded by NFR-06.002 scope.
+Build-time/proc-macro dependencies are excluded by NFR-006.002 scope.
 
 | Crate | Version | License (SPDX) | Verdict |
 |---|---|---|---|
@@ -534,7 +534,7 @@ runtime dependency remains.
 
 Browser assets are not crates: their licences are recorded in
 `src/browser/vendor/MANIFEST.md` and in the package `copyright` file, are
-compatible with GPL-3.0-or-later (MIT, OFL-1.1), and the NFR-06.002 release gate
+compatible with GPL-3.0-or-later (MIT, OFL-1.1), and the NFR-006.002 release gate
 is unchanged.
 
 Build-time/proc-macro dependencies (excluded from audit scope): clap_derive, heck,
@@ -600,8 +600,8 @@ with `papyrus 0.1.0`.
 
 ### Recorded limitations
 
-- OQ-1: no real-GUI browser run; markup-level verification only (NFR-05.001).
-- Forky only; no other Debian release verified (ADR-0003, NFR-03.002).
+- OQ-1: no real-GUI browser run; markup-level verification only (NFR-005.001).
+- Forky only; no other Debian release verified (ADR-0003, NFR-003.002).
 - Packaging script does not force rebuild; mitigated by mandatory cargo build --release before packaging.
 
 ### TASK-62 package artifact
@@ -650,7 +650,7 @@ with `papyrus 0.1.0`.
 ### Recorded limitations
 
 - **Offline namespace verified via `unshare`.** The offline claim rests on loopback-only binding, no external references in served content, and no outbound-connection code path; the `unshare -rn` namespace check was run and passed.
-- **No real-GUI browser run.** Markup- and asset-level verification only (NFR-05.001).
+- **No real-GUI browser run.** Markup- and asset-level verification only (NFR-005.001).
 - **Config keys not re-checked on the installed binary.** Browser configuration keys (`browser_host`, `browser_port`, `browser_open`) were not re-verified against the installed package in this run.
 
 ### TASK-33 package artifact
@@ -708,7 +708,7 @@ with `papyrus 0.1.0`.
 - Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
   `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
   `ip link set lo up` available.
-- Supported release: **Debian Forky only** (ADR-0003, NFR-03.002). Debian Trixie
+- Supported release: **Debian Forky only** (ADR-0003, NFR-003.002). Debian Trixie
   and every other Debian release remain **not claimed and not verified**.
 - Isolation: `fakeroot dpkg --instdir=./.tmp/task42/inst
   --admindir=./.tmp/task42/adm --force-depends`; the host package status was
@@ -725,7 +725,7 @@ with `papyrus 0.1.0`.
   into the binary and served from memory.
 - New test file: `tests/ui_mockups_smoke.rs` (2 tests), passing under `cargo test`.
 - No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
-  license audit remains valid (NFR-06.002).
+  license audit remains valid (NFR-006.002).
 
 ### Quality gates
 
@@ -765,10 +765,10 @@ with `papyrus 0.1.0`.
 ### Recorded limitations
 
 - **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
-  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-005.001
   browser support remains covered by the TASK-40 contract tests and MOCK-0006.
 - **Forky only.** No Debian Trixie or other release was installed or verified,
-  and none is claimed (ADR-0003, NFR-03.002).
+  and none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed
   from prior work; the isolated verification did not modify it.
 - **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
@@ -789,7 +789,7 @@ with `papyrus 0.1.0`.
 - Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
   `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
   `ip link set lo up` available.
-- Supported release: **Debian Forky only** (ADR-0003, NFR-03.002). Debian Trixie
+- Supported release: **Debian Forky only** (ADR-0003, NFR-003.002). Debian Trixie
   and every other Debian release remain **not claimed and not verified**.
 - Isolation: `fakeroot dpkg --instdir=./.tmp/task46/inst
   --admindir=./.tmp/task46/adm --force-depends`; the host package status was
@@ -807,7 +807,7 @@ with `papyrus 0.1.0`.
   create/list/view/edit/deprecate/restore only.
 - New test file: `tests/business_rules_smoke.rs` (2 tests), passing under `cargo test`.
 - No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
-  license audit remains valid (NFR-06.002).
+  license audit remains valid (NFR-006.002).
 
 ### Quality gates
 
@@ -849,10 +849,10 @@ with `papyrus 0.1.0`.
 ### Recorded limitations
 
 - **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
-  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-005.001
   browser support remains covered by the TASK-25 contract tests.
 - **Forky only.** No Debian Trixie or other release was installed or verified,
-  and none is claimed (ADR-0003, NFR-03.002).
+  and none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed
   from prior work; the isolated verification did not modify it.
 - **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
@@ -875,7 +875,7 @@ with `papyrus 0.1.0`.
 - Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
   `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
   `ip link set lo up` available.
-- Supported release: **Debian Forky only** (ADR-0003, NFR-03.002). Debian Trixie
+- Supported release: **Debian Forky only** (ADR-0003, NFR-003.002). Debian Trixie
   and every other Debian release remain **not claimed and not verified**.
 - Isolation: `fakeroot dpkg --instdir=./.tmp/inst
   --admindir=./.tmp/adm --force-depends`; the host package status was
@@ -896,7 +896,7 @@ with `papyrus 0.1.0`.
   security/licence/architecture plus free-form sanitized values.
 - New test file: `tests/audit_records_smoke.rs` (2 tests), passing under `cargo test`.
 - No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
-  license audit remains valid (NFR-06.002).
+  license audit remains valid (NFR-006.002).
 
 ### Quality gates
 
@@ -940,10 +940,10 @@ with `papyrus 0.1.0`.
 ### Recorded limitations
 
 - **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
-  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-005.001
   browser support remains covered by the TASK-26 contract tests.
 - **Forky only.** No Debian Trixie or other release was installed or verified,
-  and none is claimed (ADR-0003, NFR-03.002).
+  and none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed
   from prior work; the isolated verification did not modify it.
 - **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
@@ -958,7 +958,7 @@ with `papyrus 0.1.0`.
 ## TASK-59 — Technical specifications milestone packaging and verification
 
 - Date: **2026-11-07 (UTC)**.
-- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-03.002.
+- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-003.002.
   Debian Trixie and every other Debian release are **not claimed and not verified**.
 - Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43-7, dpkg 1.23.11,
   `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot` 2.1.4, `unshare -rn` with
@@ -981,7 +981,7 @@ with `papyrus 0.1.0`.
 - New test file: `tests/technical_specifications_smoke.rs` (2 tests), passing under
   `cargo test`.
 - No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
-  license audit remains valid (NFR-06.002).
+  license audit remains valid (NFR-006.002).
 
 ### Build and package (TASK-59)
 
@@ -1085,10 +1085,10 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 ### Recorded limitations
 
 - **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
-  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-005.001
   browser support remains covered by the TASK-57 contract tests and MOCK-0009.
 - **Forky only.** No Debian Trixie or other release was installed or verified,
-  and none is claimed (ADR-0003, NFR-03.002).
+  and none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed
   from prior work; the isolated verification did not modify it. The post-removal
   `PATH` check therefore uses the isolated root only.
@@ -1117,7 +1117,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 - Date: **2026-11-10 (UTC)**.
 - Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11,
   `rustc`/`cargo` 1.99.1, clippy 0.1.99, `fakeroot`, `unshare`/`ip` available.
-- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-03.002.
+- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-003.002.
   Debian Trixie and every other Debian release are **not claimed and not verified**.
 - Isolation: `fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm
   --force-depends`; host package status unchanged before and after the run
@@ -1134,7 +1134,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 - New test file: `tests/content_management_smoke.rs` (4 tests), passing under
   `cargo test`.
 - No runtime dependencies added; the TASK-1/TASK-4 runtime dependency license
-  audit remains valid (NFR-06.002).
+  audit remains valid (NFR-006.002).
 
 ### Quality gates
 
@@ -1164,7 +1164,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 | Browser: cross-type ID resolution (single, multi -> 500, deprecated/unknown -> 404) | PASS |
 | Browser: JSON API and embedded assets served from the binary | PASS |
 | 320 px markup hooks and no external references | PASS |
-| Front-matter metadata projection (REQ-06.004) | PASS |
+| Front-matter metadata projection (REQ-006.004) | PASS |
 | Configuration, managed-artifacts/lifecycle, and agent-skills browser surfaces removed: `/config`, `/config/edit`, `/lifecycle`, and `/skills` with their `?type=` aliases return `404`; no sidebar entry and no inventory card (ADR-034, TASK-170, TASK-194, TASK-197) | PASS |
 | Lazy migration and Backlog.md round-trip | PASS |
 | Offline operation over loopback | PASS |
@@ -1174,11 +1174,11 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 ### Recorded limitations
 
 - **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
-  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-005.001
   browser support remains covered by the TASK-4/TASK-19 contract tests and
   MOCK-0012.
 - **Forky only.** No Debian Trixie or other release was installed or verified,
-  and none is claimed (ADR-0003, NFR-03.002).
+  and none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed
   from prior work; the isolated verification did not modify it.
 - **Packaging script precondition.** `scripts/build-deb.sh` was intentionally
@@ -1197,7 +1197,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 - Environment: Debian GNU/Linux forky/sid amd64, glibc 2.43, dpkg 1.23.11,
   `rustc`/`cargo` 1.99.1, clippy 0.1.99, `rustfmt` (rustfmt 1.99.1), `fakeroot`
   2.1.4, `unshare`/`ip` available.
-- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-03.002.
+- Supported release: **Debian Forky only** (amd64), per ADR-0003 and NFR-003.002.
   Debian Trixie and every other Debian release are **not claimed and not verified**.
 - Isolation: `fakeroot dpkg --instdir=./.tmp/inst --admindir=./.tmp/adm
   --force-depends`; the host reported `papyrus 0.1.0` installed before and after
@@ -1214,7 +1214,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 - New test file: `tests/use_cases_test_cases_test_reports_smoke.rs` (2 tests),
   passing under `cargo test`.
 - No runtime dependencies were added; the TASK-1/TASK-4 runtime dependency
-  license audit remains valid (NFR-06.002). Use cases, test cases, and test
+  license audit remains valid (NFR-006.002). Use cases, test cases, and test
   reports have no supersede or delete command (BR-018/BR-019/BR-020); the
   lifecycle smoke covers create/list/view/edit/deprecate/restore only. There is no
   dedicated `--type use-case`/`--type test-case`/`--type test-report` search
@@ -1262,10 +1262,10 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 ### Recorded limitations
 
 - **OQ-1 — no real-GUI browser run.** Verification is markup- and asset-level
-  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-05.001
+  only. Firefox, Edge, and Safari 100+ were not driven in a GUI; NFR-005.001
   browser support remains covered by the TASK-81 contract tests and MOCK-0013.
 - **Forky only.** No Debian Trixie or other release was installed or verified,
-  and none is claimed (ADR-0003, NFR-03.002).
+  and none is claimed (ADR-0003, NFR-003.002).
 - **Host baseline.** The build host already reported `papyrus 0.1.0` installed
   from prior work; the isolated verification did not modify it.
 - **Packaging script precondition.** `scripts/build-deb.sh` was intentionally left
@@ -1292,7 +1292,7 @@ statuses follow the existing contract: `0` success, `1` IO/boundary, `2` usage,
 ## TASK-98 — Release 1.0 native layout, import, relocation, single ID space, and packaging verification
 
 **Supported platform statement.** Debian **Forky amd64** is the supported and verified
-release target for this package (ADR-0003, NFR-03.002). Debian Trixie and every other
+release target for this package (ADR-0003, NFR-003.002). Debian Trixie and every other
 release are **not claimed or verified**; no other architecture is claimed.
 
 ### Environment
@@ -1478,7 +1478,7 @@ Observed results:
 ## TASK-117 — Config-defined document types release verification and packaging
 
 **Supported platform statement.** Debian **Forky amd64** is the supported and verified
-release target for this package (ADR-0003, NFR-03.002). Debian Trixie and every other
+release target for this package (ADR-0003, NFR-003.002). Debian Trixie and every other
 release, and every other architecture, remain **not claimed or verified**.
 
 This section records the m-17 release gate for config-defined document types. It is a
@@ -1659,7 +1659,7 @@ it returned `NOTE-001 doc Wallet note` and did not change the project hash.
 | Declare `note` by editing config only | PASS — `--help` lists `note` with no rebuild |
 | Installed `note create/list/view/status/archive/delete/search` | PASS — `NOTE-001`, status `review`, archived path, forced delete, search hit |
 | Offline `unshare -rn` (loopback up) | PASS — outbound TCP failed; `--help`, `note --help`, `note list` succeeded; browser list/detail/edit/API/assets returned 200 |
-| Man page for `note` | Not expected and not asserted (NFR-03.003 gap; ADR-0021 stays Proposed) |
+| Man page for `note` | Not expected and not asserted (NFR-003.003 gap; ADR-0021 stays Proposed) |
 | `dpkg -r papyrus` | PASS — binary and copyright removed from the isolated root |
 | `dpkg --purge papyrus` | PASS — no papyrus file and no papyrus admin entry remain |
 | Host package database and filesystem | PASS — `dpkg -l papyrus` identical before/after |
@@ -1692,15 +1692,15 @@ folder note.
 | G-3 | `README.md` says milestones move `active -> archived`; `src/registry.rs` `MILESTONE_STATES` is `["open","closed"]`, and shipped milestone files carry no status while `archive` moves the file. | Low | README owner | Stale wording recorded; not release-blocking for this gate. |
 | G-4 | `config list` omits `document_types.<slug>.default_status`; `config get` returns it, `config set`/`unset` validate it, and an invalid value is inspectable and repairable. | Medium | TASK-111 owner | Follow-up; not release-blocking because the repair path works. |
 | G-5 | BR-007 documents `papyrus release close <id>` as the only `planned -> released` transition, but `src/release.rs` has no `Close` variant and `papyrus release close REL-001` exits 2; the browser lifecycle text also names a non-existent `papyrus release status <id> released`. The `planned -> released` transition is unreachable. | High | Release owner / BR-007 owner | **Release-blocking** for the m-17 gate unless a follow-up code task is opened or the owner accepts amending BR-007. |
-| F-117-1 | `sanitize_name` rejects NUL, CR, LF, empty values, and path separators, but accepts other C0 controls (TAB 0x09, 0x01) in a document title; C-18 exercises the rejected forms. | Low | REQ-01.004 / TASK-110 owner | Follow-up input-validation hardening; not release-blocking. |
+| F-117-1 | `sanitize_name` rejects NUL, CR, LF, empty values, and path separators, but accepts other C0 controls (TAB 0x09, 0x01) in a document title; C-18 exercises the rejected forms. | Low | REQ-001.004 / TASK-110 owner | Follow-up input-validation hardening; not release-blocking. |
 
 ### Recorded limitations (G-6)
 
-- No real-GUI browser run (NFR-05.001 limitation); verification is HTTP, markup, and
+- No real-GUI browser run (NFR-005.001 limitation); verification is HTTP, markup, and
   asset level.
-- Debian Forky amd64 only (ADR-0003, NFR-03.002); no other release or architecture is
+- Debian Forky amd64 only (ADR-0003, NFR-003.002); no other release or architecture is
   claimed.
-- Config-defined slugs have no man page; ADR-0021 remains Proposed and NFR-03.003 is
+- Config-defined slugs have no man page; ADR-0021 remains Proposed and NFR-003.003 is
   not claimed. This is a recorded release risk, not a new claim.
 - `scripts/build-deb.sh` does not force a rebuild; the mitigation was
   `cargo build --release` first and asserting `--help` before packaging.
@@ -1717,7 +1717,7 @@ browser, upgrade, package, offline, and no-drift checks pass.
 ## TASK-149 — Browser assets, offline rendering, and binary budget
 
 **Supported platform statement.** Debian **Forky amd64** is the supported and verified
-release target for this package (ADR-0003, NFR-03.002). Debian Trixie and every other
+release target for this package (ADR-0003, NFR-003.002). Debian Trixie and every other
 release, and every other architecture, remain **not claimed or verified**.
 
 This section records the m-21 packaging gate for the vendored browser assets
@@ -1867,7 +1867,7 @@ Rust delta -> 8,323,136 B measured.
 | Offline `unshare -rn` (loopback up) | PASS — outbound TCP failed (exit 7); list, board, math page, diagram page, 26/26 assets, and `check` succeeded over loopback |
 | Installed-binary run from an empty working directory with an asset-free project (`env -i`) | PASS — 26/26 assets |
 | No new crate or build step | PASS — `Cargo.lock` 36 packages, no `build.rs`, no `npm`/`node` reference in `scripts/` or `packaging/`, 29 committed vendor files |
-| Man page | Absent, as expected (NFR-03.003 unclaimed, ADR-0021 `Proposed`) |
+| Man page | Absent, as expected (NFR-003.003 unclaimed, ADR-0021 `Proposed`) |
 
 ### Findings
 
@@ -1888,7 +1888,7 @@ was required by this gate.
   JavaScript-disabled operation, `document.scrollWidth == clientWidth`, and the
   `check --fix` loop are verified in the dated
   `## TASK-150 — Browser runtime verification (2026-11-16)` section below.
-- Debian Forky amd64 only (ADR-0003, NFR-03.002); no other release or architecture is
+- Debian Forky amd64 only (ADR-0003, NFR-003.002); no other release or architecture is
   claimed.
 - `git ls-files src/browser/vendor` was not run because the verification session
   permitted only `git add`/`git commit`. The committed-assets claim is supported by
@@ -1919,7 +1919,7 @@ was required by this gate.
 ## TASK-150 — Browser runtime verification (2026-11-16)
 
 **Supported platform statement.** Debian **Forky amd64** is the supported and verified
-release target (ADR-0003, NFR-03.002). No other Debian release or architecture is
+release target (ADR-0003, NFR-003.002). No other Debian release or architecture is
 claimed.
 
 This section is the durable evidence for the end-to-end diagnostics, browser-shell, and
@@ -1960,7 +1960,7 @@ passed. Binary growth over TASK-149: **+160 B**; `.deb` delta **−264 B**.
 |---|---|---|---|---|
 | M1 | Firefox ESR (installed) | `/usr/lib/firefox-esr/firefox-esr`, SHA-256 `3c87b278879fd1d6a4ee027e0b111afb7d03cc8786c8147ee11a6eb60774c27e` | 153.5.1esr | full checklist; WebDriver BiDi at DPR 1, plus geckodriver 0.36.0 for focus/keyboard |
 
-Supported browser under NFR-05.001 as amended 2026-11-16 is **Firefox 115+ only**.
+Supported browser under NFR-005.001 as amended 2026-11-16 is **Firefox 115+ only**.
 M2 (older ESR at/above 115), M3 (Edge 130) and M4 (Safari 18.x) are out of scope
 and are not executed; no owner-manual matrix and no browser result is claimed for
 them. All browser-observed evidence in this section is from M1 (Firefox 153.5.1esr)
@@ -1982,7 +1982,7 @@ the shim was removed (commit 4a54cc1) and DEF-1 is no longer a defect.
 
 ### Recorded limitations
 
-- **Browser scope.** Under NFR-05.001 as amended 2026-11-16, only Firefox 115+ is
+- **Browser scope.** Under NFR-005.001 as amended 2026-11-16, only Firefox 115+ is
   supported. M1 (Firefox 153.5.1esr) is the only browser exercised; no Edge 130,
   Safari 18.x, or older-Firefox result is claimed, and no owner-manual matrix is
   outstanding. AC #3–#6 and #9 are satisfied on the strength of M1 alone.
@@ -1997,7 +1997,7 @@ the shim was removed (commit 4a54cc1) and DEF-1 is no longer a defect.
 ### Defects
 
 No open defects. DEF-1 (Firefox 100.0 Mermaid rendering failure) is obsolete under
-NFR-05.001 as amended 2026-11-16: the supported floor is now Firefox 115+, the
+NFR-005.001 as amended 2026-11-16: the supported floor is now Firefox 115+, the
 Mermaid CSSStyleSheet compatibility shim was removed (commit 4a54cc1), and the
 Firefox 100 probe is no longer in scope. No product source, test, asset, packaging,
 requirement, business rule, ADR, or specification was changed by TASK-150.

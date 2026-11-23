@@ -16,19 +16,19 @@ accepted
 
 ## Context
 
-REQ-06.017 requires the browser to render diagrams embedded in record content, offline, with bundled assets, in a single binary, under a dependency licence compatible with GPLv3-or-later, without arbitrary script execution, and with graceful degradation. It names "PlantUML- or Mermaid-style diagrams" as examples and deliberately leaves the library choice to implementation.
+REQ-006.017 requires the browser to render diagrams embedded in record content, offline, with bundled assets, in a single binary, under a dependency licence compatible with GPLv3-or-later, without arbitrary script execution, and with graceful degradation. It names "PlantUML- or Mermaid-style diagrams" as examples and deliberately leaves the library choice to implementation.
 
 ADR-0025 settles math with a vendored KaTeX. Diagram rendering is a different problem: the two named ecosystems have incompatible delivery models.
 
 - **Mermaid** is a JavaScript library (MIT). A pre-built classic-script bundle, `mermaid.min.js`, renders into the current document. Version 11.17.2's file is 3,572,661 bytes; version 12.3.0's is 5,537,838 bytes.
 - **PlantUML** is a Java program (GPL-3.0). Rendering requires `plantuml.jar` and a JVM (a second runtime, a second process, and ~50 MB of JVM plus jar), or a running PlantUML HTTP service (a network dependency). The available JavaScript package, `plantuml-encoder`, only deflates and encodes source into a URL or image path; it does not render. PlantUML's `!include` directive reads local files, which is a second filesystem surface in a page renderer.
 
-Forces: ADR-0002/ADR-0003 ship one `.deb` containing `/usr/bin/papyrus`; ADR-0005 forbids dependencies, external servers, and remote assets; NFR-01.003 forbids network use; NFR-03.001 fixes a Rust single binary; NFR-02.002 requires sanitisation; NFR-05.001 sets Firefox 100, Edge 130, and Safari 18 as the browser floor; REQ-06.015 lets diagram content use the full window width.
+Forces: ADR-0002/ADR-0003 ship one `.deb` containing `/usr/bin/papyrus`; ADR-0005 forbids dependencies, external servers, and remote assets; NFR-001.003 forbids network use; NFR-003.001 fixes a Rust single binary; NFR-002.002 requires sanitisation; NFR-005.001 sets Firefox 100, Edge 130, and Safari 18 as the browser floor; REQ-006.015 lets diagram content use the full window width.
 
 Version choice is part of the decision, not an implementation detail:
 
 - **11.17.2 is the last 11.x release** (published 2026-08-25). It is a classic IIFE bundle that assigns `globalThis.mermaid`, has no `import`/`export`, no dynamic import, and no reachable `eval`/`new Function` (its only `Function(...)` constructor calls are the lodash global fallbacks, short-circuited by `self` in a browser). The advisory batches through 2026-08-06 — configuration prototype pollution, CSS injection into sibling elements, architecture-diagram prototype pollution, and radar/XY/gantt DoS — are all fixed by 11.16.1, so no open advisory affects 11.17.2.
-- **12.3.0 is the current `latest`** (published 2026-11-03) but is a breaking release: it declares an ES2024 baseline, a Safari 17.4+ floor, and ELK as the bundled default layout with a new default theme. ES2024 syntax is not supported by Firefox 100, which NFR-05.001 still requires; adopting 12.x would require an NFR-05.001 change, not an implementation choice. It is also 1,965,177 bytes larger and changes how existing diagrams look.
+- **12.3.0 is the current `latest`** (published 2026-11-03) but is a breaking release: it declares an ES2024 baseline, a Safari 17.4+ floor, and ELK as the bundled default layout with a new default theme. ES2024 syntax is not supported by Firefox 100, which NFR-005.001 still requires; adopting 12.x would require an NFR-005.001 change, not an implementation choice. It is also 1,965,177 bytes larger and changes how existing diagrams look.
 
 Mermaid's renderer injects a `<style>` element into the SVG it produces, which collides with the current `style-src 'self'` policy. A Firefox 153esr probe against the exact CSP confirmed the consequence: with `style-src 'self'` the SVG renders as an unreadable black box; with `style-src 'self' 'unsafe-inline'` the neutral theme renders correctly. The relaxation is therefore required, not cosmetic.
 
@@ -37,7 +37,7 @@ Mermaid quality also matters: it is JS code executing in the same origin as the 
 The current release binary is 4,730,296 bytes (KaTeX and its fonts already embedded). The projected binary with Mermaid 11.17.2 is 8,302,957 bytes before the small Rust/client additions.
 
 ## Decision
-1. **Diagram syntax support is Mermaid only.** The accepted fence info string is exactly `mermaid` (case-sensitive, trailing whitespace trimmed, zero to three leading spaces, at least three backticks or tildes, same opener/closer rules as the math fence in `docs/specifications/browser-math-and-diagram-rendering.md` §3.4). The `mmd` alias is **dropped**: REQ-06.017 names only `mermaid`, the alias is an unrequested extension, and it would double the fence-recognition and test surface. An `mmd` fence stays literal text.
+1. **Diagram syntax support is Mermaid only.** The accepted fence info string is exactly `mermaid` (case-sensitive, trailing whitespace trimmed, zero to three leading spaces, at least three backticks or tildes, same opener/closer rules as the math fence in `docs/specifications/browser-math-and-diagram-rendering.md` §3.4). The `mmd` alias is **dropped**: REQ-006.017 names only `mermaid`, the alias is an unrequested extension, and it would double the fence-recognition and test surface. An `mmd` fence stays literal text.
 
    - `plantuml` and `puml` fences are PlantUML fences and render as source with a visible note (decision 2). `uml`, `dot`, `graphviz`, and every other unknown fence remain literal text exactly as today, fence lines included, never an error, never silently dropped.
    - An empty or whitespace-only `mermaid` fence is literal text (fences included), not a figure and not an error.
@@ -53,7 +53,7 @@ The current release binary is 4,730,296 bytes (KaTeX and its fonts already embed
 
    The block is server-rendered; it never links the Mermaid bundle and never relaxes the CSP. `dot`, `graphviz`, and `uml` are not PlantUML and get no note.
 
-   Reasons, in order of force: a JVM and `plantuml.jar` cannot be shipped inside a Rust binary (NFR-03.001, ADR-0002); a PlantUML service is a network dependency (NFR-01.003); `plantuml-encoder` does not render; and PlantUML's file-include semantics would add a filesystem surface to the renderer. REQ-06.017's wording is permissive ("for example … PlantUML- or Mermaid-style"), so this is a scope decision, not a requirement gap.
+   Reasons, in order of force: a JVM and `plantuml.jar` cannot be shipped inside a Rust binary (NFR-003.001, ADR-0002); a PlantUML service is a network dependency (NFR-001.003); `plantuml-encoder` does not render; and PlantUML's file-include semantics would add a filesystem surface to the renderer. REQ-006.017's wording is permissive ("for example … PlantUML- or Mermaid-style"), so this is a scope decision, not a requirement gap.
 
 3. **Server-side work is the same delimiter pre-pass as ADR-0025, extended with one fence shape.** A `mermaid` fence becomes:
 
@@ -132,7 +132,7 @@ The current release binary is 4,730,296 bytes (KaTeX and its fonts already embed
 
    - Server pre-pass, per fence: **100,000 UTF-8 bytes** and **1,000 lines**. Counting stops at the cap. Over-limit input is not handed to Mermaid: the server emits the same figure shape, carries `data-render-error="diagram"`, keeps the full source in the `<pre>`, and adds `Diagram not rendered: source exceeds the 100,000-byte or 1,000-line limit.` The client skips any figure with `data-render-error`.
    - Client: `maxTextSize: 100000` (characters) and `maxEdges: 500`. Mermaid's flowchart parser throws `Edge limit exceeded` above 500 edges; `render()` rejects; the per-figure catch applies the failure contract. The server does **not** count edges, because counting them would require parsing Mermaid syntax on the server, which decision 3 and ADR-0025 forbid.
-   - The caps are not configurable in this release: no configuration key, no environment variable, no per-record override. A record is user input (NFR-02.002), and a pathological diagram must not hang the browser thread or exhaust memory; changing a constant requires a new ADR.
+   - The caps are not configurable in this release: no configuration key, no environment variable, no per-record override. A record is user input (NFR-002.002), and a pathological diagram must not hang the browser thread or exhaust memory; changing a constant requires a new ADR.
 
 8. **The sandboxed-iframe fallback is rejected.** An opaque-origin `sandbox="allow-scripts"` document cannot load `/assets/mermaid.min.js`: the request is cross-origin from an opaque origin and the asset server sends no CORS headers. Adding `allow-same-origin` removes the isolation that motivated the iframe. The only remaining variant inlines the 3.4 MiB bundle into the child document, which needs `script-src 'unsafe-inline'` inside the frame — a larger relaxation than the scoped `style-src` grant — plus height messaging, print, full-width, focus, and accessibility machinery. The scoped style grant contains the risk with less complexity, so the fallback is not adopted. A future proposal to revisit it needs its own ADR.
 
@@ -175,22 +175,22 @@ A record author controls the diagram source, and Mermaid parses it client-side a
 - *Diagram hangs the page*: byte and line caps plus Mermaid's `maxEdges`, per-figure `try`/`catch`; the rest of the page stays interactive.
 - *CSP accepted too broadly*: two literal strings, asserted per response class; `unsafe-inline` appears only in the diagram `style-src`, never in `script-src`.
 - *Full-width diagram forces page-level horizontal scroll*: every diagram is wrapped in an `overflow-x: auto` container and a test asserts `document.scrollWidth == clientWidth` on a wide-diagram page.
-- *Mermaid 12.x drift*: the manifest pins 11.17.2; an update to 12.x is an NFR-05.001 browser-floor decision and needs a new ADR.
+- *Mermaid 12.x drift*: the manifest pins 11.17.2; an update to 12.x is an NFR-005.001 browser-floor decision and needs a new ADR.
 
 ## Alternatives Considered
 
 | Option | Outcome | Reason |
 |---|---|---|
 | Mermaid 11.17.2 vendored, client-side, scoped `style-src 'unsafe-inline'` (this ADR) | Selected | Only option that renders the requested diagram class offline, in one binary, without a second runtime, while keeping Firefox 100 support. |
-| Mermaid 12.3.0 vendored | Rejected | 5,537,838 B (+1,965,177 B), ES2024 baseline and Safari 17.4+ floor incompatible with NFR-05.001's Firefox 100, and a breaking default-layout/theme change. |
+| Mermaid 12.3.0 vendored | Rejected | 5,537,838 B (+1,965,177 B), ES2024 baseline and Safari 17.4+ floor incompatible with NFR-005.001's Firefox 100, and a breaking default-layout/theme change. |
 | Mermaid rendered inside a sandboxed opaque-origin iframe with its own CSP | Rejected | An opaque origin cannot load the same-origin bundle without CORS, `allow-same-origin` defeats the isolation, and inlining the bundle requires `script-src 'unsafe-inline'` in the frame plus height/print/full-width complexity. |
-| PlantUML via `plantuml.jar` + JVM | Rejected | Second runtime and process; breaks single-binary packaging (NFR-03.001, ADR-0002). |
-| PlantUML via a local or remote PlantUML server | Rejected | Network or a background service; violates NFR-01.003 and ADR-0005's no-external-server rule. |
+| PlantUML via `plantuml.jar` + JVM | Rejected | Second runtime and process; breaks single-binary packaging (NFR-003.001, ADR-0002). |
+| PlantUML via a local or remote PlantUML server | Rejected | Network or a background service; violates NFR-001.003 and ADR-0005's no-external-server rule. |
 | `plantuml-encoder` in the browser + an image endpoint | Rejected | The encoder does not render; it produces a URL for a renderer that does not exist offline. |
 | Graphviz / `viz.js` (WASM) | Rejected | 2–3 MB WASM plus `script-src 'wasm-unsafe-eval'` and a wasm loader; its syntax is not PlantUML or Mermaid, so it satisfies neither named example. |
-| Server-side rendering to SVG at record save time | Rejected | REQ-06.017 requires browser-side rendering and source preservation; it would rewrite records or store derived artifacts, both forbidden by ADR-0013. |
+| Server-side rendering to SVG at record save time | Rejected | REQ-006.017 requires browser-side rendering and source preservation; it would rewrite records or store derived artifacts, both forbidden by ADR-0013. |
 | Mermaid syntax subset re-implemented in Rust → inline SVG | Rejected | A diagram layout engine is a large, permanent in-project liability; it would also contradict "no server-side rendering". |
-| Diagrams deferred to a later release (math only) | Rejected | REQ-06.017 has an explicit acceptance criterion for diagrams; deferral is a requirement change, not an implementation choice. |
+| Diagrams deferred to a later release (math only) | Rejected | REQ-006.017 has an explicit acceptance criterion for diagrams; deferral is a requirement change, not an implementation choice. |
 
 ## Open Questions
 
@@ -209,7 +209,7 @@ All resolved. No open question remains for this ADR.
 | Decision | Before | After | Reason |
 |---|---|---|---|
 | Status | `Accepted` claimed on 2026-11-15 while four questions were open | Completed 2026-11-16; every open question resolved | TASK-146 could not start against an incomplete acceptance. |
-| 1 — fence set | `mermaid` and `mmd` | `mermaid` only | REQ-06.017 names only `mermaid`; the alias is an unrequested extension. |
+| 1 — fence set | `mermaid` and `mmd` | `mermaid` only | REQ-006.017 names only `mermaid`; the alias is an unrequested extension. |
 | 2 — PlantUML | `.puml`/`plantuml` note, `dot`/`graphviz` ambiguous | `plantuml`/`puml` source block with note; `uml`/`dot`/`graphviz` literal text | Aligns with the requirement's single named `plantuml` fence and removes ambiguity. |
 | 4 — version and asset | "Mermaid 11.x", 3.4 MiB | 11.17.2, one file, 3,572,661 B, SHA-256 recorded | 11.x was not a pin; 12.x breaks Firefox 100 and adds 1.97 MB. |
 | 5 — client | `mermaid.render()` only; type set unspecified | nine promised types, no allowlist, explicit failure contract, no `bindFunctions` | Makes the promise testable and the fallback deterministic. |
@@ -241,16 +241,16 @@ Decision 13 was reverted on 2026-11-16 because the supported floor was raised to
 5. **Asset and notice.** The Mermaid file, `LICENSE`, `UPSTREAM.md`, `MANIFEST.md` row, digest test, and the MIT section of the package `copyright` are mandatory before the asset ships (ADR-0027).
 6. **No JVM, no `plantuml.jar`, no rendering service, no network call** exists in any code path; a grep test asserts no `plantuml`/`java` invocation.
 7. **`script-src` stays `'self'`**; `'unsafe-inline'` may appear only in the diagram response's `style-src`. A change to that grant, to `securityLevel`, to `htmlLabels`, or to a cap requires a new ADR.
-8. **Mermaid 12.x is out of scope** until NFR-05.001's Firefox floor is revisited; an asset update to 12.x needs a new ADR, not a manifest edit.
+8. **Mermaid 12.x is out of scope** until NFR-005.001's Firefox floor is revisited; an asset update to 12.x needs a new ADR, not a manifest edit.
 9. **Every rendered figure keeps its source `<pre>` until a successful replacement**, and a failure restores/keeps the source and marks the figure.
 10. **Diagram source is never parsed, rewritten, or persisted by the server.**
 11. **The 12 MiB binary budget** (ADR-0027 decision 6) remains the release gate; the projected 7.92 MiB leaves 4.08 MiB of headroom.
 
 ## References
 
-- `docs/requirements/business/REQ-06.017.md` — diagrams in the browser.
-- `docs/requirements/business/REQ-06.015.md` — full-width diagram content.
-- `docs/requirements/non-functional/NFR-01.003.md`, `NFR-02.002.md`, `NFR-03.001.md`, `NFR-05.001.md`, `NFR-06.002.md`.
+- `docs/requirements/business/REQ-006.017.md` — diagrams in the browser.
+- `docs/requirements/business/REQ-006.015.md` — full-width diagram content.
+- `docs/requirements/non-functional/NFR-001.003.md`, `NFR-002.002.md`, `NFR-003.001.md`, `NFR-005.001.md`, `NFR-006.002.md`.
 - `docs/specifications/browser-math-and-diagram-rendering.md` — the shared pre-pass, fallback contract, and CSP baseline.
 - `docs/architecture/adr/ADR-0002-distribution-format-amd64-deb-packages.md`, `ADR-0003-supported-debian-release-target-forky-only.md` — one binary per package.
 - `docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md` — dependency-free server, CSP baseline.

@@ -5,7 +5,7 @@ created_date: '2026-11-20T17:35:52Z'
 updated_date: '2026-11-20T18:05:12Z'
 labels: []
 references:
-  - REQ-07.004
+  - REQ-007.004
   - ADR-0017
   - ADR-0018
 status: Done

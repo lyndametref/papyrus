@@ -24,16 +24,11 @@ references:
   - src/browser/assets.rs
   - src/browser/vendor/MANIFEST.md
 modified_files:
-  - src/browser/assets.rs
-  - src/browser/mod.rs
-  - src/browser/http.rs
   - src/browser/vendor/katex/0.16.11/katex.min.js
   - src/browser/vendor/katex/0.16.11/katex.min.css
   - src/browser/vendor/katex/0.16.11/fonts
   - src/browser/vendor/katex/0.16.11/LICENSE
   - src/browser/vendor/katex/0.16.11/UPSTREAM.md
-  - src/browser/vendor/MANIFEST.md
-  - packaging/deb/usr/share/doc/papyrus/copyright
   - tests/browser_cli.rs
 priority: high
 ordinal: 41560

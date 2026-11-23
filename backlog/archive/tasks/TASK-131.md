@@ -16,8 +16,8 @@ dependencies:
   - TASK-129
 references:
   - docs/specifications/milestone-and-release-management.md
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-03.002.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-003.002.md
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
@@ -45,7 +45,7 @@ ordinal: 41420
 - Revision line: add a 2026-11-15 entry that records the correction and explicitly notes the superseded `active -> archived` and `papyrus milestone archive` wording.
 - Keep the release sections (create/list/view/edit/close, relationship, persistence) otherwise intact.
 
-**Out of scope.** Code (TASK-134), REQ-06.013 (TASK-135), ADR text, business rules, other specification pages, requirement IDs, and any new milestone feature or verb. Do not change the release lifecycle, the dangling-release behavior, or the sanitization rules.
+**Out of scope.** Code (TASK-134), REQ-006.013 (TASK-135), ADR text, business rules, other specification pages, requirement IDs, and any new milestone feature or verb. Do not change the release lifecycle, the dangling-release behavior, or the sanitization rules.
 
 **Assumptions.** The implementation already matches the close-only lifecycle after TASK-130; this page is being corrected to it, not defining new behavior. Legacy archived milestone files may still exist on disk and stay readable/editable in place, but no command produces, moves, or restores that state. `milestone delete` continues to resolve records in the active and legacy read locations.
 

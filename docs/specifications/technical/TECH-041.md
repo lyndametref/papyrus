@@ -9,8 +9,8 @@ references:
   - ADR-0009
   - ADR-0010
   - ADR-0013
-  - NFR-04.004
-  - REQ-01.005
+  - NFR-004.004
+  - REQ-001.005
   - TASK-64
 status: verified
 ---
@@ -19,7 +19,7 @@ status: verified
 ## Description
 ## Purpose
 
-This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — bidirectional translation between Papyrus display IDs and Backlog.md storage IDs, fixed per-type offsets (task `0`, milestone `1`), storage prefixes, and the `m-0` base — was renounced by NFR-04.004 and REQ-01.005. Papyrus now keeps a single ID space with no translation layer. The live contract is now defined by:
+This specification is **superseded in intent** and no longer states a live behaviour contract. Its subject — bidirectional translation between Papyrus display IDs and Backlog.md storage IDs, fixed per-type offsets (task `0`, milestone `1`), storage prefixes, and the `m-0` base — was renounced by NFR-004.004 and REQ-001.005. Papyrus now keeps a single ID space with no translation layer. The live contract is now defined by:
 
 - `docs/specifications/papyrus-native-record-layout-and-single-id-space.md` (single ID space, allocation without offsets, milestones starting at 1)
 
@@ -45,7 +45,7 @@ All former in-scope and out-of-scope items are withdrawn; see the superseding sp
 | Artifact | Reference |
 |---|---|
 | Ticket | TASK-64 (historical) |
-| Requirements | NFR-04.004 (renunciation); REQ-01.005 (single ID space) |
+| Requirements | NFR-004.004 (renunciation); REQ-001.005 (single ID space) |
 | ADRs | ADR-0010, ADR-0013 (superseding); ADR-0008, ADR-0009 (superseded) |
 | Superseding specification | `papyrus-native-record-layout-and-single-id-space.md` |
 | UI mockups | none |

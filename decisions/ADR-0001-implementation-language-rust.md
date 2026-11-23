@@ -16,13 +16,13 @@ accepted
 
 ## Context
 
-Papyrus is a project-level backlog and documentation manager delivered as a command-line tool. The NFR-03 group ("Implementation and Distribution") records validated constraints for implementation and distribution. **NFR-03.001** requires that the Papyrus application be implemented in Rust. This is a firm, decided constraint.
+Papyrus is a project-level backlog and documentation manager delivered as a command-line tool. The NFR-003 group ("Implementation and Distribution") records validated constraints for implementation and distribution. **NFR-003.001** requires that the Papyrus application be implemented in Rust. This is a firm, decided constraint.
 
 The available toolchain in the verified environment includes Rust 1.99.1, Cargo, and rustup. Node.js and Python 3 are available as auxiliary build/release tooling only and are not runtime dependencies of the distributed CLI.
 
 ## Decision
 
-- Implement Papyrus in **Rust** as the sole implementation language (NFR-03.001).
+- Implement Papyrus in **Rust** as the sole implementation language (NFR-003.001).
 - Use **Cargo** for dependency management, reproducible builds, and the testing workflow.
 - Rust 1.99.1 (via rustup) is the pinned baseline toolchain for builds.
 - Node.js and Python 3, where used, remain build-time/auxiliary tooling only and are never runtime dependencies of the distributed CLI.
@@ -48,12 +48,12 @@ The available toolchain in the verified environment includes Rust 1.99.1, Cargo,
 
 | Option | Outcome | Reason |
 |---|---|---|
-| Python implementation | Rejected | Violates NFR-03.001; adds a runtime interpreter dependency and packaging complexity. |
-| Go implementation | Rejected | Violates NFR-03.001. |
-| Shell/Node.js CLI | Rejected | Violates NFR-03.001; not suitable for a structured backlog/documentation manager. |
+| Python implementation | Rejected | Violates NFR-003.001; adds a runtime interpreter dependency and packaging complexity. |
+| Go implementation | Rejected | Violates NFR-003.001. |
+| Shell/Node.js CLI | Rejected | Violates NFR-003.001; not suitable for a structured backlog/documentation manager. |
 
 ## References
 
-- `docs/requirements/non-functional/NFR-03.md` — Implementation and Distribution group.
-- `docs/requirements/non-functional/NFR-03.001.md` — Implement Papyrus in Rust.
+- `docs/requirements/non-functional/NFR-003.md` — Implementation and Distribution group.
+- `docs/requirements/non-functional/NFR-003.001.md` — Implement Papyrus in Rust.
 - Verified environment: Rust 1.99.1, Cargo, rustup.

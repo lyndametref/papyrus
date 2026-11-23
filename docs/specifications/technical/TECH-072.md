@@ -13,11 +13,11 @@ references:
   - ADR-0020
   - ADR-0036
   - ADR-0037
-  - REQ-01.004
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
+  - REQ-001.004
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
   - NFR-007.001
   - NFR-007.002
 status: verified
@@ -228,7 +228,7 @@ ID resolves exactly as before and keeps the same not-found page.
   `deprecated/` folders stay inert.
 - **Disabled types.** Still absent from the command tree and still skipped by
   migration.
-- **Errors.** Validation and exit-code mapping (REQ-01.004) are untouched.
+- **Errors.** Validation and exit-code mapping (REQ-001.004) are untouched.
 
 ## Test plan
 

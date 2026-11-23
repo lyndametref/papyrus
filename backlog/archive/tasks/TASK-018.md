@@ -17,32 +17,32 @@ dependencies:
   - TASK-051
   - TASK-063
 references:
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-05.001.md
-  - docs/requirements/business/REQ-05.002.md
-  - docs/requirements/business/REQ-05.003.md
-  - docs/requirements/business/REQ-05.004.md
-  - docs/requirements/business/REQ-05.005.md
-  - docs/requirements/business/REQ-05.006.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-02.003.md
-  - docs/requirements/business/REQ-03.001.md
-  - docs/requirements/business/REQ-04.001.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-005.001.md
+  - docs/requirements/business/REQ-005.002.md
+  - docs/requirements/business/REQ-005.003.md
+  - docs/requirements/business/REQ-005.004.md
+  - docs/requirements/business/REQ-005.005.md
+  - docs/requirements/business/REQ-005.006.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-002.003.md
+  - docs/requirements/business/REQ-003.001.md
+  - docs/requirements/business/REQ-004.001.md
   - docs/business-rules/BR-015-search-command-behavior.md
   - >-
     docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md
-  - docs/requirements/business/REQ-06.md
-  - docs/requirements/business/REQ-05.008.md
-  - docs/requirements/business/REQ-05.009.md
-  - docs/requirements/business/REQ-05.010.md
-  - docs/requirements/business/REQ-05.011.md
-  - docs/requirements/business/REQ-02.001.md
-  - docs/requirements/business/REQ-03.002.md
-  - docs/requirements/business/REQ-04.002.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-04.003.md
+  - docs/requirements/business/REQ-006.md
+  - docs/requirements/business/REQ-005.008.md
+  - docs/requirements/business/REQ-005.009.md
+  - docs/requirements/business/REQ-005.010.md
+  - docs/requirements/business/REQ-005.011.md
+  - docs/requirements/business/REQ-002.001.md
+  - docs/requirements/business/REQ-003.002.md
+  - docs/requirements/business/REQ-004.002.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-004.003.md
   - docs/business-rules/BR-005-task-command-behavior.md
   - docs/business-rules/BR-006-milestone-command-behavior.md
   - docs/business-rules/BR-007-release-command-behavior.md
@@ -52,7 +52,6 @@ references:
   - docs/business-rules/BR-013-rule-command-behavior.md
   - docs/business-rules/BR-014-audit-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
-  - >-
     docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md
   - docs/specifications/search-complete-unified.md
   - docs/business-rules/BR-017-tech-spec-command-behavior.md

@@ -14,18 +14,18 @@ dependencies:
   - TASK-030
   - TASK-023
 references:
-  - docs/requirements/business/REQ-05.003.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/business/REQ-005.003.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-011-glossary-command-behavior.md
   - docs/business-rules/BR-015-search-command-behavior.md
@@ -35,7 +35,6 @@ references:
   - docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md
   - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
 documentation:
   - docs/specifications/glossary-terms-milestone-packaging-and-verification.md
@@ -58,7 +57,7 @@ Rebuild the amd64 Debian package from the post-TASK-32 source, verify its metada
 Feature specification: docs/specifications/glossary-terms-milestone-packaging-and-verification.md (self-contained scope, behavior, validation, assumptions, open questions).
 
 ## Acceptance Criteria
-- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides glossary term management, search, and browser (glossary category); Debian Trixie and other releases are not claimed or verified.
+- [ ] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides glossary term management, search, and browser (glossary category); Debian Trixie and other releases are not claimed or verified.
 - [ ] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists glossary (guards against packaging a stale binary).
 - [ ] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [ ] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

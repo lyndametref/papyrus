@@ -24,30 +24,30 @@ references:
   - MOCK-0002
   - MOCK-0012
   - MOCK-0013
-  - NFR-01.002
-  - NFR-01.003
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - NFR-05.001
-  - REQ-05
-  - REQ-05.001
-  - REQ-05.007
-  - REQ-05.010
-  - REQ-05.012
-  - REQ-05.013
-  - REQ-05.014
-  - REQ-06
-  - REQ-06.002
-  - REQ-06.003
-  - REQ-06.004
-  - REQ-06.006
-  - REQ-06.007
-  - REQ-06.008
-  - REQ-06.009
-  - REQ-06.010
-  - REQ-06.011
-  - REQ-06.012
+  - NFR-001.002
+  - NFR-001.003
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - NFR-005.001
+  - REQ-005
+  - REQ-005.001
+  - REQ-005.007
+  - REQ-005.010
+  - REQ-005.012
+  - REQ-005.013
+  - REQ-005.014
+  - REQ-006
+  - REQ-006.002
+  - REQ-006.003
+  - REQ-006.004
+  - REQ-006.006
+  - REQ-006.007
+  - REQ-006.008
+  - REQ-006.009
+  - REQ-006.010
+  - REQ-006.011
+  - REQ-006.012
   - TASK-11
   - TASK-15
   - TASK-150
@@ -71,18 +71,18 @@ references:
   - TASK-86
   - TC-001
   - ADR-034
-  - REQ-06.018
+  - REQ-006.018
   - RE-005
 status: draft
 ---
 # TECH-057 Browser Access for Use Cases, Test Cases, and Test Reports
 
-> **Revised (TASK-201, 2026-11-18):** the `Managed artifacts & lifecycles` and `Agent skills & workflows` sidebar entries in section 3 are retired per ADR-034 and REQ-06.018; the sidebar order now ends at `UI Mockups`. See TECH-080.
+> **Revised (TASK-201, 2026-11-18):** the `Managed artifacts & lifecycles` and `Agent skills & workflows` sidebar entries in section 3 are retired per ADR-034 and REQ-006.018; the sidebar order now ends at `UI Mockups`. See TECH-080.
 
 ## Description
 ## Purpose
 
-Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), TASK-25 (business rules), TASK-26 (audit records), TASK-57 (technical specifications), TASK-66/TASK-67 (front-matter metadata projection), and TASK-72 (managed artifacts) so it also serves three documentation stores — use cases, test cases, and test reports — each with a title, a description, and an optional applicability, plus the general front-matter metadata (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`). The transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 is reused unchanged; this increment adds three documentation categories (`use-case`, `test-case`, `test-report`), their record models, list/view/edit screens, API endpoints, and tests. It implements the browser-visibility part of REQ-05.012, REQ-05.013, REQ-05.014 and REQ-05.007 under REQ-06.002, and advances NFR-01.002 (display and edit all Papyrus content) for these three types. Deprecated records of all three types are hidden from lists and unreachable by URL, consistent with every other document type (REQ-05.007, BR-018/BR-019/BR-020).
+Extend the offline, project-local, read-and-edit web interface delivered by TASK-6 (requirements), TASK-11 (backlog records), TASK-15 (decision records), TASK-23 (glossary terms), TASK-24 (UI specifications), TASK-40 (UI mockups), TASK-25 (business rules), TASK-26 (audit records), TASK-57 (technical specifications), TASK-66/TASK-67 (front-matter metadata projection), and TASK-72 (managed artifacts) so it also serves three documentation stores — use cases, test cases, and test reports — each with a title, a description, and an optional applicability, plus the general front-matter metadata (`id`, `title`, `created_date`, `updated_date`, `labels`, `references`). The transport, asset delivery, rendering, security, and configuration baseline of TASK-6 and ADR-0005/ADR-0006 is reused unchanged; this increment adds three documentation categories (`use-case`, `test-case`, `test-report`), their record models, list/view/edit screens, API endpoints, and tests. It implements the browser-visibility part of REQ-005.012, REQ-005.013, REQ-005.014 and REQ-005.007 under REQ-006.002, and advances NFR-001.002 (display and edit all Papyrus content) for these three types. Deprecated records of all three types are hidden from lists and unreachable by URL, consistent with every other document type (REQ-005.007, BR-018/BR-019/BR-020).
 
 Use cases, test cases, and test reports are Markdown text records with the fixed template `# <ID> <title>`, then `## Description`, then, only when applicability is provided, `## Applicability`. The browser edits the title, the description, and the applicability, and manages the front-matter `labels` and `references` lists, and must preserve every other byte/section of the file. Whole-file regeneration of a record (for example by reusing the CLI's `render_record` serializer) is forbidden because it destroys editor-added and unknown sections.
 
@@ -103,7 +103,7 @@ Use cases, test cases, and test reports are Markdown text records with the fixed
 
 ### Out of scope
 
-- Creating, deprecating, restoring, or deleting records from the browser; changing record IDs or deprecation state. These remain CLI-only (REQ-05.012/013/014, BR-018/019/020).
+- Creating, deprecating, restoring, or deleting records from the browser; changing record IDs or deprecation state. These remain CLI-only (REQ-005.012/013/014, BR-018/019/020).
 - Cross-type navigation beyond the baseline sidebar, and the final completeness check — TASK-19/TASK-82.
 - Search inside the browser UI, Markdown rendering, rich-text editing, attachments, or file uploads.
 - Authentication, authorization, sessions, cookies, or TLS.
@@ -239,7 +239,7 @@ Record views in this specification follow the shared single record view layout d
 2. A request for a deprecated ID returns `404` on `GET /doc/{id}`, `GET /doc/{id}/edit`, `POST /doc/{id}`, `GET /api/doc/{id}`, and `POST /api/doc/{id}`, exactly as for an unknown ID.
 3. Every HTML `404` response for an ID matching the configured prefix pattern (`<prefix>-<digits>`) renders the matching type's `404` page, and that page is identical for a deprecated ID and an unknown ID. It uses the shared error-page layout and shows the `404` status, the heading `Record not found`, the help text "Deprecated <type> are not listed and cannot be opened. The same page is used for an unknown address.", and exactly one recovery link, "Back to <type plural>", pointing to `/?type=<category>`. Because the deprecated and unknown responses are identical in status, heading, help text, and recovery link, the page never reveals whether a hidden ID exists in `deprecated/`.
 4. JSON `404` responses keep the baseline JSON error object (section 10.6), and an ID that matches no pattern for any of the three types keeps the baseline `404` page.
-5. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-05.007, BR-018/BR-019/BR-020).
+5. No browser control changes deprecation state; deprecation and restoration remain CLI-only (REQ-005.007, BR-018/BR-019/BR-020).
 
 ### 10. JSON API
 
@@ -255,7 +255,7 @@ Record views in this specification follow the shared single record view layout d
      "description": "A user signs in with ...",
      "applicability": "Applies to all clients ...",
      "labels": ["auth"],
-     "references": ["REQ-05.001"],
+     "references": ["REQ-005.001"],
      "created_date": "2026-11-10T20:16:00Z",
      "updated_date": "2026-11-11T08:15:00Z",
      "version": "1762000000.123456789.412",
@@ -266,12 +266,12 @@ Record views in this specification follow the shared single record view layout d
        "created_date": "2026-11-10T20:16:00Z",
        "updated_date": "2026-11-11T08:15:00Z",
        "labels": ["auth"],
-       "references": ["REQ-05.001"]
+       "references": ["REQ-005.001"]
      }
    }
    ```
 
-   `description` and `applicability` are strings or `null` (null when the section is absent or empty); `labels` and `references` are arrays (empty when absent); `path` is relative to the project directory with `/` separators and never exposes an absolute path. `metadata` is the object defined by TASK-67 (REQ-06.004), whose keys are the front-matter keys in canonical order. For `test-case` records `kind`/`form` are `test-case`; for `test-report` records they are `test-report`.
+   `description` and `applicability` are strings or `null` (null when the section is absent or empty); `labels` and `references` are arrays (empty when absent); `path` is relative to the project directory with `/` separators and never exposes an absolute path. `metadata` is the object defined by TASK-67 (REQ-006.004), whose keys are the front-matter keys in canonical order. For `test-case` records `kind`/`form` are `test-case`; for `test-report` records they are `test-report`.
 3. `POST /api/doc/{id}` requires `Content-Type: application/json` and accepts an object with:
    - `version` (required, string);
    - `title` (required when present, string; omitting it leaves the title unchanged);
@@ -285,7 +285,7 @@ Record views in this specification follow the shared single record view layout d
 
 ### 11. Assets, rendering, security, and accessibility
 
-1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-05.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
+1. All baseline rules in sections 6, 9, and 10 of `docs/specifications/browser-requirements.md` apply unchanged: embedded templates rendered server-side and every `/assets/*` file served from the static asset table, `{{name}}` placeholder substitution, HTML escaping, CSP and security headers, Host/Origin validation, request limits, timeouts, browser baseline (Firefox 115+; NFR-005.001), accessibility basics, no external resources, and no server-authored inline scripts or styles (the diagram page injects a scoped `<style>` element client-side under the diagram CSP; see `browser-requirements.md` §9.7).
 2. The sidebar's three new entries, the three list/view/edit templates, the three `404` pages, and the front-matter metadata rows are the only rendering additions; the shared shell and the remaining error pages are reused.
 3. Labels and references are rendered as tags in the view and edited with the tag add/remove interaction (reusing the MOCK-0002 pattern). Both fields are keyboard operable; every input has a visible label or accessible name; remove controls are labelled `Remove <value>`; the add input is labelled. Focus is not trapped.
 4. Both body fields are native `input`/`textarea` controls with a `<label>`; no tag, select, or custom widget is added for them. The form is keyboard operable and works with JavaScript disabled. Focus is not trapped.
@@ -360,16 +360,16 @@ UI mockups are required before any UI implementation work and must be approved b
 - Assumption: The browser edit form requires both title and description, matching MOCK-0013 and the management specification; an on-disk record with an absent/empty description is viewable as `(none)` but must be completed before it can be saved from the browser.
 - Assumption: The browser description and applicability are multi-line and preserve LF; the CLI `--description`/`--applicability` remain single-line and `--editor` remains the CLI route for multi-line bodies. This is consistent with the management specification section 7.
 - Assumption: Browser title and description validation reuses the baseline editing limits (title 1–200, multi-line text at most 20000 Unicode scalar values) for consistency with every other browser document type; MOCK-0013 draws no length help text.
-- Assumption: Deprecated records of all three types are excluded exactly like other document types: not listed, not counted, not reachable, not editable (REQ-05.007, BR-018/BR-019/BR-020).
+- Assumption: Deprecated records of all three types are excluded exactly like other document types: not listed, not counted, not reachable, not editable (REQ-005.007, BR-018/BR-019/BR-020).
 - Assumption: The `document_types.<type>.enabled` flag controls the sidebar entry and category for each type, like the other document types; a missing directory is an empty category, not an error.
 - Assumption: Labels are collapsed on duplicate, matching the task-label handling; references reject duplicates, matching the UI-mockup reference handling.
 - Assumption: Front-matter metadata projection reuses the shared `RecordView` (TASK-67); `created_date` and `updated_date` are read-only in the browser and `updated_date` is refreshed only when a save changes at least one byte.
-- Assumption: Real-browser verification in Firefox 115+ (NFR-05.001) remains a deferred follow-up, consistent with sibling tickets.
+- Assumption: Real-browser verification in Firefox 115+ (NFR-005.001) remains a deferred follow-up, consistent with sibling tickets.
 - Assumption: No new dependencies, crates, or ADRs are introduced.
 
 ## Open questions
 
-- **OQ-1 (non-blocking, product)** — Whether use cases, test cases, and test reports should gain structured references to tasks or milestones in the browser. REQ-05.012/013/014 leave association to tasks/milestones undecided; this specification treats them as literal text in the general `references` list.
+- **OQ-1 (non-blocking, product)** — Whether use cases, test cases, and test reports should gain structured references to tasks or milestones in the browser. REQ-005.012/013/014 leave association to tasks/milestones undecided; this specification treats them as literal text in the general `references` list.
 - **OQ-2 (non-blocking, validation)** — The management specification and BR-018/019/020 state no length limit for title/description/applicability, while the browser baseline applies title 1–200 and multi-line text 20000 limits. This specification adopts the baseline limits for consistency with the other browser document types; MOCK-0013 draws no length help text. If the product prefers no browser length limit, only the documented messages and tests for the two length rules change.
 - **OQ-3 (resolved)** — The legacy list preview and row metadata are removed; list rows use the shared contract in `browser-shell-ui.md` §3. Real-browser verification in Firefox 115+ remains a deferred follow-up (TASK-150).
 
@@ -377,8 +377,8 @@ UI mockups are required before any UI implementation work and must be approved b
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-05, REQ-05.007, REQ-05.010, REQ-05.012, REQ-05.013, REQ-05.014, REQ-06, REQ-06.002, REQ-06.003, REQ-06.004, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012 |
-| Non-functional | NFR-01.002, NFR-01.003, NFR-02.002, NFR-04.001, NFR-04.002, NFR-05.001 |
+| Requirement | REQ-005, REQ-005.007, REQ-005.010, REQ-005.012, REQ-005.013, REQ-005.014, REQ-006, REQ-006.002, REQ-006.003, REQ-006.004, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012 |
+| Non-functional | NFR-001.002, NFR-001.003, NFR-002.002, NFR-004.001, NFR-004.002, NFR-005.001 |
 | Business rule | BR-004 (browser command behavior), BR-016 (configuration keys and precedence), BR-018 (use-case document type), BR-019 (test-case document type), BR-020 (test-report document type) |
 | ADR | ADR-0001, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0009, ADR-0010, ADR-0012, ADR-0013 |
 | Ticket | TASK-6 (baseline), TASK-11, TASK-15, TASK-23, TASK-24, TASK-25, TASK-26, TASK-40, TASK-57, TASK-58, TASK-66, TASK-67, TASK-72, TASK-78, TASK-79, TASK-81, TASK-86 |

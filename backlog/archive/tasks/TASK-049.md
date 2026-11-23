@@ -19,18 +19,18 @@ references:
   - docs/specifications/ui/browser-audit-records-ui.md
   - docs/specifications/cli-milestone-packaging-and-verification.md
   - docs/packaging.md
-  - docs/requirements/business/REQ-05.006.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/business/REQ-06.001.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-03.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
-  - docs/requirements/non-functional/NFR-06.001.md
-  - docs/requirements/non-functional/NFR-06.002.md
+  - docs/requirements/business/REQ-005.006.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/business/REQ-006.001.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-003.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
+  - docs/requirements/non-functional/NFR-006.001.md
+  - docs/requirements/non-functional/NFR-006.002.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/business-rules/BR-014-audit-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
@@ -39,15 +39,8 @@ references:
   - docs/architecture/adr/ADR-0004-repository-root-single-crate-layout.md
   - >-
     docs/architecture/adr/ADR-0005-embedded-dependency-free-http-server-and-server-rendered-ui.md
-  - >-
     docs/architecture/adr/ADR-0006-optimistic-concurrency-and-atomic-record-writes.md
 documentation:
-  - docs/specifications/audit-records-management.md
-  - docs/specifications/search-audit-records.md
-  - docs/specifications/browser-audit-records.md
-  - docs/specifications/ui/browser-audit-records-ui.md
-  - docs/specifications/cli-milestone-packaging-and-verification.md
-  - docs/packaging.md
 priority: medium
 type: chore
 ordinal: 27400
@@ -69,7 +62,7 @@ Scope (in):
 Scope (out):
 - No new product behavior, commands, options, or UI changes; feature behavior delivered by TASK-47 (management), TASK-48 (search), TASK-26 (browser), TASK-49 (design review, MOCK-0008 approved).
 - Audit records have no supersede command (BR-014 documents active -> deprecated only); lifecycle smoke covers create/list/view/edit/deprecate/restore only. No supersede step is claimed. No requirements-tag interaction (that is business rules, BR-013).
-- No verification on Debian releases other than Forky (ADR-0003, NFR-03.002); no real-GUI browser checks (markup/asset-level only); no dependency-license audit re-run; no changes to requirements, business rules, ADRs, packaging scripts, or UI; product code changes only as a minimal bug fix found during verification.
+- No verification on Debian releases other than Forky (ADR-0003, NFR-003.002); no real-GUI browser checks (markup/asset-level only); no dependency-license audit re-run; no changes to requirements, business rules, ADRs, packaging scripts, or UI; product code changes only as a minimal bug fix found during verification.
 
 Milestone m-9 scope vs packaging: this ticket packages and verifies the m-9 audit-records increment only; it does not re-deliver management, search, browser, or design-review behavior.
 
@@ -79,13 +72,13 @@ Assumptions:
 - Assumption: scratch directories live under ./.tmp/ and are removed before the task ends.
 - Assumption: the package version stays 0.1.0 (open question OQ-4).
 - Assumption: scripts/build-deb.sh is used unchanged and does not force a rebuild; cargo build --release must run first.
-- Assumption: no new runtime dependency was added; the TASK-1/TASK-4 runtime dependency license audit remains valid (NFR-06.002).
+- Assumption: no new runtime dependency was added; the TASK-1/TASK-4 runtime dependency license audit remains valid (NFR-006.002).
 - Assumption: no UI change ships in this ticket; MOCK-0001 through MOCK-0008 approved baselines remain the layout references and no new mockup is produced.
 - Assumption: audit-record browser edit is field-preserving (browser-audit-records spec); smoke asserts only edited fields change.
 - Assumption: audit record content may be empty on browser edit, which clears the ## Content section; the CLI handles an empty/absent content on subsequent reads (browser-audit-records spec OQ, adopted default).
 
 Open questions (non-blocking, each with a default in the specification):
-- OQ-1 (default: markup/asset-level verification only; no real-GUI browser run) - NFR-05.001 verification method.
+- OQ-1 (default: markup/asset-level verification only; no real-GUI browser run) - NFR-005.001 verification method.
 - OQ-2 (default: fakeroot dpkg --instdir/--admindir on the Forky build host) - container/VM isolation.
 - OQ-3 (default: new tests/audit_records_smoke.rs) - milestone test file location.
 - OQ-4 (default: keep version 0.1.0).
@@ -94,7 +87,7 @@ Open questions (non-blocking, each with a default in the specification):
 Specification: docs/specifications/cli-milestone-packaging-and-verification.md (generic; dedicated audit-records milestone-packaging spec absent - see OQ-5). Feature specs: docs/specifications/audit-records-management.md, docs/specifications/search-audit-records.md, docs/specifications/browser-audit-records.md, docs/specifications/ui/browser-audit-records-ui.md.
 
 ## Acceptance Criteria
-- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-03.002 - and the installed binary provides audit-record management, search, and browser (audit-record category); Debian Trixie and other releases are not claimed or verified.
+- [x] The amd64 Debian package built from the current source installs on Debian Forky (amd64) - the only supported release per ADR-0003 and NFR-003.002 - and the installed binary provides audit-record management, search, and browser (audit-record category); Debian Trixie and other releases are not claimed or verified.
 - [x] cargo build --release succeeds with the pinned Rust 1.99.1 toolchain and target/release/papyrus --help lists audit (guards against packaging a stale binary).
 - [x] cargo test, cargo clippy --all-targets -- -D warnings, and cargo fmt --check pass with Rust 1.99.1, and the test counts are recorded.
 - [x] scripts/build-deb.sh (unchanged) produces papyrus_<version>_amd64.deb with Version equal to the Cargo package version and Architecture: amd64.

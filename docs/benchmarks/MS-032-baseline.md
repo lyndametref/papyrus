@@ -271,9 +271,9 @@ The per-record inventory cost rises from roughly 10 ms at 100 records to roughly
 
 ## Comparison with the historical 382-record figures
 
-Historical figures, provenance `MS-032 description; NFR-007.001 and NFR-007.002 rationale`: inventory `/` 14.2 s and `/doc/REQ-07.001` view 1.8 s at 382 active records. The historical corpus is not preserved, so exact equality is neither expected nor targeted; no corpus parameter was tuned to approach these values.
+Historical figures, provenance `MS-032 description; NFR-007.001 and NFR-007.002 rationale`: inventory `/` 14.2 s and `/doc/REQ-007.001` view 1.8 s at 382 active records. The historical corpus is not preserved, so exact equality is neither expected nor targeted; no corpus parameter was tuned to approach these values.
 
-The historical `/doc/REQ-07.001` view is represented by `REQ-001` in the generated corpus (the requirement family group; the member route `REQ-001.001` is the closest individual member route and is also recorded below).
+The historical `/doc/REQ-007.001` view is represented by `REQ-001` in the generated corpus (the requirement family group; the member route `REQ-001.001` is the closest individual member route and is also recorded below).
 
 | Metric | Historical (382 records) | Measured `records-382` run A |
 |---|---|---|

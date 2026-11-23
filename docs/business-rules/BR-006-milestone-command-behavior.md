@@ -16,7 +16,7 @@ The `papyrus milestone` command manages milestones with the verbs `create`, `lis
 
 ## Rationale
 
-Based on REQ-03.001 — Manage Milestones and REQ-07.001 — Organize Artifacts into Three Categories, this rule exists because a milestone is a backlog artifact whose lifecycle is fixed by the category model rather than configurable: the state is stored in the front-matter `status` field (REQ-05.010), `close` moves `open` to `closed`, and `archive` closes an open milestone if needed before moving its file to `backlog/archive/milestones/` and marking it `archived` (RE-002). Archived milestones are hidden from active listings and there is no restore command; configuration cannot add, remove, or rename lifecycle values.
+Based on REQ-003.001 — Manage Milestones and REQ-007.001 — Organize Artifacts into Three Categories, this rule exists because a milestone is a backlog artifact whose lifecycle is fixed by the category model rather than configurable: the state is stored in the front-matter `status` field (REQ-005.010), `close` moves `open` to `closed`, and `archive` closes an open milestone if needed before moving its file to `backlog/archive/milestones/` and marking it `archived` (RE-002). Archived milestones are hidden from active listings and there is no restore command; configuration cannot add, remove, or rename lifecycle values.
 
 ## Applicability
 
@@ -43,4 +43,4 @@ Applies to every invocation of `papyrus milestone` and to every milestone record
 - `statuses` or `default_status` configuration cannot change the lifecycle, and milestone archive uses the backlog archive location rather than the document-type archive flow.
 
 ## Requirements
-- REQ-03.001
+- REQ-003.001

@@ -20,13 +20,12 @@ references:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
-  - REQ-05.007
-  - REQ-07.001
-  - REQ-01.001
+  - REQ-005.007
+  - REQ-007.001
+  - REQ-001.001
 documentation:
   - docs/specifications/browser-managed-artifacts-and-lifecycles.md
 modified_files:
-  - docs/specifications/browser-managed-artifacts-and-lifecycles.md
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
   - docs/specifications/project-initialization-and-configuration.md
 priority: medium

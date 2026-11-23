@@ -15,7 +15,7 @@ milestone: MS-022
 dependencies:
   - TASK-132
 references:
-  - docs/requirements/business/REQ-01.008.md
+  - docs/requirements/business/REQ-001.008.md
   - >-
     docs/architecture/adr/ADR-0029-read-only-corpus-diagnostics-with-duplicate-id-repair.md
   - src/record/store.rs
@@ -28,11 +28,11 @@ ordinal: 41510
 
 
 ## Description
-**Why.** REQ-01.008 and ADR-0029 decision 7 settle `--fix` as a duplicate-ID-only repair that goes through the single write path (ADR-0013 decision 7). No ID-rewrite primitive exists today, and the repair must be safe for identity uniqueness while never rewriting a reference.
+**Why.** REQ-001.008 and ADR-0029 decision 7 settle `--fix` as a duplicate-ID-only repair that goes through the single write path (ADR-0013 decision 7). No ID-rewrite primitive exists today, and the repair must be safe for identity uniqueness while never rewriting a reference.
 
 **What.** The `--fix` and `--force` flags on `check`, the deterministic keeper rule, ID reassignment through the allocator, the refusal rules, the confirmation prompt, the per-repair concurrency re-check, and the tests that pin the accepted semantics.
 
-**Contract.** `docs/specifications/project-diagnostics-check.md` section 10 is the implementation contract (10.1 flags, 10.2 plan input, 10.3 keeper, 10.4 allocation, 10.5 write primitive, 10.6 refusals, 10.7 references, 10.8 prompt and terminal gate, 10.9 concurrency, 10.10 report, 10.11 exit codes, 10.12 verification). Sections 1-9 remain the read-only contract landed by TASK-137. REQ-01.008 and ADR-0029 decisions 7-9 are the authority behind them.
+**Contract.** `docs/specifications/project-diagnostics-check.md` section 10 is the implementation contract (10.1 flags, 10.2 plan input, 10.3 keeper, 10.4 allocation, 10.5 write primitive, 10.6 refusals, 10.7 references, 10.8 prompt and terminal gate, 10.9 concurrency, 10.10 report, 10.11 exit codes, 10.12 verification). Sections 1-9 remain the read-only contract landed by TASK-137. REQ-001.008 and ADR-0029 decisions 7-9 are the authority behind them.
 
 **In scope.**
 - `BuiltinCmd::Check { fix, force }`; `--force` declares clap `requires = "fix"`, so `--force` without `--fix` is a usage error with exit 2 before any scan or write.
@@ -75,7 +75,7 @@ ordinal: 41510
 - [x] A run that found findings still exits 4 after successful repairs, and a corpus left between the two write steps (new file present, old file present) stays readable and is repaired by the next run.
 
 ## Definition of Done
-- [x] #1 The `--fix` and `--force` behavior of `docs/specifications/project-diagnostics-check.md` section 10 is implemented and matches REQ-01.008 and ADR-0029 decisions 7-9.
+- [x] #1 The `--fix` and `--force` behavior of `docs/specifications/project-diagnostics-check.md` section 10 is implemented and matches REQ-001.008 and ADR-0029 decisions 7-9.
 - [x] #2 `cargo test` passes, including the new unit, CLI, and golden tests.
 - [x] #3 `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` pass.
 - [x] #4 No new crate or dependency is added.
@@ -85,7 +85,7 @@ ordinal: 41510
 
 
 ## Implementation Notes
-Contract: `docs/specifications/project-diagnostics-check.md` section 10. REQ-01.008 and ADR-0029 decisions 7-9 are the authority; neither is edited.
+Contract: `docs/specifications/project-diagnostics-check.md` section 10. REQ-001.008 and ADR-0029 decisions 7-9 are the authority; neither is edited.
 
 1. Flags and dispatch
    - `src/cli/builtin.rs`: `BuiltinCmd::Check { fix: bool, force: bool }`; `--fix` = "Repair duplicate record IDs.", `--force` = "Skip the repair confirmation prompt; requires --fix." with `#[arg(long, requires = "fix")]`. `--force` without `--fix` becomes a clap usage error (exit 2, no scan, no write); do not hand-roll the check and do not pin clap's wording.

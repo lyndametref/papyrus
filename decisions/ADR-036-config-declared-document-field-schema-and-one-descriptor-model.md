@@ -9,17 +9,17 @@ references:
   - ADR-0017
   - ADR-0018
   - ADR-0019
-  - REQ-07.001
-  - REQ-07.002
-  - REQ-07.003
-  - REQ-07.004
-  - REQ-05.001
-  - REQ-05.002
-  - REQ-05.005
-  - REQ-05.006
-  - REQ-05.008
-  - REQ-05.010
-  - REQ-05.011
+  - REQ-007.001
+  - REQ-007.002
+  - REQ-007.003
+  - REQ-007.004
+  - REQ-005.001
+  - REQ-005.002
+  - REQ-005.005
+  - REQ-005.006
+  - REQ-005.008
+  - REQ-005.010
+  - REQ-005.011
   - TECH-007
   - TECH-040
   - TECH-066
@@ -68,11 +68,11 @@ accepted
 - **Not changed.** `group` stays reserved because the engine owns the group link (decision 9); no other reserved-key rule changes, and the check still runs in configuration validation and again when a patch is built.
 - **Follow-up outside this record.** TECH-077 section 3 ("The reserved field keys are ...") still lists eight keys and needs the same line.
 
-### Clarification (2026-11-23) — REQ-07.002 still states wholesale replacement
+### Clarification (2026-11-23) — REQ-007.002 still states wholesale replacement
 
-- **Conflict.** REQ-07.002 still says a present `document_types` replaces the seed set wholesale: its "Defaults, fill, and merge" bullet "An absent slug stays absent. `document_types` is replaced wholesale when present in the project file, and no seed entry is re-added", and its acceptance criterion "A present `document_types` replaces the seed set wholesale, and an absent slug stays absent; no seed entry is re-added". Both contradict this record's clarification of 2026-11-22 ("seed slugs are always effective", decision 32): a present `document_types` map is an overlay, the eleven seed slugs always resolve from the seed table, and "an absent slug stays absent" applies only to non-seed (user-defined) slugs and to the written file.
+- **Conflict.** REQ-007.002 still says a present `document_types` replaces the seed set wholesale: its "Defaults, fill, and merge" bullet "An absent slug stays absent. `document_types` is replaced wholesale when present in the project file, and no seed entry is re-added", and its acceptance criterion "A present `document_types` replaces the seed set wholesale, and an absent slug stays absent; no seed entry is re-added". Both contradict this record's clarification of 2026-11-22 ("seed slugs are always effective", decision 32): a present `document_types` map is an overlay, the eleven seed slugs always resolve from the seed table, and "an absent slug stays absent" applies only to non-seed (user-defined) slugs and to the written file.
 - **Which wording must change.** A requirements-engineer follow-up must rewrite that merge bullet and that acceptance criterion to say the seed slugs are always effective and the map is an overlay, with "an absent slug stays absent" scoped to user-defined slugs and to the written file. No other requirement clause changes.
-- **Not changed here.** This record does not edit the requirement. REQ-07.002's eight-key reserved list (decision 23 as amended here) and its nine-key field-item list (decision 11 as amended here) are two further requirements follow-ups, not part of this note.
+- **Not changed here.** This record does not edit the requirement. REQ-007.002's eight-key reserved list (decision 23 as amended here) and its nine-key field-item list (decision 11 as amended here) are two further requirements follow-ups, not part of this note.
 ## Supersession
 
 1. This ADR supersedes ADR-0017 decisions 1, 2, 3, 4, 7, 9, and 10 and downstream constraints 1 and 4, and only those. ADR-0017 decisions 5, 6, and 8 and downstream constraints 2, 3, 5, and 6 remain in force. ADR-0017 keeps its accepted status because the supersession is by decision, not in full.
@@ -122,7 +122,7 @@ accepted
 ## Seed table
 
 28. The seed table is the only definition of built-in document types. It lives in `src/config.rs` as a static `SEED_DOCUMENT_TYPES` table of seed entries, replacing `DEFAULT_DOCUMENT_TYPES`, next to `DocTypeEntry` and `Config::default`. `Config::default`, `init`, and the registry derive from that one table; `src/registry.rs` derives document descriptors from it. No per-type module and no second static table may hold document fields, headings, options, or role sets.
-29. The seed contains exactly the default document types of REQ-07.002, with these models, roles, and fields:
+29. The seed contains exactly the default document types of REQ-007.002, with these models, roles, and fields:
 
 | Slug | Model | Roles and fields | Seed statuses | Reference visibility |
 |---|---|---|---|---|
@@ -169,7 +169,7 @@ accepted
 8. `SingleHtmlMockup` has fixed `pending`, `approved`, and `archived` metadata and no `status` verb; `GroupedMarkdown` membership is immutable and archive or delete never cascades.
 9. ADR-0017 decisions 5, 6, and 8 and constraints 2, 3, 5, and 6, and ADR-0019, remain in force.
 ## Context
-REQ-07.004 currently promises one generic content model for config-defined document types: seven front-matter keys plus an optional `## Description`. ADR-0018 fixed that model and explicitly excluded a per-type field schema and a template file; ADR-0017 decisions 1-4, 7, 9, and 10 fixed the descriptor model around `ContentModel` with `Generic`, `Typed`, and `HtmlMockup`, and around static `'static` typed schemas. Built-in document types keep their fields in nine per-type modules and static descriptors: `src/requirement.rs` owns `## User Story`, `## Group`, `## Description` and dotted IDs; `src/glossary.rs` owns `## Definition`; `src/rule.rs` owns four sections; `src/ui_spec.rs`, `src/audit.rs`, `src/tech_spec.rs`, `src/use_case.rs`, `src/test_case.rs`, and `src/test_report.rs` each own their fields and verb options; `src/ui_mockup.rs` owns HTML metadata. `src/config.rs` holds `DocTypeEntry { prefix, directory, enabled, statuses, default_status }` and a `DEFAULT_DOCUMENT_TYPES` table with no field, model, role, or presentation facts. `src/registry.rs` holds a `DescriptorTemplate` with `ContentModel::Typed`, `Generic`, or `HtmlMockup` per type. The record layer already has the single mutation API `record::patch` and the single writer `record::store` (ADR-0013), so the missing piece is a data model for fields, not another write path.
+REQ-007.004 currently promises one generic content model for config-defined document types: seven front-matter keys plus an optional `## Description`. ADR-0018 fixed that model and explicitly excluded a per-type field schema and a template file; ADR-0017 decisions 1-4, 7, 9, and 10 fixed the descriptor model around `ContentModel` with `Generic`, `Typed`, and `HtmlMockup`, and around static `'static` typed schemas. Built-in document types keep their fields in nine per-type modules and static descriptors: `src/requirement.rs` owns `## User Story`, `## Group`, `## Description` and dotted IDs; `src/glossary.rs` owns `## Definition`; `src/rule.rs` owns four sections; `src/ui_spec.rs`, `src/audit.rs`, `src/tech_spec.rs`, `src/use_case.rs`, `src/test_case.rs`, and `src/test_report.rs` each own their fields and verb options; `src/ui_mockup.rs` owns HTML metadata. `src/config.rs` holds `DocTypeEntry { prefix, directory, enabled, statuses, default_status }` and a `DEFAULT_DOCUMENT_TYPES` table with no field, model, role, or presentation facts. `src/registry.rs` holds a `DescriptorTemplate` with `ContentModel::Typed`, `Generic`, or `HtmlMockup` per type. The record layer already has the single mutation API `record::patch` and the single writer `record::store` (ADR-0013), so the missing piece is a data model for fields, not another write path.
 
 The accepted owner decisions in RE-010 change the premise: D1 supersedes ADR-0018 in full and replaces ADR-0017's descriptor decisions; D5 replaces `ContentModel` with `DocumentModel { SingleMarkdown, GroupedMarkdown, SingleHtmlMockup }`; D6 makes grouped and HTML models seed-only; D13 fixes the title contract; D14 fixes the configuration format as nested group and member blocks, a `fields` sequence, no per-field `order` or `enabled`, scalar fill, collection replace, no `model`, `title`, `content`, or `id_shape` keys, and file-edit-only field addition. The refactor also deletes the nine typed document modules (MS-034), so every field, heading, option, and verb they currently hold must become data before the modules can go.
 
@@ -213,5 +213,5 @@ Alternatives considered:
 - *Reserved-key or duplicate-key bypass*: the check runs in configuration validation and again when the patch is built, and tests cover every reserved key, duplicate keys per role, and a field with neither `heading` nor `frontmatter_key`.
 - *Group membership drift*: the `group` key is engine-only, `edit` exposes no group option, and a test asserts that a member cannot be moved and that archiving or deleting a group leaves members untouched.
 - *HTML metadata treated as front matter*: `SingleHtmlMockup` declares no `statuses`, has no `status` verb, and its metadata states are fixed; a test asserts the four rejected configurations (custom status, default status, status verb, field sequence).
-- *Seed and requirement drift*: the seed table is asserted against the per-type field inventories in REQ-05.001 to REQ-05.014 and BR-009 to BR-020; a seed change that is not reflected in those records fails the cross-check.
+- *Seed and requirement drift*: the seed table is asserted against the per-type field inventories in REQ-005.001 to REQ-005.014 and BR-009 to BR-020; a seed change that is not reflected in those records fails the cross-check.
 - *Old configuration regression*: a fixture set of pre-refactor files must load to the same effective descriptors, with the only difference being the new default field sets for seed types.

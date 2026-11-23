@@ -16,11 +16,11 @@ superseded
 
 ## Context
 
-NFR-04.003 requires Papyrus task and milestone files to be readable, listable, and updatable by Backlog.md without loss of the fields Backlog.md requires. Milestone files may carry the general front-matter keys and `release` beyond `id` and `title`; those additive keys must be accepted and preserved by Backlog.md. REQ-05.010's traceability records the originating instruction verbatim: "insure the compatibility with task and milestone from backlog md, only acceptable discrpency is the addition of releases for milestone. check the files created with backlog md in @backlog/ and how the folder is structured and implement the same behavior in papyrus".
+NFR-004.003 requires Papyrus task and milestone files to be readable, listable, and updatable by Backlog.md without loss of the fields Backlog.md requires. Milestone files may carry the general front-matter keys and `release` beyond `id` and `title`; those additive keys must be accepted and preserved by Backlog.md. REQ-005.010's traceability records the originating instruction verbatim: "insure the compatibility with task and milestone from backlog md, only acceptable discrpency is the addition of releases for milestone. check the files created with backlog md in @backlog/ and how the folder is structured and implement the same behavior in papyrus".
 
 ADR-0007 decides that front matter carries the metadata and that existing records are migrated lazily, per record, on first read and first write. This ADR decides the surrounding on-disk contract, because front matter alone does not make the files interchangeable: path, filename, ID derivation, body shape, status vocabulary, and configuration precedence all differ today.
 
-A first draft of this ADR proposed adopting Backlog.md task and milestone IDs directly (`TASK-18`, `m-0`) as Papyrus IDs. The user reversed that: Papyrus keeps its documented ID format (`TASK-001`, `MS-001`, configured prefix plus `id_padding`) and **translates** to and from Backlog.md storage IDs at the storage boundary (REQ-01.005). Decision 4 below is that translation, and it supersedes the earlier draft's decision 4.
+A first draft of this ADR proposed adopting Backlog.md task and milestone IDs directly (`TASK-18`, `m-0`) as Papyrus IDs. The user reversed that: Papyrus keeps its documented ID format (`TASK-001`, `MS-001`, configured prefix plus `id_padding`) and **translates** to and from Backlog.md storage IDs at the storage boundary (REQ-001.005). Decision 4 below is that translation, and it supersedes the earlier draft's decision 4.
 
 Observed Backlog.md state in this repository (the only in-project evidence available):
 
@@ -38,13 +38,13 @@ Observed Papyrus state in `src/`:
 - Tasks are written as `<TASK_PREFIX>-<padded number>.md` with a `# <ID> <title>` heading and `## Status`, `## Milestone`, `## Assignee`, `## Labels`, `## Dependencies`, `## Acceptance Criteria`, `## Comments` sections. Milestones are written as `<MS-001>.md` with `## Release`.
 - Archived records go to `backlog/tasks/archived/` and `backlog/milestones/archived/`.
 - `papyrus.config.yml` defaults are `task_prefix: "TASK"`, `milestone_prefix: "MS"`, `id_padding: 3`, `statuses: ["ToDo", ...]`, `default_status: "ToDo"`.
-- Consequence today: Papyrus cannot resolve a Backlog.md-created task at all. `browser::records::build_index` and `task::view` require a stem of `<PREFIX>-<digits>`; `task-18 - Complete-...` does not match, and `TASK-18.md` does not exist. NFR-04.003 currently fails in both directions.
+- Consequence today: Papyrus cannot resolve a Backlog.md-created task at all. `browser::records::build_index` and `task::view` require a stem of `<PREFIX>-<digits>`; `task-18 - Complete-...` does not match, and `TASK-18.md` does not exist. NFR-004.003 currently fails in both directions.
 
-The forces are: Backlog.md must operate on the same files with no conversion step and no parallel store (NFR-04.001, NFR-04.003); Papyrus must keep its documented, configurable ID format and stable IDs (REQ-01.005); IDs must survive archive, restore, and title changes; and the two conventions must not become two identities for one record.
+The forces are: Backlog.md must operate on the same files with no conversion step and no parallel store (NFR-004.001, NFR-004.003); Papyrus must keep its documented, configurable ID format and stable IDs (REQ-001.005); IDs must survive archive, restore, and title changes; and the two conventions must not become two identities for one record.
 
 ## Decision
 
-1. **For task and milestone *storage*, the Backlog.md on-disk contract is authoritative.** Papyrus writes and reads the Backlog.md path, filename, front-matter field set, and body layout. Papyrus-specific metadata is limited to the milestone key `release` (plus the general keys, which are additive and tolerated per NFR-04.003); no other extra key, heading, or section is added to task or milestone files. Record *identity* is not adopted from Backlog.md: it is translated (decision 4).
+1. **For task and milestone *storage*, the Backlog.md on-disk contract is authoritative.** Papyrus writes and reads the Backlog.md path, filename, front-matter field set, and body layout. Papyrus-specific metadata is limited to the milestone key `release` (plus the general keys, which are additive and tolerated per NFR-004.003); no other extra key, heading, or section is added to task or milestone files. Record *identity* is not adopted from Backlog.md: it is translated (decision 4).
 
 2. **Paths.**
    - Active tasks: `<backlog_directory>/tasks/`.
@@ -80,7 +80,7 @@ The forces are: Backlog.md must operate on the same files with no conversion ste
    - **Generation is symmetric.** On create, Papyrus allocates the next storage number for the type (after the current maximum in both active and archived locations) and derives the display ID from it; the number is written once and never recomputed.
    - **Consequence for existing projects.** Display numbers follow storage numbers, so this repository's existing records appear as `TASK-018` … `TASK-060` and `MS-001` … `MS-013` (from `task-18` … `task-60` and `m-0` … `m-12`). The documented `TASK-001` example describes a project whose first task has storage number 1; it is not a promise that the first *visible* record is 001.
 
-5. **Front matter.** Tasks carry exactly the Backlog.md key set and order (ADR-0007): `id`, `title`, `status`, `assignee`, `created_date`, `updated_date`, `labels`, `milestone`, `dependencies`, `references`, `documentation`, `type`, `ordinal`; `assignee` is a YAML list. Milestones carry `id`, `title`, the general Papyrus keys `created_date`, `updated_date`, `labels`, `references`, and `release`, matching REQ-05.010 and NFR-04.003. For tasks and milestones the `id` value, and every `milestone:`/`dependencies:` value, is the storage form from decision 4.
+5. **Front matter.** Tasks carry exactly the Backlog.md key set and order (ADR-0007): `id`, `title`, `status`, `assignee`, `created_date`, `updated_date`, `labels`, `milestone`, `dependencies`, `references`, `documentation`, `type`, `ordinal`; `assignee` is a YAML list. Milestones carry `id`, `title`, the general Papyrus keys `created_date`, `updated_date`, `labels`, `references`, and `release`, matching REQ-005.010 and NFR-004.003. For tasks and milestones the `id` value, and every `milestone:`/`dependencies:` value, is the storage form from decision 4.
 
 6. **Body.** No `#` heading. Task bodies preserve Backlog.md's marker comments and section order; a newly created task is written with `## Description` (SECTION markers) and `## Acceptance Criteria` (AC markers, numbered items). Edits patch only the affected lines and never regenerate the body from a model, so markers, numbering, notes, plan, definition of done, comments, and unknown sections survive. Milestone bodies keep `## Description` in Backlog.md's plain form.
 
@@ -90,7 +90,7 @@ The forces are: Backlog.md must operate on the same files with no conversion ste
 
    Two input shapes must be distinguished, because they do not permit the same guarantee:
    - **Already in the Backlog.md storage shape** (this repository's tasks and milestones): the block is added or extended, timestamp keys are added, and the body, marker comments, and section order stay byte-identical. A task whose front matter is already complete is not rewritten at all.
-   - **Legacy Papyrus shape** (heading, `## Status`/`## Assignee`/`## Milestone`/`## Labels`/`## Dependencies` sections, no markers): converting such a file to the storage shape necessarily changes the body — the heading is dropped, the retired metadata sections are removed after their values move to front matter, and `## Description`/`## Acceptance Criteria` are mapped into Backlog.md's marker sections with every unknown section and free-text block appended verbatim, in file order. This is the only migration path permitted to alter a task/milestone body, it happens on first read or first write, and it is reported per file in the dry-run inventory so the change is reviewable. Confirmed (REQ-05.011, user decision 2026-11-08): the byte-identical guarantee applies to bodies already in Backlog.md shape; legacy bodies are converted with a reported per-file diff.
+   - **Legacy Papyrus shape** (heading, `## Status`/`## Assignee`/`## Milestone`/`## Labels`/`## Dependencies` sections, no markers): converting such a file to the storage shape necessarily changes the body — the heading is dropped, the retired metadata sections are removed after their values move to front matter, and `## Description`/`## Acceptance Criteria` are mapped into Backlog.md's marker sections with every unknown section and free-text block appended verbatim, in file order. This is the only migration path permitted to alter a task/milestone body, it happens on first read or first write, and it is reported per file in the dry-run inventory so the change is reviewable. Confirmed (REQ-005.011, user decision 2026-11-08): the byte-identical guarantee applies to bodies already in Backlog.md shape; legacy bodies are converted with a reported per-file diff.
 
 9. **Conflicts and duplicates are detected, reported, and never resolved silently.** Every comparison normalizes both sides first (case-insensitive prefix, padding-insensitive number, offset applied). Caused cases and their outcomes:
 
@@ -105,7 +105,7 @@ The forces are: Backlog.md must operate on the same files with no conversion ste
 
    No conflict path deletes, overwrites, or renumbers a record; each reports the paths and the two IDs so a human resolves it.
 
-10. **Interoperability and translation are verified empirically, not assumed.** The NFR-04.003 gate is extended to cover identity: Backlog.md creates `task-61` → Papyrus lists it as `TASK-061` and `view TASK-061` opens it; Papyrus creates `TASK-062` → Backlog.md lists `task-62` with the same title; `milestone: m-12` displays as `MS-013` and `view MS-013` resolves it; `dependencies: [TASK-31]` displays as `TASK-031`. `release` on milestones and the additive general keys must be proven tolerated by Backlog.md's reader before the change is accepted, and the same verification runs on records migrated lazily on first read and first write.
+10. **Interoperability and translation are verified empirically, not assumed.** The NFR-004.003 gate is extended to cover identity: Backlog.md creates `task-61` → Papyrus lists it as `TASK-061` and `view TASK-061` opens it; Papyrus creates `TASK-062` → Backlog.md lists `task-62` with the same title; `milestone: m-12` displays as `MS-013` and `view MS-013` resolves it; `dependencies: [TASK-31]` displays as `TASK-031`. `release` on milestones and the additive general keys must be proven tolerated by Backlog.md's reader before the change is accepted, and the same verification runs on records migrated lazily on first read and first write.
 
 11. **Backlog.md `docs` and `drafts` remain Backlog-owned.** Papyrus does not read or write those directories unless a later requirement makes them managed record types. They are also outside the migration.
 
@@ -115,8 +115,8 @@ The forces are: Backlog.md must operate on the same files with no conversion ste
 
 **Positive:**
 
-- NFR-04.003 becomes achievable in both directions, and this repository's existing task and milestone files become visible to Papyrus.
-- One on-disk convention for task and milestone records removes the two parallel stores, while Papyrus keeps the ID format its documentation and users rely on (REQ-01.005).
+- NFR-004.003 becomes achievable in both directions, and this repository's existing task and milestone files become visible to Papyrus.
+- One on-disk convention for task and milestone records removes the two parallel stores, while Papyrus keeps the ID format its documentation and users rely on (REQ-001.005).
 - Because the mapping is derived, adopting the Backlog.md layout requires no mapping file, no extra key, and no reconciliation job.
 - Archive layout matches the tool that created the archive, so neither tool loses track of archived work, and display IDs survive archive and restore.
 - Status vocabulary is shared, so a Papyrus status change appears on the Backlog.md board.
@@ -139,7 +139,7 @@ The forces are: Backlog.md must operate on the same files with no conversion ste
 - *Collision when a Backlog.md file and a Papyrus file denote the same record*: decision 9 detects it by normalized storage ID, stops the migration, and refuses writes; nothing is merged, and the report names both paths.
 - *Migration of records that use either format*: conversion on first read or first write reads both shapes (ADR-0007 decision 8), preserves the number, and refuses to guess when both exist; the dry-run inventory shows every rename before it happens.
 - *Legacy body conversion losing content*: the legacy-to-storage conversion (decision 8) drops a heading and retires metadata sections; unknown sections and free text are appended verbatim, the dry-run inventory records the before/after body for each converted file, and the conversion is a one-time path with no second use in the writer.
-- *Backlog.md rejects or rewrites a file Papyrus wrote*: the NFR-04.003 two-direction verification runs before the change is accepted; any rejected field is a blocker, not a known limitation.
+- *Backlog.md rejects or rewrites a file Papyrus wrote*: the NFR-004.003 two-direction verification runs before the change is accepted; any rejected field is a blocker, not a known limitation.
 - *Storage front-matter casing asymmetry (task `TASK-18` upper vs milestone `m-0` lower)*: this is observed Backlog.md behavior, encoded as-is; the translation normalizes on read, and a round-trip test confirms Backlog.md accepts what Papyrus writes. If Backlog.md tolerates a uniform form, normalizing is a later simplification, not a correctness requirement.
 - *Status validation blocking legitimate edits*: the accepted status set comes from configuration; an unknown observed status is reported and preserved, not normalized.
 - *Slug collisions*: resolved by number, never by slug; a duplicate stem is a validation error, not a silent overwrite.
@@ -150,28 +150,28 @@ The forces are: Backlog.md must operate on the same files with no conversion ste
 1. Resolved (user decision 2026-11-08): Papyrus commands accept only the Papyrus display format; a Backlog.md storage ID (`task-18`, `m-0`, `TASK-18`) supplied as input is rejected with a hint naming the equivalent Papyrus ID. Not blocking.
 2. Resolved (user decision 2026-11-08): the milestone offset is fixed `+1` (`m-0` → `MS-001`, `m-12` → `MS-013`); not configurable. Not blocking.
 3. Resolved (user decision 2026-11-08): when a storage number's digit count exceeds `id_padding`, the display ID uses the wider number; padding is a minimum, never truncated or errored. Not blocking.
-4. Resolved (user decision 2026-11-08): confirmed via REQ-05.011 — the byte-identical guarantee covers bodies already in Backlog.md shape; legacy bodies are converted with a reported per-file diff. Blocking for the task/milestone migration task only, not for the design.
+4. Resolved (user decision 2026-11-08): confirmed via REQ-005.011 — the byte-identical guarantee covers bodies already in Backlog.md shape; legacy bodies are converted with a reported per-file diff. Blocking for the task/milestone migration task only, not for the design.
 
 ## Alternatives Considered
 
 | Option | Outcome | Reason |
 |---|---|---|
-| Adopt the Backlog.md layout for storage and translate IDs at the boundary (this ADR) | Selected | Satisfies NFR-04.003 in both directions while keeping the Papyrus ID contract of REQ-01.005. |
+| Adopt the Backlog.md layout for storage and translate IDs at the boundary (this ADR) | Selected | Satisfies NFR-004.003 in both directions while keeping the Papyrus ID contract of REQ-001.005. |
 | Adopt Backlog.md IDs directly as Papyrus IDs (earlier draft of this ADR) | Superseded by product decision | It works mechanically but discards the configured prefix, `id_padding`, and the documented `TASK-001`/`MS-001` examples. |
-| Keep the Papyrus layout and add only front matter | Rejected | Backlog.md cannot see `<TASK-001>.md`, `tasks/archived/`, or `## Status`; NFR-04.003 fails. |
-| Dual-write a Backlog.md-compatible file next to the Papyrus file | Rejected | Two sources of truth, two files to keep in sync, violates NFR-04.001's single text store. |
+| Keep the Papyrus layout and add only front matter | Rejected | Backlog.md cannot see `<TASK-001>.md`, `tasks/archived/`, or `## Status`; NFR-004.003 fails. |
+| Dual-write a Backlog.md-compatible file next to the Papyrus file | Rejected | Two sources of truth, two files to keep in sync, violates NFR-004.001's single text store. |
 | Persist an ID mapping table (sidecar file or extra front-matter key) | Rejected | A second store that can drift, must be migrated, and would have to be repaired when files are edited by Backlog.md; a derived affine map needs neither. |
 | Make the display prefix and offset fully configurable per project | Rejected | Adds renumbering hazards with no observed need; display prefixes and padding are already configurable, the offset is a fixed property of each tool's numbering. |
-| Convert on import/export only | Rejected | Requires a conversion step, which NFR-04.003 explicitly rules out. |
+| Convert on import/export only | Rejected | Requires a conversion step, which NFR-004.003 explicitly rules out. |
 | Use `papyrus.config.yml` as the sole configuration and ignore `backlog/config.yml` | Rejected | The two configurations already disagree on statuses and prefixes; Backlog.md would break on files Papyrus writes. |
 | Adopt Backlog.md layout for every record type (requirements, decisions, docs) | Rejected | Backlog.md has no format for those; Papyrus's document conventions stay authoritative there. |
 
 ## References
 
-- `docs/requirements/non-functional/NFR-04.003.md` — interoperability requirement and verification method.
-- `docs/requirements/business/REQ-01.005.md` — stable IDs, two ID spaces, bidirectional translation, reference translation.
-- `docs/requirements/business/REQ-05.010.md` — front-matter field map and Backlog.md compatibility statement.
-- `docs/requirements/business/REQ-03.001.md`, `REQ-03.002.md` — milestone and release identity and lifecycle.
+- `docs/requirements/non-functional/NFR-004.003.md` — interoperability requirement and verification method.
+- `docs/requirements/business/REQ-001.005.md` — stable IDs, two ID spaces, bidirectional translation, reference translation.
+- `docs/requirements/business/REQ-005.010.md` — front-matter field map and Backlog.md compatibility statement.
+- `docs/requirements/business/REQ-003.001.md`, `REQ-003.002.md` — milestone and release identity and lifecycle.
 - `docs/architecture/adr/ADR-0007-yaml-front-matter-as-single-record-metadata-source.md` — front-matter field map, canonical key order, lazy per-record migration.
 - `docs/architecture/adr/ADR-0009-shared-record-envelope-and-unified-write-path.md` — one writer, ID translation at the store boundary, migration staging.
 - Observed files: `backlog/config.yml`, `backlog/tasks/*.md`, `backlog/milestones/*.md`, `backlog/archive/`.

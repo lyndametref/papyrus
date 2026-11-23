@@ -26,7 +26,7 @@
     <div class="wf-box wf-ticket">
       <h2 class="wf-section-title">Ticket</h2>
       <p><strong>TASK-87</strong> — Design review: browser configuration view, single record view layout, and lifecycle configuration</p>
-      <p class="wf-note">Sources: REQ-06.002, REQ-06.003, REQ-06.006, REQ-06.007, REQ-06.008, REQ-06.009, REQ-06.010, REQ-06.011, REQ-06.012, REQ-01.002, REQ-01.003; docs/specifications/browser-requirements.md §4a/4b/4c/4d/10a; browser-managed-artifacts-and-lifecycles.md §4a; browser-glossary-terms.md §3a; browser-spec-revisions-task-86.md §9; MOCK-0001..MOCK-0013</p>
+      <p class="wf-note">Sources: REQ-006.002, REQ-006.003, REQ-006.006, REQ-006.007, REQ-006.008, REQ-006.009, REQ-006.010, REQ-006.011, REQ-006.012, REQ-001.002, REQ-001.003; docs/specifications/browser-requirements.md §4a/4b/4c/4d/10a; browser-managed-artifacts-and-lifecycles.md §4a; browser-glossary-terms.md §3a; browser-spec-revisions-task-86.md §9; MOCK-0001..MOCK-0013</p>
     </div>
 
     <h2 class="wf-section-title">Review contents</h2>
@@ -101,7 +101,7 @@
               </tbody>
             </table>
             <p class="wf-note">Editable keys are exactly those <code>papyrus config set</code> accepts; the view applies the same validation and precedence. No key is secret; environment values are never shown as editable config.</p>
-            <p class="wf-note">Changing a folder key relocates the folder through the single relocation routine (REQ-01.002); the browser never moves a folder itself. Every path passes the project-directory boundary check.</p>
+            <p class="wf-note">Changing a folder key relocates the folder through the single relocation routine (REQ-001.002); the browser never moves a folder itself. Every path passes the project-directory boundary check.</p>
             <p><a class="wf-link" href="#web/lifecycle" data-goto="lifecycle">Per-artifact (read-only) configuration → Managed artifacts &amp; lifecycles</a></p>
           </main>
         </div>
@@ -118,19 +118,19 @@
           <span style="font-size:20px;font-weight:700">Project Name</span>
           <span class="wf-note" style="margin-left:auto">Local browser / offline · 127.0.0.1:6420</span>
         </div>
-        <nav aria-label="Breadcrumb" style="margin:8px 0"><a class="wf-link" href="#web/list-nfr" data-goto="list-nfr">Requirements</a> › <a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-04</a> › <span>REQ-04.002</span></nav>
+        <nav aria-label="Breadcrumb" style="margin:8px 0"><a class="wf-link" href="#web/list-nfr" data-goto="list-nfr">Requirements</a> › <a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-004</a> › <span>REQ-004.002</span></nav>
         <div class="wf-box" style="margin:12px 0" aria-label="Summary card">
-          <strong>ID:</strong> REQ-04.002<br>
+          <strong>ID:</strong> REQ-004.002<br>
           <strong>Created:</strong> 2026-10-01<br>
           <strong>Updated:</strong> 2026-11-05
         </div>
         <h1 class="wf-title">Capture payment</h1>
         <p class="wf-note">Labels: <span class="wf-badge">payments</span> <span class="wf-badge">core</span></p>
-        <p><strong>Form:</strong> requirement · <strong>Type:</strong> business · <strong>Owning group:</strong> <a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-04 Payments</a></p>
+        <p><strong>Form:</strong> requirement · <strong>Type:</strong> business · <strong>Owning group:</strong> <a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-004 Payments</a></p>
         <p><strong>User story:</strong> As a cashier, I want to capture a payment.</p>
         <p><strong>Description:</strong> Captures a payment against an order.</p>
         <details><summary>Dependencies (2)</summary><ul><li><a class="wf-link" href="#web/view-task" data-goto="view-task">TASK-12</a></li><li>TASK-99 (unresolved, plain text)</li></ul></details>
-        <details><summary>References (1)</summary><ul><li><a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-05.001</a></li></ul></details>
+        <details><summary>References (1)</summary><ul><li><a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-005.001</a></li></ul></details>
         <p style="margin-top:12px"><button class="wf-button">Edit</button></p>
         <footer class="wf-footer">Footer · offline</footer>
       </div>
@@ -145,18 +145,18 @@
           <span style="font-size:20px;font-weight:700">Project Name</span>
           <span class="wf-note" style="margin-left:auto">Local browser / offline · 127.0.0.1:6420</span>
         </div>
-        <nav aria-label="Breadcrumb" style="margin:8px 0"><a class="wf-link" href="#web/list-nfr" data-goto="list-nfr">Requirements</a> › <a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-04</a> › <span>NFR-04.002</span></nav>
+        <nav aria-label="Breadcrumb" style="margin:8px 0"><a class="wf-link" href="#web/list-nfr" data-goto="list-nfr">Requirements</a> › <a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-004</a> › <span>NFR-004.002</span></nav>
         <div class="wf-box" style="margin:12px 0" aria-label="Summary card">
-          <strong>ID:</strong> NFR-04.002<br>
+          <strong>ID:</strong> NFR-004.002<br>
           <strong>Created:</strong> 2026-10-02<br>
           <strong>Updated:</strong> 2026-11-06<br>
-          <strong>Owning group:</strong> <a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-04 Persistence</a>
+          <strong>Owning group:</strong> <a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-004 Persistence</a>
         </div>
         <h1 class="wf-title">Durability of writes</h1>
         <p class="wf-note">Labels: <span class="wf-badge">persistence</span></p>
         <p><strong>Form:</strong> requirement · <strong>Type:</strong> non-functional</p>
         <p><strong>Description:</strong> Writes must be durable.</p>
-        <details><summary>References (1)</summary><ul><li><a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-04.002</a></li></ul></details>
+        <details><summary>References (1)</summary><ul><li><a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-004.002</a></li></ul></details>
         <p style="margin-top:12px"><button class="wf-button">Edit</button></p>
         <footer class="wf-footer">Footer · offline</footer>
       </div>
@@ -187,7 +187,7 @@
         </ul>
         <p><strong>References:</strong></p>
         <ul>
-          <li><a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-06.012</a></li>
+          <li><a class="wf-link" href="#web/view-req" data-goto="view-req">REQ-006.012</a></li>
           <li>REQ-99.999 (unresolved, plain text)</li>
         </ul>
         <p style="margin-top:12px"><button class="wf-button">Edit</button></p>
@@ -210,11 +210,11 @@
           <h1 class="wf-title">Non-functional requirements</h1>
           <h2 class="wf-title" style="font-size:16px">Non-functional requirements</h2>
           <div class="wf-box" style="margin:8px 0">
-            <strong>NFR-01 Persistence</strong> (group) — 2 requirements
-            <ul><li><a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-01.001 Durability</a></li><li><a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-01.002 Offline</a></li></ul>
+            <strong>NFR-001 Persistence</strong> (group) — 2 requirements
+            <ul><li><a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-001.001 Durability</a></li><li><a class="wf-link" href="#web/view-req-nfr" data-goto="view-req-nfr">NFR-001.002 Offline</a></li></ul>
           </div>
           <div class="wf-box" style="margin:8px 0">
-            <strong>NFR-04</strong> (group record missing → number fallback) — No requirements
+            <strong>NFR-004</strong> (group record missing → number fallback) — No requirements
           </div>
           <p class="wf-note">No "Other requirements" / catch-all section. Every atomic requirement appears under exactly one group. Empty group renders with member count "No requirements".</p>
         </main>
@@ -297,7 +297,7 @@
         <section class="wf-box" style="margin:8px 0">
           <h2 class="wf-title" style="font-size:16px">Releases</h2>
           <p class="wf-note">Curated description: grouping of milestones toward a delivery.</p>
-          <p><strong>Lifecycle:</strong> Draft → Released. A release becomes released when its milestone set is complete (REQ-03.002).</p>
+          <p><strong>Lifecycle:</strong> Draft → Released. A release becomes released when its milestone set is complete (REQ-003.002).</p>
           <p class="wf-note">Read-only config — enabled: true; ID prefix: REL; storage folder: backlog/releases. Changes via <a class="wf-link" href="#web/config" data-goto="config">Configuration</a>.</p>
         </section>
         <section class="wf-box" style="margin:8px 0">
@@ -339,7 +339,7 @@
         <section class="wf-box" style="margin:8px 0">
           <h2 class="wf-title" style="font-size:16px">UI mockups</h2>
           <p class="wf-note">Curated description: UI mockup review packages.</p>
-          <p><strong>Lifecycle:</strong> Draft → Approved → Deprecated / Restored. Approval explicit per mockup (REQ-05.008).</p>
+          <p><strong>Lifecycle:</strong> Draft → Approved → Deprecated / Restored. Approval explicit per mockup (REQ-005.008).</p>
           <p class="wf-note">Read-only config — enabled: true; ID prefix: MOCK; storage folder: specifications/ui/mockups. Changes via <a class="wf-link" href="#web/config" data-goto="config">Configuration</a>.</p>
         </section>
         <section class="wf-box" style="margin:8px 0">
@@ -386,7 +386,7 @@
           </div>
           <button class="wf-button" aria-expanded="false" aria-controls="type-list">Document types</button>
           <div class="wf-box" aria-label="Summary card">
-            <strong>ID:</strong> REQ-04.002<br>
+            <strong>ID:</strong> REQ-004.002<br>
             <strong>Created:</strong> 2026-10-01<br>
             <strong>Updated:</strong> 2026-11-05
           </div>

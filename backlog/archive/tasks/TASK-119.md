@@ -16,8 +16,8 @@ references:
   - >-
     docs/architecture/adr/ADR-0022-document-lifecycle-state-and-archive-location.md
   - docs/specifications/interactive-init-walkthrough-for-artifact-activation.md
-  - REQ-05.007
-  - REQ-07.001
+  - REQ-005.007
+  - REQ-007.001
 documentation:
   - src/init.rs
   - src/config.rs

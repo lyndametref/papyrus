@@ -19,13 +19,13 @@ dependencies:
   - TASK-106
   - TASK-107
 documentation:
-  - docs/requirements/business/REQ-07.001.md
+  - docs/requirements/business/REQ-007.001.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
-  - docs/requirements/business/REQ-04.002.md
-  - docs/requirements/business/REQ-07.002.md
-  - docs/requirements/business/REQ-07.003.md
-  - docs/requirements/business/REQ-07.004.md
-  - docs/requirements/business/REQ-05.007.md
+  - docs/requirements/business/REQ-004.002.md
+  - docs/requirements/business/REQ-007.002.md
+  - docs/requirements/business/REQ-007.003.md
+  - docs/requirements/business/REQ-007.004.md
+  - docs/requirements/business/REQ-005.007.md
   - docs/architecture/adr/ADR-0023-consolidated-record-layout-and-field-map.md
   - >-
     docs/architecture/adr/ADR-0019-fail-closed-document-type-configuration-validation.md
@@ -38,19 +38,19 @@ ordinal: 41090
 ## Description
 Documentation-only alignment of the business-rule corpus with the artifact-category and config-defined document-type model.
 
-Why: after TASK-105 to TASK-114 the shipped CLI derives one command family per enabled `document_types` slug (REQ-07.003), validates the type map fail-closed (REQ-07.002, ADR-0019), supports list-valued `statuses` (ADR-0024), and stores document state as `active`/`archived` plus custom front-matter statuses (REQ-07.001, REQ-05.007, ADR-0022/0023). The rules under `docs/business-rules/` still describe a fixed per-type command set with `deprecate`/`restore`, the `nfreq` alias, `deploy` as a seeded type, and a type map without slugs, statuses, or validation. They contradict the requirements, the ADRs, and the code.
+Why: after TASK-105 to TASK-114 the shipped CLI derives one command family per enabled `document_types` slug (REQ-007.003), validates the type map fail-closed (REQ-007.002, ADR-0019), supports list-valued `statuses` (ADR-0024), and stores document state as `active`/`archived` plus custom front-matter statuses (REQ-007.001, REQ-005.007, ADR-0022/0023). The rules under `docs/business-rules/` still describe a fixed per-type command set with `deprecate`/`restore`, the `nfreq` alias, `deploy` as a seeded type, and a type map without slugs, statuses, or validation. They contradict the requirements, the ADRs, and the code.
 
 In scope: 14 rule files in `docs/business-rules/` — BR-001, BR-007, BR-008, BR-009, BR-010, BR-011, BR-012, BR-013, BR-014, BR-016, BR-017, BR-018, BR-019, BR-020 — plus the regenerated `docs/business-rules/index.html`.
 
 Out of scope: `docs/requirements/**` (never edited), `docs/architecture/**`, `README.md` and man pages (separate README alignment work), `docs/domain-model/**` and `docs/specifications/**`, BR-002 to BR-006, BR-015, and all source code.
 
-Authoritative sources: REQ-07.001 to REQ-07.004, REQ-04.002, REQ-05.007, REQ-05.001, REQ-05.002, REQ-05.008; ADR-0016, ADR-0017, ADR-0018, ADR-0019, ADR-0022, ADR-0023, ADR-0024; `src/registry.rs` as a read-only cross-check of the shipped verb and status model.
+Authoritative sources: REQ-007.001 to REQ-007.004, REQ-004.002, REQ-005.007, REQ-005.001, REQ-005.002, REQ-005.008; ADR-0016, ADR-0017, ADR-0018, ADR-0019, ADR-0022, ADR-0023, ADR-0024; `src/registry.rs` as a read-only cross-check of the shipped verb and status model.
 
 Dependencies: the five prerequisites are tracked in the Backlog dependency graph and are completed (TASK-108, TASK-109, TASK-110, TASK-111, TASK-112).
 
 Convention change: the changed rules stop mirroring `README.md` verbatim. They state the contract in prose grounded in the requirements and ADRs, and drop `README.md` line-range citations that no longer match the shipped command set. BR-015 and BR-002 to BR-006 keep their current excerpts.
 
-BR-010 is converted, not dropped: it becomes the `nfr` rule so `papyrus nfr` keeps a rule page and REQ-05.002 traceability stays substantively correct. Rule numbering stays stable; BR-011 to BR-020 are not renumbered.
+BR-010 is converted, not dropped: it becomes the `nfr` rule so `papyrus nfr` keeps a rule page and REQ-005.002 traceability stays substantively correct. Rule numbering stays stable; BR-011 to BR-020 are not renumbered.
 
 Assumptions:
 - Assumption: `README.md` and the man pages still describe the pre-registry command set when this task runs, so changed rules cite requirements and ADRs rather than README excerpts; re-syncing the excerpts belongs to the README alignment work.
@@ -58,7 +58,7 @@ Assumptions:
 - Assumption: `src/registry.rs` reflects the shipped model after TASK-105 to TASK-114; a disagreement between it and the requirements is reported in the task notes, not fixed in code.
 - Assumption: requirements and ADRs are authoritative and are not edited; conflicts outside `docs/business-rules/` are follow-ups.
 - Assumption: business-rule numbering is stable, so BR-010 keeps its number as the `nfr` rule and no gap or renumbering is introduced.
-- Assumption: the eleven default document types listed in REQ-07.002 are the complete seeded set, and `deploy` is not one of them.
+- Assumption: the eleven default document types listed in REQ-007.002 are the complete seeded set, and `deploy` is not one of them.
 
 Follow-ups recorded, not fixed here: stale `active -> deprecated` wording and BR-010 references in `docs/domain-model/**` and in completed milestone specifications, and the README/man-page realignment.
 
@@ -67,7 +67,7 @@ Follow-ups recorded, not fixed here: stale `active -> deprecated` wording and BR
 - [x] BR-009, BR-010, BR-011, BR-012, BR-013, BR-014, BR-017, BR-018, BR-019, BR-020 each state for their type: it is an ordinary document_types.<slug> entry that can be renamed, removed, or given a different prefix and directory under doc_directory; it has the baseline verbs; req and nfr additionally declare create-group and --group on create, and no other type in this list declares an extension verb; records use the document status model with main statuses active/archived and optional configured custom statuses; archive is the only way to archive and there is no deprecate or restore; the type-specific content fields described today are retained.
 - [x] BR-010 is converted to the nfr rule: the file is renamed to BR-010-nfr-command-behavior.md with git mv, keeps the heading # BR-010: Papyrus nfr Command Behavior, and covers papyrus nfr only, with no nfreq command, alias, or lifecycle claim; BR-011 to BR-020 keep their current numbers and no rule is renumbered.
 - [x] BR-016 documents document_types keyed by slug, where the key is the command name and no separate document-slug key exists; per-entry prefix, directory, enabled, optional statuses and default_status, with active/archived always declared and default_status never archived; the eleven seeded defaults req, nfr, glossary, rule, ui-spec, ui-mockup, audit, tech-spec, use-case, test-case, test-report and no deploy; whole-map semantics including removal versus enabled:false; list-valued statuses written by config set from a comma-separated value and stored as a YAML flow sequence; slug character rules and case-insensitive rejection of built-in command names; prefix uniqueness across all entries and directory uniqueness among enabled entries; fail-closed validation that names the offending key; and the two repair surfaces config get|set|unset|list and init --force. The existing precedence order is unchanged.
-- [x] BR-008 contains no decision archive command line, no archive description, and no statement that a decision can be archived or carries an archive state; its status list is exactly proposed, accepted, rejected, deprecated, superseded; its rationale cites REQ-04.002 under its current title Update and Supersede Decisions.
+- [x] BR-008 contains no decision archive command line, no archive description, and no statement that a decision can be archived or carries an archive state; its status list is exactly proposed, accepted, rejected, deprecated, superseded; its rationale cites REQ-004.002 under its current title Update and Supersede Decisions.
 - [x] Every rule changed by this task separates the document main statuses active and archived from custom front-matter statuses, states that archiving sets archived, does not retain the previous custom value, and has no inverse command, keeps decision statuses distinct from document statuses, and keeps the milestone open -> closed and release planned -> released lifecycles fixed and non-configurable. BR-007 is updated to state planned -> released and to stop claiming active -> released.
 - [x] No rule under docs/business-rules/ retains deprecate or restore for a document type, the nfreq command or alias, deploy in the default document_types set, deprecated/ as the document inactive location, or a static per-type command table. Task and milestone restore wording, the decision status deprecated, and historical ADR text are unaffected.
 - [x] docs/business-rules/index.html is regenerated from the rule files with the business-rules index script; the script reports the same number of rules as there are BR-*.md files, the page lists BR-001 to BR-020 with BR-010 titled Papyrus nfr Command Behavior, and no Markdown index is created or edited.
@@ -82,7 +82,7 @@ Follow-ups recorded, not fixed here: stale `active -> deprecated` wording and BR
 
 
 ## Implementation Notes
-1. Baseline inventory: read the 14 target rules; grep docs/business-rules for deprecate, restore, nfreq, deploy, deprecated/, and active -> and record the affected lines. Cross-check the expected verbs and statuses against src/registry.rs and REQ-07.001/REQ-07.003.
+1. Baseline inventory: read the 14 target rules; grep docs/business-rules for deprecate, restore, nfreq, deploy, deprecated/, and active -> and record the affected lines. Cross-check the expected verbs and statuses against src/registry.rs and REQ-007.001/REQ-007.003.
 2. Rewrite rule text in this order: BR-001 (categories, document families, baseline verbs, status verb, --help inventory, removed static commands), BR-016 (keys, eleven defaults, list-valued statuses, whole-map semantics, validation, repair surfaces), BR-007 (release lifecycle), BR-008 (decision archive removal), BR-009 and BR-010 (req and nfr families with create-group/--group), BR-011 to BR-014 and BR-017 to BR-020 (baseline-only types).
 3. git mv docs/business-rules/BR-010-nfreq-command-behavior.md docs/business-rules/BR-010-nfr-command-behavior.md, then rewrite the body for papyrus nfr.
 4. Cross-reference check: extract every BR-\\d{3}, REQ-\\d{2}(\\.\\d{3})?, and ADR-\\d{4} from the changed rules, assert each target file exists, and re-run the forbidden-string grep requiring empty output.
@@ -111,7 +111,7 @@ created: 2026-11-13T21:59:00Z
 
 ---
 
-Scope addition from TASK-105 refinement Q2: TASK-108 removes the `papyrus decision archive` CLI surface; this task removes the matching BR-008 documentation so the rule and the command set agree with REQ-04.002.
+Scope addition from TASK-105 refinement Q2: TASK-108 removes the `papyrus decision archive` CLI surface; this task removes the matching BR-008 documentation so the rule and the command set agree with REQ-004.002.
 
 ---
 
@@ -119,7 +119,7 @@ created: 2026-11-14T18:16:00Z
 
 ---
 
-Refinement 2026-11-14: AC#3 changed from retiring BR-010 to converting it into the nfr rule (user decision). Rationale: papyrus nfr remains a real command family with create-group/--group, so retiring BR-010 would leave it with no rule page and break REQ-05.002 traceability. Consequence: AC#2 now includes BR-010; the file is renamed to BR-010-nfr-command-behavior.md; no renumbering. Scope also adds BR-007 (stale active -> released lifecycle) so AC#6 holds; BR-002 to BR-006 and BR-015 stay unchanged.
+Refinement 2026-11-14: AC#3 changed from retiring BR-010 to converting it into the nfr rule (user decision). Rationale: papyrus nfr remains a real command family with create-group/--group, so retiring BR-010 would leave it with no rule page and break REQ-005.002 traceability. Consequence: AC#2 now includes BR-010; the file is renamed to BR-010-nfr-command-behavior.md; no renumbering. Scope also adds BR-007 (stale active -> released lifecycle) so AC#6 holds; BR-002 to BR-006 and BR-015 stay unchanged.
 
 ---
 
@@ -136,7 +136,7 @@ created: 2026-11-14T18:34:00Z
 
 ---
 
-Quality-review follow-up (business-analyst). BR-007 now states the release verbs `create`, `list`, `view`, `edit`, and `close`, with `papyrus release close <id>` as the only `planned -> released` transition, matching REQ-03.002. BR-016 fail-closed wording now excludes the repair surfaces (`config get|set|unset|list` and `init --force`), consistent with its own Repair surfaces section. `docs/business-rules/index.html` regenerated (20 rules). Evidence: forbidden strings (deprecate, deprecated/, active ->, nfreq, deploy) absent except the allowed decision status `deprecated`, the removal statements for `nfreq`, and the explicit `deploy` non-seeded note; all BR/REQ/ADR identifiers in the corpus resolve. Code gap (not edited): `src/release.rs` `ReleaseCmd` has no `Close` variant, `src/registry.rs` has no release transition handler, and `src/browser/render.rs` still prints `papyrus release status <id> released`; needs a follow-up code task. Also stale and out of scope: `docs/specifications/release-lifecycle.md` still says `active -> released` and keeps the transition as an open question.
+Quality-review follow-up (business-analyst). BR-007 now states the release verbs `create`, `list`, `view`, `edit`, and `close`, with `papyrus release close <id>` as the only `planned -> released` transition, matching REQ-003.002. BR-016 fail-closed wording now excludes the repair surfaces (`config get|set|unset|list` and `init --force`), consistent with its own Repair surfaces section. `docs/business-rules/index.html` regenerated (20 rules). Evidence: forbidden strings (deprecate, deprecated/, active ->, nfreq, deploy) absent except the allowed decision status `deprecated`, the removal statements for `nfreq`, and the explicit `deploy` non-seeded note; all BR/REQ/ADR identifiers in the corpus resolve. Code gap (not edited): `src/release.rs` `ReleaseCmd` has no `Close` variant, `src/registry.rs` has no release transition handler, and `src/browser/render.rs` still prints `papyrus release status <id> released`; needs a follow-up code task. Also stale and out of scope: `docs/specifications/release-lifecycle.md` still says `active -> released` and keeps the transition as an open question.
 
 ---
 

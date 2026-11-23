@@ -20,7 +20,6 @@ references:
 documentation:
   - src/record/descriptor.rs
   - src/cli/tree.rs
-  - >-
     docs/specifications/remove-the-process-global-descriptor-cache-and-slug-leaks.md
 priority: medium
 ordinal: 41230

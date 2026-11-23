@@ -11,7 +11,7 @@ references:
   - ADR-0026
   - ADR-0027
   - ADR-0028
-  - REQ-06.014
+  - REQ-006.014
   - NFR-007.003
   - TECH-007
   - TECH-008

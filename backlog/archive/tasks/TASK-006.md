@@ -11,19 +11,19 @@ milestone: MS-002
 dependencies:
   - TASK-005
 references:
-  - docs/requirements/business/REQ-06.md
-  - docs/requirements/business/REQ-06.002.md
-  - docs/requirements/business/REQ-05.001.md
-  - docs/requirements/business/REQ-05.002.md
-  - docs/requirements/non-functional/NFR-01.002.md
-  - docs/requirements/non-functional/NFR-01.003.md
-  - docs/requirements/non-functional/NFR-02.001.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.002.md
-  - docs/requirements/non-functional/NFR-05.001.md
+  - docs/requirements/business/REQ-006.md
+  - docs/requirements/business/REQ-006.002.md
+  - docs/requirements/business/REQ-005.001.md
+  - docs/requirements/business/REQ-005.002.md
+  - docs/requirements/non-functional/NFR-001.002.md
+  - docs/requirements/non-functional/NFR-001.003.md
+  - docs/requirements/non-functional/NFR-002.001.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.002.md
+  - docs/requirements/non-functional/NFR-005.001.md
   - docs/business-rules/BR-004-browser-command-behavior.md
   - docs/specifications/browser-requirements.md
-  - docs/requirements/non-functional/NFR-04.001.md
+  - docs/requirements/non-functional/NFR-004.001.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
   - docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html
   - docs/specifications/ui/browser-requirements-ui.md
@@ -52,7 +52,7 @@ Behavior contract:
 UI mockups: MOCK-0001 (`docs/specifications/ui/mockups/MOCK-0001-browser-requirements-review.html`) was approved by the user on 2026-11-03 (UTC) and is the authoritative layout reference for the list/sidebar, record view, edit form, error, and 320 px states; the layout description is `docs/specifications/ui/browser-requirements-ui.md`.
 
 ## Acceptance Criteria
-- [x] The browser command serves the local web interface over the project's documentation store for the requirement record types implemented in this increment (business-requirement and non-functional-requirement groups and requirements) and opens it by default unless disabled; REQ-06.002's backlog-store coverage is delivered by TASK-11.
+- [x] The browser command serves the local web interface over the project's documentation store for the requirement record types implemented in this increment (business-requirement and non-functional-requirement groups and requirements) and opens it by default unless disabled; REQ-006.002's backlog-store coverage is delivered by TASK-11.
 - [x] With no internet connection, users can view and edit all currently implemented business and non-functional requirement content in the browser, and saved changes remain available.
 - [x] The interface renders in Firefox, Microsoft Edge, and Safari version 100 or later; the default bind address and port and non-loopback warning match the documented behavior.
 - [x] Browser-facing input is sanitized and the local interface does not read or write outside the project directory, except for init.
@@ -241,7 +241,7 @@ created: 2026-11-03T20:15:00Z
 
 ---
 
-Traceability fix (2026-11-03): AC #1 now states the increment scope — the documentation store for business-requirement and non-functional-requirement groups and requirements — and records that REQ-06.002's backlog-store coverage is delivered by TASK-11. Specification corrected to the approved mockup: §4.15 edit breadcrumb is `Requirements › ID › Edit` (no owning-group crumb), new §4.23 plus §7.12 and UI handoff state the version token is a hidden input with a visible static dashed note, and Assumptions/Traceability record the REQ-06.002 increment boundary. Other ACs, DoD, milestone, dependencies, and priority unchanged.
+Traceability fix (2026-11-03): AC #1 now states the increment scope — the documentation store for business-requirement and non-functional-requirement groups and requirements — and records that REQ-006.002's backlog-store coverage is delivered by TASK-11. Specification corrected to the approved mockup: §4.15 edit breadcrumb is `Requirements › ID › Edit` (no owning-group crumb), new §4.23 plus §7.12 and UI handoff state the version token is a hidden input with a visible static dashed note, and Assumptions/Traceability record the REQ-006.002 increment boundary. Other ACs, DoD, milestone, dependencies, and priority unchanged.
 
 ---
 

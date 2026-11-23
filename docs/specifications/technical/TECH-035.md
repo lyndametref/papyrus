@@ -10,14 +10,14 @@ references:
   - BR-014
   - BR-015
   - BR-016
-  - NFR-02.002
-  - NFR-04.001
-  - NFR-04.002
-  - REQ-05
-  - REQ-05.006
-  - REQ-05.007
-  - REQ-06
-  - REQ-06.001
+  - NFR-002.002
+  - NFR-004.001
+  - NFR-004.002
+  - REQ-005
+  - REQ-005.006
+  - REQ-005.007
+  - REQ-006
+  - REQ-006.001
   - TASK-44
   - TASK-47
   - TASK-48
@@ -29,7 +29,7 @@ status: verified
 ## Description
 ## Purpose
 
-Extend `papyrus search` to include audit records. Audit records are document records: they are stored under the configured `document_types.audit` directory (default `docs/audit-records/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged. This increment implements REQ-06.001 under REQ-05/REQ-05.006/REQ-05.007, and advances BR-015 and BR-014.
+Extend `papyrus search` to include audit records. Audit records are document records: they are stored under the configured `document_types.audit` directory (default `docs/audit-records/`) and are searched whenever the documented `doc` type is selected (including the default all-types search). The command shape, option vocabulary, matching rules, ordering, output shapes, exit codes, boundary enforcement, and read-only guarantee established by `docs/specifications/search-requirements.md` are reused unchanged. This increment implements REQ-006.001 under REQ-005/REQ-005.006/REQ-005.007, and advances BR-015 and BR-014.
 
 ## Scope
 
@@ -67,8 +67,8 @@ None of these block implementation; each has a specified default in this documen
 
 | Artifact | Reference |
 |---|---|
-| Requirement | REQ-06, REQ-06.001, REQ-05, REQ-05.006, REQ-05.007 |
-| Non-functional | NFR-02.002 (sanitize input), NFR-04.001 (text-only persistence), NFR-04.002 (project-directory boundary) |
+| Requirement | REQ-006, REQ-006.001, REQ-005, REQ-005.006, REQ-005.007 |
+| Non-functional | NFR-002.002 (sanitize input), NFR-004.001 (text-only persistence), NFR-004.002 (project-directory boundary) |
 | Business rule | BR-015 (search command behavior), BR-014 (audit command behavior), BR-016 (configuration keys and precedence) |
 | ADR | ADR-0001 (Rust), ADR-0004 (repository-root single crate) |
 | Ticket | TASK-48 |

@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-/// The document verbs a descriptor may expose (REQ-07.003).
+/// The document verbs a descriptor may expose (REQ-007.003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DocumentVerb {
     Create,
@@ -813,7 +813,7 @@ fn create_document(
     ];
     // Every front-matter-backed Markdown model seeds its status from the
     // type's configured `default_status`, or `active` when none is declared
-    // (REQ-05.011). The HTML mockup keeps `pending` in its HTML metadata and
+    // (REQ-005.011). The HTML mockup keeps `pending` in its HTML metadata and
     // never reaches this path.
     if let StatusModel::DocumentMain { default, .. } = &descriptor.status_model {
         ops.push(PatchOp::SetFrontMatterValue(
@@ -873,7 +873,7 @@ fn create_group_document(
     let mut ops = Vec::new();
     // Every front-matter-backed Markdown model seeds its status from the
     // type's configured `default_status`, or `active` when none is declared
-    // (REQ-05.011). A group is a record of the same type.
+    // (REQ-005.011). A group is a record of the same type.
     if let StatusModel::DocumentMain { default, .. } = &descriptor.status_model {
         ops.push(PatchOp::SetFrontMatterValue(
             "status".to_string(),

@@ -16,19 +16,17 @@ dependencies:
   - TASK-082
   - TASK-083
 references:
-  - docs/requirements/business/REQ-06.006.md
-  - docs/requirements/business/REQ-06.009.md
-  - docs/requirements/business/REQ-06.010.md
-  - docs/requirements/business/REQ-06.011.md
-  - docs/requirements/business/REQ-06.012.md
-  - docs/requirements/business/REQ-01.005.md
+  - docs/requirements/business/REQ-006.006.md
+  - docs/requirements/business/REQ-006.009.md
+  - docs/requirements/business/REQ-006.010.md
+  - docs/requirements/business/REQ-006.011.md
+  - docs/requirements/business/REQ-006.012.md
+  - docs/requirements/business/REQ-001.005.md
   - docs/specifications/browser-requirements.md
   - docs/specifications/browser-glossary-terms.md
   - >-
     docs/specifications/browser-configuration-view-single-record-layout-and-lifecycle-configuration.md
-  - >-
     docs/specifications/ui/browser-configuration-view-single-record-layout-and-lifecycle-configuration-ui.md
-  - >-
     docs/specifications/ui/mockups/MOCK-0014-browser-configuration-view-single-record-layout-and-lifecycle-configuration-review.html
   - docs/specifications/browser-spec-revisions-task-86.md
 priority: high
@@ -38,7 +36,7 @@ ordinal: 39100
 
 
 ## Description
-REQ-06.006, REQ-06.009, REQ-06.010, REQ-06.011, and REQ-06.012 define presentation rules the browser does not yet implement: non-functional requirements sit in a catch-all section, record metadata is spread across the page, references are plain text, the glossary landing page shows dates and references, and the header emphasizes Papyrus instead of the project. These changes share the rendering layer and the approved mockup MOCK-0014, so they are delivered together.
+REQ-006.006, REQ-006.009, REQ-006.010, REQ-006.011, and REQ-006.012 define presentation rules the browser does not yet implement: non-functional requirements sit in a catch-all section, record metadata is spread across the page, references are plain text, the glossary landing page shows dates and references, and the header emphasizes Papyrus instead of the project. These changes share the rendering layer and the approved mockup MOCK-0014, so they are delivered together.
 
 Scope (in scope):
 - Apply the shared single record view layout from browser-requirements.md §4c to every managed Markdown record type with a single record view: a summary card showing only record ID, created date, and updated date (plus the owning group for a sub-requirement); labels as a taglist under the title; dependencies and references at the end as native HTML disclosure sections shown only when the record has at least one value.
@@ -59,7 +57,7 @@ The approved design authority is MOCK-0014 and the revised browser specification
 Assumptions:
 - Assumption: MOCK-0014 (approved 2026-11-12 UTC) is the sole visual authority for these five surfaces; existing MOCK-0001..MOCK-0013 revisions are separate follow-ups and do not block this task.
 - Assumption: disclosure sections are collapsed by default per the recommended default OQ-4, unless MOCK-0014 specifies otherwise.
-- Assumption: the configured project name comes from project configuration (REQ-01.002) and is already available to the shared header.
+- Assumption: the configured project name comes from project configuration (REQ-001.002) and is already available to the shared header.
 - Assumption: browser record indexes already resolve records by Papyrus ID, so reference links use /doc/{id} with no storage-ID translation.
 - Assumption: NFR grouping is derived in the browser from the ID prefix only; no Group field is added to requirement files.
 

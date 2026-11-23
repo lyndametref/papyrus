@@ -12,11 +12,11 @@ milestone: MS-005
 dependencies:
   - TASK-013
 references:
-  - docs/requirements/business/REQ-05.004.md
-  - docs/requirements/business/REQ-05.007.md
-  - docs/requirements/non-functional/NFR-02.002.md
-  - docs/requirements/non-functional/NFR-04.001.md
-  - docs/requirements/non-functional/NFR-04.002.md
+  - docs/requirements/business/REQ-005.004.md
+  - docs/requirements/business/REQ-005.007.md
+  - docs/requirements/non-functional/NFR-002.002.md
+  - docs/requirements/non-functional/NFR-004.001.md
+  - docs/requirements/non-functional/NFR-004.002.md
   - docs/business-rules/BR-012-ui-spec-command-behavior.md
   - docs/business-rules/BR-016-configuration-keys-and-precedence.md
 documentation:
@@ -31,16 +31,16 @@ ordinal: 17100
 Implement the `ui-spec` commands so contributors can create, list, view, edit, deprecate, and restore UI specifications (title, associated view, description), with stable IDs and text-file persistence inside the project directory.
 
 Scope (in):
-- `papyrus ui-spec create <title> --view <view> --description <text>` (BR-012, REQ-05.004).
-- `papyrus ui-spec list` (BR-012, REQ-05.004).
-- `papyrus ui-spec view <id>` (BR-012, REQ-05.004).
-- `papyrus ui-spec edit <id> [--view <view>] [--description <text>] [--editor]` (BR-012, REQ-05.004).
-- `papyrus ui-spec deprecate <id>` and `papyrus ui-spec restore <id>` (BR-012, REQ-05.007).
-- Stable IDs of the form <prefix>-<number> (default UI-001) using configured document_types.ui-spec prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-05.004, REQ-05.007, BR-012, BR-016).
-- UI-specification fields: title, view, description; file template `# <ID> <title>`, `## View`, `## Description` (REQ-05.004, BR-012).
-- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID and content (REQ-05.007, BR-012).
-- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-02.002, NFR-04.001, NFR-04.002).
-- Common CLI controls and outcomes inherited from TASK-2 (REQ-01.004).
+- `papyrus ui-spec create <title> --view <view> --description <text>` (BR-012, REQ-005.004).
+- `papyrus ui-spec list` (BR-012, REQ-005.004).
+- `papyrus ui-spec view <id>` (BR-012, REQ-005.004).
+- `papyrus ui-spec edit <id> [--view <view>] [--description <text>] [--editor]` (BR-012, REQ-005.004).
+- `papyrus ui-spec deprecate <id>` and `papyrus ui-spec restore <id>` (BR-012, REQ-005.007).
+- Stable IDs of the form <prefix>-<number> (default UI-001) using configured document_types.ui-spec prefix and id_padding; IDs are not reused across active and deprecated folders (REQ-005.004, REQ-005.007, BR-012, BR-016).
+- UI-specification fields: title, view, description; file template `# <ID> <title>`, `## View`, `## Description` (REQ-005.004, BR-012).
+- Deprecation moves files to the type deprecated folder and hides them from lists, search, and the web UI; restoration returns them with the same ID and content (REQ-005.007, BR-012).
+- UTF-8 text-only persistence inside the project directory; input sanitization by normalization/escaping (NFR-002.002, NFR-004.001, NFR-004.002).
+- Common CLI controls and outcomes inherited from TASK-2 (REQ-001.004).
 
 Scope (out):
 - Unified search for UI specifications (TASK-35).
@@ -101,7 +101,7 @@ Assumptions:
 - Disabled ui-spec type: create and list exit 4 (consistent with TASK-30), so no records are created or shown.
 
 Resolved open questions:
-- OQ-1: create takes <title> positionally and requires --view and --description (BR-012 synopsis, REQ-05.004) -> all three required.
+- OQ-1: create takes <title> positionally and requires --view and --description (BR-012 synopsis, REQ-005.004) -> all three required.
 - OQ-2: edit exposes only --view, --description, --editor; there is no --title option, so the title is editable only through --editor (BR-012).
 - OQ-3: file body layout unspecified by BR-012 -> '## View' then '## Description' (OQ-1 of the specification, non-blocking).
 - OQ-4: linking MOCK ids to UI specifications is unspecified and out of scope; browser work belongs to TASK-24/TASK-36 (OQ-2 of the specification, non-blocking).
