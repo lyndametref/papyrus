@@ -2,7 +2,7 @@
 id: TASK-287
 title: "Run the quality gate audit and collect release evidence"
 created_date: '2026-11-20T17:44:13Z'
-updated_date: '2026-11-23T11:29:26Z'
+updated_date: '2026-11-23T12:22:24Z'
 labels: []
 references:
   - NFR-007.001
@@ -13,7 +13,7 @@ references:
   - ADR-043
   - TECH-008
   - AUD-150
-status: ToDo
+status: Done
 assignee:
   - quality-gatekeeper
 milestone: MS-037
@@ -70,3 +70,5 @@ One audit record of type `quality` referencing REL-001 contains the gate table, 
 - [ ] The duplicate AUD-145 and AUD-148 records are resolved to one record per ID, and papyrus check reports no duplicate-id finding for either.
 - [ ] Exactly one audit record of type quality referencing REL-001 records the evidence, severity counts, and verdict.
 - [ ] No blocking finding is open; each blocker or high is reported to the orchestrator.
+## Comments
+- **orchestrator**: Quality gate AUD-154: pass with findings; AC-1 to AC-5 pass, AC-6 pending TASK-288; duplicate audit records resolved; release gate held until the final package and version pin.
