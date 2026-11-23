@@ -66,6 +66,45 @@ use papyrus::config::{Config, DocTypeEntry};
 use papyrus::registry::ArtifactRegistry;
 use std::path::Path;
 
+#[cfg(unix)]
+#[test]
+fn unreadable_outside_config_is_rejected_before_any_read() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let project = tmpdir("outside-config-project");
+    let outside = tmpdir("outside-config-target");
+    init_project(&project);
+    let outside_file = outside.join("outside.yml");
+    fs::write(&outside_file, "project_name: Outside\n").unwrap();
+    fs::set_permissions(&outside_file, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let out = bin()
+        .args([
+            "--dir",
+            project.to_str().unwrap(),
+            "--config",
+            outside_file.to_str().unwrap(),
+            "req",
+            "list",
+        ])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "stderr: {stderr}");
+    assert!(
+        stderr.contains("configuration path resolves outside project directory"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        !stderr.contains("Permission denied"),
+        "the outside target must not be read: {stderr}"
+    );
+
+    fs::set_permissions(&outside_file, fs::Permissions::from_mode(0o600)).unwrap();
+    let _ = fs::remove_dir_all(&project);
+    let _ = fs::remove_dir_all(&outside);
+}
+
 fn tmpdir2(name: &str) -> std::path::PathBuf {
     let mut p = std::env::temp_dir();
     p.push(format!(

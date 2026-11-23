@@ -82,7 +82,8 @@ pub struct Target {
 #[derive(Clone, Debug)]
 pub struct Request {
     pub method: Method,
-    /// The method token exactly as sent, so the request log can print it.
+    /// The method token exactly as sent, so an unmapped method can be logged
+    /// after sanitization.
     pub raw_method: String,
     pub target: Target,
     pub version: Version,

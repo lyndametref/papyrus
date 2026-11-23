@@ -1706,6 +1706,11 @@ fn move_record(
     crate::record::store::move_record(ctx, source, destination)
 }
 
+/// Whether a destination path is occupied, including by a dangling symlink.
+fn destination_occupied(path: &std::path::Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok()
+}
+
 /// Retire legacy metadata sections and refresh `updated_date` before a
 /// lifecycle write (archive/restore). The file is written once.
 fn retire_and_touch(
@@ -1754,7 +1759,7 @@ pub fn archive(
         .file_name()
         .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
     let archived_path = Context::ensure_within(&ctx.project_dir, &archive.join(file_name))?;
-    if archived_path == path || archived_path.exists() {
+    if archived_path == path || destination_occupied(&archived_path) {
         return Err(AppError::Validation(format!("already archived: {}", id)));
     }
 
@@ -1789,7 +1794,7 @@ pub fn restore(
         .file_name()
         .ok_or_else(|| AppError::Runtime("invalid record path".to_string()))?;
     let active_path = Context::ensure_within(&ctx.project_dir, &active.join(file_name))?;
-    if active_path == path || active_path.exists() {
+    if active_path == path || destination_occupied(&active_path) {
         return Err(AppError::Validation(format!("already active: {}", id)));
     }
 
@@ -2346,6 +2351,23 @@ mod tests {
         restore(&c, &access(&c).0, &access(&c).1, "TASK-001").unwrap();
         assert!(dir.join("backlog/tasks/TASK-001.md").exists());
         assert!(!dir.join("backlog/archive/tasks/TASK-001.md").exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn archive_destination_occupancy_sees_a_dangling_symlink() {
+        let dir = tmpdir("archive-dangling-symlink");
+        fs::create_dir_all(dir.join("backlog/archive/tasks")).unwrap();
+        let destination = dir.join("backlog/archive/tasks/TASK-001.md");
+        std::os::unix::fs::symlink(dir.join("missing-target.md"), &destination).unwrap();
+
+        assert!(
+            destination_occupied(&destination),
+            "a dangling symlink must count as an occupied destination"
+        );
+        assert!(!destination_occupied(
+            &dir.join("backlog/archive/tasks/missing.md")
+        ));
     }
 
     #[test]

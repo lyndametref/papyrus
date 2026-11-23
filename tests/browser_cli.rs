@@ -789,8 +789,18 @@ fn t06_non_loopback_warning() {
     init_project(&dir);
     // The specification requires this test to send no traffic.
     let server = Server::start(&dir, &["--host", "0.0.0.0", "--no-open"], &[]);
-    server.wait_for_stderr("warning: binding to non-loopback address 0.0.0.0");
+    server.wait_for_stderr(
+        "warning: binding to non-loopback address 0.0.0.0 without authentication; anyone who can reach this port can read and modify every record",
+    );
     drop(server);
+
+    let loopback = Server::start(&dir, &["--no-open"], &[]);
+    assert!(
+        !loopback.stderr_text().contains("non-loopback"),
+        "loopback must not warn: {:?}",
+        loopback.stderr_text()
+    );
+    drop(loopback);
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -1777,6 +1787,39 @@ fn unknown_path_is_404_for_every_method() {
     // The request log prints the method token exactly as sent.
     server.wait_for_stderr("DELETE /nope 404");
     assert!(!server.stderr_text().contains("OTHER "));
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// T-22 (foreign Host and Origin are rejected before routing)
+#[test]
+fn foreign_host_and_origin_are_rejected() {
+    let dir = fixture("foreign-authority");
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let port = server.port;
+
+    let foreign_host = send_raw(
+        port,
+        format!(
+            "GET / HTTP/1.1\r\nHost: evil.example:{}\r\nConnection: close\r\n\r\n",
+            port
+        )
+        .as_bytes(),
+    );
+    assert_eq!(foreign_host.status, 400, "foreign Host must be rejected");
+
+    let foreign_origin = request(
+        port,
+        "POST",
+        "/",
+        &[("Origin", "http://evil.example")],
+        Some(b""),
+    );
+    assert_eq!(
+        foreign_origin.status, 403,
+        "foreign Origin must be rejected"
+    );
+
     drop(server);
     let _ = fs::remove_dir_all(&dir);
 }

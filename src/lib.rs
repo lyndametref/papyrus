@@ -64,6 +64,24 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
     use crate::cli;
     use crate::registry::ArtifactRegistry;
 
+    /// Resolve a configuration path that is loaded in this phase.
+    ///
+    /// The path is canonicalized and must stay inside the project before any
+    /// read happens (NFR-04.002), so a command's later context check is never
+    /// the first guard against an outside target.
+    fn contained_config_path(
+        project_raw: &std::path::Path,
+        config_path: &std::path::Path,
+    ) -> Result<std::path::PathBuf, error::AppError> {
+        let project_dir = crate::context::Context::canonical_project_dir(project_raw)?;
+        crate::context::Context::ensure_within(&project_dir, config_path).map_err(|_| {
+            error::AppError::Runtime(format!(
+                "configuration path resolves outside project directory: {}",
+                config_path.display()
+            ))
+        })
+    }
+
     let full_args: Vec<String> = std::env::args().collect();
     let args: Vec<String> = full_args.iter().skip(1).cloned().collect();
     let prescan = cli::scan(&args);
@@ -94,6 +112,7 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
             (None, None)
         } else if is_config {
             let cfg = if config_path.exists() {
+                let config_path = contained_config_path(&project_raw, &config_path)?;
                 crate::commands::load_effective_config(&config_path, &project_raw).ok()
             } else {
                 None
@@ -110,6 +129,7 @@ pub fn run() -> Result<CommandOutput, error::AppError> {
             (Some(cfg), reg)
         } else {
             // load + validate
+            let config_path = contained_config_path(&project_raw, &config_path)?;
             let cfg = crate::commands::load_effective_config(&config_path, &project_raw)?;
             let reg = ArtifactRegistry::build(&cfg).map_err(crate::error::AppError::from)?;
             (Some(cfg), Some(reg))

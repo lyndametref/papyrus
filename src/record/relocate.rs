@@ -158,11 +158,15 @@ fn preflight(source_dir: &Path, destination_dir: &Path) -> Result<(), AppError> 
         let src = entry.path();
         let name = entry.file_name();
         let dst = destination_dir.join(&name);
-        if dst.exists() {
-            return Err(AppError::Validation(format!(
-                "destination entry conflict: {}",
-                name.to_string_lossy()
-            )));
+        match fs::symlink_metadata(&dst) {
+            Ok(_) => {
+                return Err(AppError::Validation(format!(
+                    "destination entry conflict: {}",
+                    name.to_string_lossy()
+                )));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(AppError::Validation(error.to_string())),
         }
         let ft = entry
             .file_type()
@@ -325,6 +329,34 @@ mod tests {
             json: false,
             no_color: false,
         }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn dangling_symlink_destination_counts_as_occupied() {
+        let base =
+            std::env::temp_dir().join(format!("papyrus-reloc-unit-symlink-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        let proj = base.join("proj");
+        fs::create_dir_all(proj.join("src")).unwrap();
+        fs::write(proj.join("src/a.txt"), "a").unwrap();
+        fs::create_dir_all(proj.join("dst")).unwrap();
+        std::os::unix::fs::symlink(proj.join("missing-target"), proj.join("dst/a.txt")).unwrap();
+
+        let ctx = make_ctx(&proj);
+        TEST_FAIL_AFTER.with(|c| c.set(0));
+        TEST_MOVED_COUNT.with(|c| c.set(0));
+        let error = relocate(&ctx, &proj.join("src"), &proj.join("dst"))
+            .expect_err("a dangling symlink must occupy the destination entry");
+        assert!(
+            error
+                .to_string()
+                .contains("destination entry conflict: a.txt"),
+            "unexpected error: {error}"
+        );
+        assert!(proj.join("src/a.txt").exists(), "source must be untouched");
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]

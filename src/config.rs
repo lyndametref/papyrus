@@ -56,6 +56,153 @@ pub fn parse_list_value(key: &str, raw: &str) -> Result<Vec<String>, String> {
     Ok(values)
 }
 
+/// Maximum accepted size of the configuration YAML file, in bytes.
+pub const MAX_CONFIG_YAML_BYTES: usize = 1024 * 1024;
+
+/// Maximum accepted size of one record's YAML front matter, in bytes.
+pub const MAX_FRONT_MATTER_YAML_BYTES: usize = 64 * 1024;
+
+/// Reject an oversized YAML input or one that uses anchors or aliases.
+///
+/// Papyrus never emits anchors or aliases, and a hostile document can use them
+/// to expand a small input into a large value graph. The parser already caps
+/// recursion and alias repetition; rejecting the syntax and the byte size
+/// before parsing keeps the work bounded and the failure explicit.
+pub fn validate_yaml_input(raw: &str, max_bytes: usize, label: &str) -> Result<(), String> {
+    if raw.len() > max_bytes {
+        return Err(format!(
+            "{} exceeds the {} byte YAML limit",
+            label, max_bytes
+        ));
+    }
+    if yaml_has_anchor_or_alias(raw) {
+        return Err(format!(
+            "{} must not contain YAML anchors or aliases",
+            label
+        ));
+    }
+    Ok(())
+}
+
+/// Whether the document uses the anchor (`&`) or alias (`*`) indicator.
+///
+/// The scan is lexical: quoted scalars, comments, and block scalar bodies are
+/// skipped, and an indicator only counts at the start of a node, so an
+/// ordinary plain scalar such as `Rock & Roll` is not rejected.
+fn yaml_has_anchor_or_alias(raw: &str) -> bool {
+    let mut block_parent_indent: Option<usize> = None;
+    for line in raw.lines() {
+        let indent = line.len() - line.trim_start_matches([' ', '\t']).len();
+        if let Some(parent) = block_parent_indent {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if indent > parent {
+                continue;
+            }
+            block_parent_indent = None;
+        }
+        if line_has_anchor_or_alias(line) {
+            return true;
+        }
+        if block_scalar_parent_indent(line, indent).is_some() {
+            block_parent_indent = Some(indent);
+        }
+    }
+    false
+}
+
+fn line_has_anchor_or_alias(line: &str) -> bool {
+    let mut quote: Option<char> = None;
+    let mut at_node_start = true;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if let Some(q) = quote {
+            match (q, ch) {
+                ('\'', '\'') => {
+                    if chars.peek() == Some(&'\'') {
+                        chars.next();
+                    } else {
+                        quote = None;
+                    }
+                }
+                ('"', '\\') => {
+                    chars.next();
+                }
+                ('"', '"') => quote = None,
+                _ => {}
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' => {
+                quote = Some(ch);
+                at_node_start = false;
+            }
+            '#' if at_node_start => break,
+            '&' | '*' if at_node_start => return true,
+            '[' | '{' | ',' => at_node_start = true,
+            ':' if chars.peek().is_none_or(|next| {
+                next.is_whitespace() || matches!(next, '[' | '{' | '}' | ']' | ',')
+            }) =>
+            {
+                at_node_start = true;
+            }
+            ':' => at_node_start = false,
+            '-' if at_node_start => {}
+            c if c.is_whitespace() => {}
+            _ => at_node_start = false,
+        }
+    }
+    false
+}
+
+/// Return the parent indentation when this line starts a block scalar.
+fn block_scalar_parent_indent(line: &str, indent: usize) -> Option<usize> {
+    let mut quote: Option<char> = None;
+    let mut separator = None;
+    let mut chars = line.char_indices().peekable();
+    while let Some((index, ch)) = chars.next() {
+        if let Some(q) = quote {
+            match (q, ch) {
+                ('\'', '\'') => {
+                    if chars.peek().map(|(_, next)| *next) == Some('\'') {
+                        chars.next();
+                    } else {
+                        quote = None;
+                    }
+                }
+                ('"', '\\') => {
+                    chars.next();
+                }
+                ('"', '"') => quote = None,
+                _ => {}
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' => quote = Some(ch),
+            ':' if chars.peek().is_none_or(|(_, next)| next.is_whitespace()) => {
+                separator = Some(index);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let separator = separator?;
+    let value = line[separator + 1..].trim();
+    let mut indicator = value.chars();
+    match indicator.next() {
+        Some('|') | Some('>') => {}
+        _ => return None,
+    }
+    if indicator.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit()) {
+        Some(indent)
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct TypeEntry {
@@ -3353,6 +3500,40 @@ pub fn write_config_file(path: &Path, content: &str) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn yaml_input_limits_reject_hostile_documents() {
+        assert!(validate_yaml_input("project_name: Fine\n", 1024, "configuration").is_ok());
+        assert!(
+            validate_yaml_input("title: Rock & Roll\nrefs: 'a * b'\n", 1024, "configuration")
+                .is_ok(),
+            "ordinary plain and quoted scalars are not anchors or aliases"
+        );
+        assert!(
+            validate_yaml_input(
+                "description: |\n  * a bullet\n  & another bullet\n",
+                1024,
+                "configuration"
+            )
+            .is_ok(),
+            "block scalar bodies are not YAML tokens"
+        );
+
+        let oversized = "a".repeat(65);
+        assert!(
+            validate_yaml_input(&oversized, 64, "configuration")
+                .unwrap_err()
+                .contains("64 byte YAML limit")
+        );
+
+        let hostile = "base: &base [one, two, three]\ncopy: [*base, *base, *base]\n";
+        assert!(
+            validate_yaml_input(hostile, 1024, "configuration")
+                .unwrap_err()
+                .contains("must not contain YAML anchors or aliases")
+        );
+        assert!(validate_yaml_input("value: *missing\n", 1024, "configuration").is_err());
+    }
 
     type ExpectedField<'a> = (
         &'a str,
