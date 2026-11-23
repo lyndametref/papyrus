@@ -46,6 +46,40 @@ fn assert_refused(out: &Path, label: &str) -> Output {
     output
 }
 
+/// Run the shared `package_validate_out` function directly, so a permitted
+/// path can be checked without a release build.
+fn validate_out(out: &Path) -> Output {
+    let script = root().join("scripts/package-out.sh");
+    Command::new("bash")
+        .arg("-c")
+        .arg("set -euo pipefail; source \"$1\"; ROOT=\"$2\"; package_validate_out \"$3\"")
+        .arg("--")
+        .arg(&script)
+        .arg(root())
+        .arg(out)
+        .output()
+        .expect("run package_validate_out")
+}
+
+fn prepare_out(out: &Path) -> Output {
+    let script = root().join("scripts/package-out.sh");
+    Command::new("bash")
+        .arg("-c")
+        .arg("set -euo pipefail; source \"$1\"; ROOT=\"$2\"; package_prepare_out \"$3\" false")
+        .arg("--")
+        .arg(&script)
+        .arg(root())
+        .arg(out)
+        .output()
+        .expect("run package_prepare_out")
+}
+
+fn assert_in_repo_refusal_message(output: &Output) {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(".tmp"), "{stderr}");
+    assert!(stderr.contains("builds"), "{stderr}");
+}
+
 #[test]
 fn h2_out_inside_the_repository_is_refused_before_creation() {
     let target = root()
@@ -53,15 +87,151 @@ fn h2_out_inside_the_repository_is_refused_before_creation() {
         .join(format!("package-guard-evil-{}", std::process::id()));
     let _ = fs::remove_dir_all(&target);
     let output = assert_refused(&target, "repository target");
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("project-local .tmp"),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert_in_repo_refusal_message(&output);
     assert!(
         !target.exists(),
         "the refused out directory must not be created"
     );
+}
+
+// ADR-043 decision 7 as amended 2026-11-23 -------------------------------
+#[test]
+fn adr043_tmp_and_builds_roots_are_permitted_in_repository_targets() {
+    let pid = std::process::id();
+    let tmp = root()
+        .join(".tmp")
+        .join(format!("package-guard-permitted-tmp-{pid}"));
+    let version = format!("0.0.0-guard-{pid}");
+    let builds = root()
+        .join("builds")
+        .join(&version)
+        .join(".build")
+        .join("papyrus");
+
+    for (out, label, leaf) in [
+        (&tmp, "tmp", format!("package-guard-permitted-tmp-{pid}")),
+        (&builds, "builds", "papyrus".to_string()),
+    ] {
+        let _ = fs::remove_dir_all(root().join("builds").join(&version));
+        let output = validate_out(out);
+        assert!(
+            output.status.success(),
+            "{label}: a permitted root must be accepted, stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let accepted = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        assert!(
+            accepted.ends_with(&leaf),
+            "{label}: expected the canonical path to end in {leaf}, got {accepted}"
+        );
+        assert!(
+            !out.exists(),
+            "{label}: validation must not create the directory"
+        );
+
+        let output = prepare_out(out);
+        assert!(
+            output.status.success(),
+            "{label}: a permitted root must be prepared, stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(out.is_dir(), "{label}: the permitted root is created");
+    }
+    let _ = fs::remove_dir_all(&tmp);
+    let _ = fs::remove_dir_all(root().join("builds").join(&version));
+}
+
+#[test]
+fn adr043_repository_root_and_builds_itself_are_refused() {
+    let root_output = build_package(&root());
+    assert_eq!(root_output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&root_output.stderr);
+    assert!(stderr.contains("repository root"), "{stderr}");
+    assert!(root().exists(), "the repository root must not be removed");
+
+    let builds = root().join("builds");
+    let existed = builds.exists();
+    let output = build_package(&builds);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "builds/ itself must be refused: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("builds"), "{stderr}");
+    assert!(stderr.contains(".tmp"), "{stderr}");
+    assert_eq!(
+        builds.exists(),
+        existed,
+        "the guard must not create or remove builds/ itself"
+    );
+}
+
+#[test]
+fn adr043_canonicalised_in_repository_paths_are_refused() {
+    let pid = std::process::id();
+    let escaped = root()
+        .join("builds")
+        .join("..")
+        .join(format!("package-guard-escape-{pid}"));
+    // `realpath -m` folds `builds/..` back to the repository root, so the path
+    // is neither permitted root and must be refused without creation.
+    let output = build_package(&escaped);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !root().join(format!("package-guard-escape-{pid}")).exists(),
+        "a canonicalised escape must not be created"
+    );
+
+    let builds_dot = root().join("builds").join(".");
+    let output = build_package(&builds_dot);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "builds/. canonicalises to builds/ itself and must be refused: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn adr043_usage_text_states_both_permitted_roots_and_each_refusal() {
+    for script in ["package-out.sh", "build-package.sh", "build-deb.sh"] {
+        let text = fs::read_to_string(root().join("scripts").join(script))
+            .unwrap_or_else(|error| panic!("{script}: {error}"));
+        for needle in [
+            ".tmp/",
+            "builds/<segment>",
+            "<repo>",
+            "repository root",
+            "system directories",
+            "HOME",
+            "exit code 2",
+        ] {
+            assert!(
+                text.contains(needle),
+                "{script} usage text must state {needle:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn adr043_parent_of_the_repository_root_is_refused() {
+    let parent = root().parent().expect("repository parent").to_path_buf();
+    let output = build_package(&parent);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("parent of the repository root"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(parent.exists(), "a refused parent must not be removed");
 }
 
 #[test]
@@ -120,11 +290,7 @@ fn h2_force_refuses_an_unsafe_non_empty_path_before_cleaning() {
         "an unsafe path must be refused even with --force: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("project-local .tmp"),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert_in_repo_refusal_message(&output);
     assert_eq!(
         fs::read(&marker).expect("marker retained"),
         b"do not clean",

@@ -9,7 +9,11 @@ set -euo pipefail
 # Version precedence: --version, then PAPYRUS_DEB_VERSION, then the Cargo.toml
 # package version. Output directory precedence: --out, then PAPYRUS_DEB_OUT,
 # then the project-local .tmp/deb directory. The shared out policy in
-# scripts/package-out.sh rejects unsafe paths before anything is created.
+# scripts/package-out.sh rejects unsafe paths before anything is created: an
+# in-repository --out must be strictly below .tmp/ or strictly below
+# builds/<segment>/...; the repository root, builds/ itself, every other
+# in-repository path, the filesystem root, system directories, $HOME and its
+# subtree, and any parent of the repository root are refused with exit 2.
 #
 # Run directly with no version to derive the version from Cargo.toml and write
 # the .deb to the project root, as before. The version and output options are
@@ -29,6 +33,15 @@ Assemble the Papyrus Debian package from the release binary.
                        when set).
   --check-assets-only  Verify vendor asset versions and exit without building.
   -h, --help           Print this help and exit.
+
+--out policy (ADR-043 decision 7, amended 2026-11-23):
+  permitted  <repo>/.tmp/<path>            scratch, removed before the work ends
+  permitted  <repo>/builds/<segment>/...   publish location, git-ignored
+  refused    <repo>                        the repository root
+  refused    <repo>/builds                 builds/ with no segment after it
+  refused    any other path inside <repo>  exit code 2
+  refused    /, system directories, $HOME and its subtree, and any parent of
+             the repository root                     exit code 2
 EOF
 }
 

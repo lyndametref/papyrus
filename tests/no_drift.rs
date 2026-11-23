@@ -20,6 +20,13 @@
 //! | 8 | a second section parser or front-matter delimiter detection | `src/record/`, `src/import.rs` |
 //!
 //! Every violation reports `file:line: text`.
+//!
+//! MS-037 release gates owned here after TASK-283:
+//!
+//! | Guard | Invariant | Failure format |
+//! |---|---|---|
+//! | no-new-crate | `Cargo.toml` sections and `Cargo.lock` hold only the 4+1 dependency baseline and 36 packages | `Cargo.toml [dependencies] changed: added crate(s) [...]` |
+//! | binary budget | `target/release/papyrus` ≤ 12,582,912 bytes (TECH-008 §2) | `target/release/papyrus is N bytes, above the 12582912-byte (12 MiB) budget` |
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -385,6 +392,254 @@ fn no_second_section_parser() {
         },
     )
     .unwrap();
+}
+
+// MS-037 release gates -------------------------------------------------------
+//
+// TECH-008 section 2 (12 MiB binary) and ADR-043's dependency baseline: the
+// release must not grow a new crate or a new dependency edge, and the release
+// binary must stay inside the recorded size budget.
+
+/// Runtime dependencies recorded at MS-037 refinement time.
+const BASELINE_DEPENDENCIES: [&str; 4] = ["clap", "serde", "serde_json", "yaml_serde"];
+/// Dev dependencies recorded at MS-037 refinement time.
+const BASELINE_DEV_DEPENDENCIES: [&str; 1] = ["serde_json"];
+/// Build dependencies recorded at MS-037 refinement time.
+const BASELINE_BUILD_DEPENDENCIES: [&str; 0] = [];
+/// The complete `Cargo.lock` package set recorded at MS-037 refinement time.
+const BASELINE_LOCK_PACKAGES: [&str; 36] = [
+    "anstream",
+    "anstyle",
+    "anstyle-parse",
+    "anstyle-query",
+    "anstyle-wincon",
+    "clap",
+    "clap_builder",
+    "clap_derive",
+    "clap_lex",
+    "colorchoice",
+    "equivalent",
+    "foldhash",
+    "hashbrown",
+    "heck",
+    "indexmap",
+    "is_terminal_polyfill",
+    "itoa",
+    "libyaml-rs",
+    "memchr",
+    "once_cell_polyfill",
+    "papyrus",
+    "proc-macro2",
+    "quote",
+    "ryu",
+    "serde",
+    "serde_core",
+    "serde_derive",
+    "serde_json",
+    "strsim",
+    "syn",
+    "unicode-ident",
+    "utf8parse",
+    "windows-link",
+    "windows-sys",
+    "yaml_serde",
+    "zmij",
+];
+/// TECH-008 section 2: the release binary budget, 12 MiB.
+const RELEASE_BINARY_BUDGET_BYTES: u64 = 12 * 1024 * 1024;
+
+/// Top-level dependency keys of one `[section]` in a `Cargo.toml`.
+fn toml_section_keys(content: &str, section: &str) -> Vec<String> {
+    let target = format!("[{section}]");
+    let mut in_section = false;
+    let mut keys = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_section = trimmed == target;
+            continue;
+        }
+        if !in_section || trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some((key, _)) = trimmed.split_once('=')
+            && !key.trim().is_empty()
+        {
+            keys.push(key.trim().to_string());
+        }
+    }
+    keys
+}
+
+/// `name = "…"` entries of a `Cargo.lock`.
+fn lock_package_names(content: &str) -> Vec<String> {
+    content
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("name = \""))
+        .filter_map(|rest| rest.strip_suffix('"'))
+        .map(str::to_string)
+        .collect()
+}
+
+fn added<'a>(found: &'a [String], baseline: &[&str]) -> Vec<&'a str> {
+    found
+        .iter()
+        .map(String::as_str)
+        .filter(|name| !baseline.contains(name))
+        .collect()
+}
+
+fn missing<'a>(found: &[String], baseline: &'a [&str]) -> Vec<&'a str> {
+    baseline
+        .iter()
+        .copied()
+        .filter(|name| !found.iter().any(|entry| entry == name))
+        .collect()
+}
+
+/// Guard one `Cargo.toml` section against its recorded baseline.
+fn check_dependency_section(
+    section: &str,
+    found: &[String],
+    baseline: &[&str],
+) -> Result<(), String> {
+    let extra = added(found, baseline);
+    let gone = missing(found, baseline);
+    if extra.is_empty() && gone.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Cargo.toml [{section}] changed: added crate(s) {extra:?}, removed crate(s) {gone:?}"
+        ))
+    }
+}
+
+/// Guard the full lockfile package set against the recorded baseline.
+fn check_lock_packages(found: &[String]) -> Result<(), String> {
+    let extra = added(found, &BASELINE_LOCK_PACKAGES);
+    let gone = missing(found, &BASELINE_LOCK_PACKAGES);
+    if extra.is_empty() && gone.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Cargo.lock changed: added package(s) {extra:?}, removed package(s) {gone:?}"
+        ))
+    }
+}
+
+/// TECH-008 section 2: fail above 12,582,912 bytes.
+fn check_binary_budget(size: u64) -> Result<u64, String> {
+    if size > RELEASE_BINARY_BUDGET_BYTES {
+        Err(format!(
+            "target/release/papyrus is {size} bytes, above the {RELEASE_BINARY_BUDGET_BYTES}-byte (12 MiB) budget"
+        ))
+    } else {
+        Ok(size)
+    }
+}
+
+#[test]
+fn no_new_crate_or_dependency_edge() {
+    let manifest = fs::read_to_string("Cargo.toml").expect("Cargo.toml");
+    check_dependency_section(
+        "dependencies",
+        &toml_section_keys(&manifest, "dependencies"),
+        &BASELINE_DEPENDENCIES,
+    )
+    .unwrap();
+    check_dependency_section(
+        "dev-dependencies",
+        &toml_section_keys(&manifest, "dev-dependencies"),
+        &BASELINE_DEV_DEPENDENCIES,
+    )
+    .unwrap();
+    check_dependency_section(
+        "build-dependencies",
+        &toml_section_keys(&manifest, "build-dependencies"),
+        &BASELINE_BUILD_DEPENDENCIES,
+    )
+    .unwrap();
+
+    let lock = fs::read_to_string("Cargo.lock").expect("Cargo.lock");
+    check_lock_packages(&lock_package_names(&lock)).unwrap();
+}
+
+#[test]
+fn no_new_crate_guard_detects_each_planted_addition() {
+    let manifest = "[dependencies]\nclap = \"4\"\nserde = \"1\"\nserde_json = \"1\"\nyaml_serde = \"0.10\"\nnewcrate = \"1\"\n";
+    let error = check_dependency_section(
+        "dependencies",
+        &toml_section_keys(manifest, "dependencies"),
+        &BASELINE_DEPENDENCIES,
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("newcrate"),
+        "the added crate must be named: {error}"
+    );
+
+    let dev = "[dev-dependencies]\nserde_json = \"1\"\ntokio = \"1\"\n";
+    let error = check_dependency_section(
+        "dev-dependencies",
+        &toml_section_keys(dev, "dev-dependencies"),
+        &BASELINE_DEV_DEPENDENCIES,
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("tokio"),
+        "the added dev crate must be named: {error}"
+    );
+
+    let build = "[build-dependencies]\ncc = \"1\"\n";
+    let error = check_dependency_section(
+        "build-dependencies",
+        &toml_section_keys(build, "build-dependencies"),
+        &BASELINE_BUILD_DEPENDENCIES,
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("cc"),
+        "the added build crate must be named: {error}"
+    );
+
+    let lock = check_lock_packages(&[
+        "papyrus".to_string(),
+        "serde".to_string(),
+        "planted-crate".to_string(),
+    ])
+    .unwrap_err();
+    assert!(
+        lock.contains("planted-crate"),
+        "the added lock package must be named: {lock}"
+    );
+}
+
+#[test]
+fn release_binary_stays_within_the_twelve_mib_budget() {
+    let path = Path::new("target/release/papyrus");
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            let size =
+                check_binary_budget(metadata.len()).unwrap_or_else(|error| panic!("{error}"));
+            eprintln!(
+                "target/release/papyrus size: {size} bytes (budget {RELEASE_BINARY_BUDGET_BYTES})"
+            );
+        }
+        Err(_) => eprintln!(
+            "release binary guard skipped: target/release/papyrus is absent (run `cargo build --release`)"
+        ),
+    }
+}
+
+#[test]
+fn binary_budget_guard_rejects_an_oversized_binary() {
+    assert_eq!(
+        check_binary_budget(RELEASE_BINARY_BUDGET_BYTES).unwrap(),
+        12_582_912
+    );
+    let error = check_binary_budget(RELEASE_BINARY_BUDGET_BYTES + 1).unwrap_err();
+    assert!(error.contains("12 MiB"), "{error}");
+    assert!(error.contains("12582913"), "{error}");
 }
 
 // TASK-97 D4: a violation after a mid-file test module is reported, and nested
