@@ -2,14 +2,14 @@
 id: TASK-315
 title: "Correct AUD-151 release audit findings"
 created_date: '2026-11-23T07:52:49Z'
-updated_date: '2026-11-23T07:52:55Z'
+updated_date: '2026-11-23T08:17:07Z'
 labels: []
 references:
   - AUD-151
   - MS-037
   - REL-001
   - TASK-286
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-037
@@ -81,3 +81,6 @@ Every finding has a recorded result and test, or a recorded narrowing with a tes
 - [ ] L2: dead wrappers are removed or documented and the stale registry module documentation is fixed.
 - [ ] The full test suite, cargo clippy --all-targets -- -D warnings, and cargo fmt --check are green.
 - [ ] No behaviour change beyond the AUD-151 corrections; AUD-151 is addressed point by point in the task evidence and is ready for re-audit.
+## Comments
+- **rust-dev**: -
+- **orchestrator**: Acceptance met: B1 archive overwrite refused on all four paths, H1 guard scoped so the suite is green, H2 generated clap ids namespaced and validated, H3 bounded reservation against directories and symlinks, H4 mockup refs encoded, M1 field domains on CLI, M2 fail-closed mockup saves, M3 atomic config with rollback, M4 and M5 hermetic tests, L1 hooks gated, L2 dead code removed; 1427 tests pass.

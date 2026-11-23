@@ -130,11 +130,6 @@ impl DocumentArgs {
             .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
     }
 
-    pub fn require_text(&self, id: &str) -> Result<sanitize::Text, AppError> {
-        self.text(id)
-            .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
-    }
-
     pub fn ids(&self) -> impl Iterator<Item = &str> {
         self.values.keys().map(String::as_str)
     }
@@ -340,6 +335,46 @@ fn field_long(field: &FieldSpec) -> String {
         .unwrap_or_else(|| sanitize::kebab_slug(&field.key))
 }
 
+/// Apply a field's declared scalar value domain (ADR-036 decision 17).
+fn ensure_field_scalar_domain(field: &FieldSpec, value: &str) -> Result<(), AppError> {
+    if field.values.allows_scalar(value) {
+        return Ok(());
+    }
+    let allowed = field.values.allowed_values().unwrap_or(&[]);
+    Err(AppError::Validation(format!(
+        "field '{}' must be one of: {}",
+        field.key,
+        allowed.join(", ")
+    )))
+}
+
+/// Apply a field's declared list value domain: allowed values, or every item as
+/// a record ID.
+fn ensure_field_list_domain(field: &FieldSpec, values: &[String]) -> Result<(), AppError> {
+    if field.values.requires_record_ids() {
+        for value in values {
+            if !crate::record::identity::is_valid_id_component(value) {
+                return Err(AppError::Validation(format!(
+                    "field '{}' must contain valid record IDs: {}",
+                    field.key, value
+                )));
+            }
+        }
+    }
+    if let Some(allowed) = field.values.allowed_values() {
+        for value in values {
+            if !allowed.iter().any(|candidate| candidate == value) {
+                return Err(AppError::Validation(format!(
+                    "field '{}' must be one of: {}",
+                    field.key,
+                    allowed.join(", ")
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn field_offered(field: &FieldSpec, verb: DocumentVerb) -> bool {
     field.verbs.iter().any(|field_verb| match field_verb {
         crate::config::FieldVerb::Create => {
@@ -507,6 +542,7 @@ fn scalar_value(args: &DocumentArgs, field: &FieldSpec) -> Result<Option<String>
             field.key
         )));
     }
+    ensure_field_scalar_domain(field, value.trim())?;
     Ok(Some(value))
 }
 
@@ -518,6 +554,7 @@ fn list_values(args: &DocumentArgs, field: &FieldSpec) -> Result<Vec<String>, Ap
             values.push(value);
         }
     }
+    ensure_field_list_domain(field, &values)?;
     Ok(values)
 }
 
@@ -1274,6 +1311,7 @@ fn edit_document(
                     );
                 } else {
                     let value = text.resolve()?;
+                    ensure_field_scalar_domain(field, value.trim())?;
                     set_scalar_ops(
                         &mut ops,
                         field.heading.as_deref(),

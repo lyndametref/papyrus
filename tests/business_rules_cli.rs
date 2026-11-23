@@ -459,6 +459,69 @@ fn rule_json_output_shapes() {
 }
 
 #[test]
+fn rule_requirement_values_must_be_record_ids() {
+    let d = tmpdir("req-domain");
+    init(&d);
+    let before = run(&d, &["rule", "list"]);
+    assert!(before.status.success());
+
+    let out = run(
+        &d,
+        &[
+            "rule",
+            "create",
+            "Bad",
+            "--description",
+            "d",
+            "--rationale",
+            "r",
+            "--applicability",
+            "a",
+            "--requirement",
+            "a..b",
+        ],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!d.join("docs/business-rules/RUL-001.md").exists());
+
+    let _ = run(
+        &d,
+        &[
+            "rule",
+            "create",
+            "Good",
+            "--description",
+            "d",
+            "--rationale",
+            "r",
+            "--applicability",
+            "a",
+            "--requirement",
+            "REQ-001",
+        ],
+    );
+    let before = fs::read_to_string(d.join("docs/business-rules/RUL-001.md")).unwrap();
+    let out = run(&d, &["rule", "edit", "RUL-001", "--requirement", "a..b"]);
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(d.join("docs/business-rules/RUL-001.md")).unwrap(),
+        before,
+        "the rejected edit writes nothing"
+    );
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
 fn rule_editor_with_script() {
     let d = tmpdir("editscript");
     init(&d);

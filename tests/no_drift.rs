@@ -245,10 +245,12 @@ fn no_record_writes_outside_the_store() {
         |line| line.contains("fs::write") || line.contains("std::fs::write"),
     )
     .unwrap();
-    // A record file may only be renamed by the shared store.
+    // A record file may only be renamed by the shared store. The configuration
+    // writer owns its own atomic rename because a configuration file is not a
+    // record (AUD-151 M3).
     check(
-        "fs::rename outside src/record/:",
-        &["src/record/"],
+        "fs::rename outside src/record/ or the configuration writer:",
+        &["src/record/", "src/config.rs"],
         |line| line.contains("fs::rename"),
     )
     .unwrap();
@@ -368,9 +370,11 @@ fn no_reimplemented_backlog_stem_detection() {
 
 #[test]
 fn no_second_record_writer() {
+    // The configuration writer uses a temporary file + rename, but it never
+    // writes a record (AUD-151 M3).
     check(
-        "second record writer outside src/record/store.rs:",
-        &["src/record/store.rs"],
+        "second record writer outside src/record/store.rs or the configuration writer:",
+        &["src/record/store.rs", "src/config.rs"],
         |line| line.contains("fn write_atomic") || line.contains(".tmp"),
     )
     .unwrap();

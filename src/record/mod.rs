@@ -22,9 +22,9 @@ pub use document::{Document, Section, parse as parse_document, render as render_
 pub use field_map::{DocumentFieldMap, FieldRole, FieldValue, ResolvedField};
 pub use frontmatter::FrontMatter;
 pub use identity::*;
-pub use patch::{Patch, PatchOp, apply_patch};
+pub use patch::{PatchOp, apply_patch};
 pub use store::{
-    NormalizedRead, Store, archive, archive_content, delete, read as read_record, read_document,
+    NormalizedRead, archive, archive_content, delete, read as read_record, read_document,
     read_document_normalized, resolve_path, set_status, write_atomic,
 };
 pub use view::RecordView;

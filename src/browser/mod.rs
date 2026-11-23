@@ -1637,6 +1637,17 @@ fn save_content(
     Ok(())
 }
 
+/// The stored source a mockup edit rewrites, or a fail-closed server error.
+///
+/// The record was read once for the request; deriving new content from an empty
+/// re-read would silently replace the record with a partial document.
+fn mockup_edit_source(source: &str) -> Result<&str, HttpError> {
+    if source.is_empty() {
+        return Err(HttpError::new(500));
+    }
+    Ok(source)
+}
+
 fn resolved_group<'a>(record: &Record, index: &'a records::Index) -> Option<&'a Record> {
     if record.descriptor.document_model != DocumentModel::GroupedMarkdown || record.is_group {
         return None;
@@ -2080,8 +2091,8 @@ fn save_mockup_document(
     if title == record.title && specs == stored("specs") && refs == stored("refs") {
         return Ok(Response::redirect(&format!("/doc/{}", record.id)));
     }
-    let original = std::fs::read_to_string(&record.path).unwrap_or_default();
-    let content = records::edit_ui_mockup(&original, &record.id, &title, &specs, &refs);
+    let original = mockup_edit_source(&record.stored_source)?;
+    let content = records::edit_ui_mockup(original, &record.id, &title, &specs, &refs);
     let ctx = state.context();
     save_content(&ctx, cfg, &state.registry, record, content)?;
     Ok(Response::redirect(&format!("/doc/{}", record.id)))
@@ -3934,8 +3945,8 @@ fn api_post_mockup(
         }
         Some(_) => return Err(HttpError::new(400)),
     };
-    let original = std::fs::read_to_string(&record.path).unwrap_or_default();
-    let content = records::edit_ui_mockup(&original, &record.id, title, &specs, &refs);
+    let original = mockup_edit_source(&record.stored_source)?;
+    let content = records::edit_ui_mockup(original, &record.id, title, &specs, &refs);
     save_content(&ctx, cfg, &state.registry, record, content)?;
     let updated = live_record(id, snapshot)?;
     Ok(Response::json(200, record_json(&updated, None, None)))
@@ -3963,6 +3974,18 @@ mod tests {
 
     fn config() -> Config {
         Config::default()
+    }
+
+    #[test]
+    fn mockup_edit_source_fails_closed_without_a_stored_source() {
+        assert!(
+            mockup_edit_source("").is_err(),
+            "an empty source never writes"
+        );
+        assert_eq!(
+            mockup_edit_source("<!doctype html>\n").unwrap(),
+            "<!doctype html>\n"
+        );
     }
 
     #[test]

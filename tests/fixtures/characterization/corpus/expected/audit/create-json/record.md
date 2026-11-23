@@ -6,12 +6,12 @@ updated_date: '{{TIMESTAMP}}'
 labels: []
 references: []
 status: active
-type: quality
+type: security
 ---
 # AUD-003 Corpus audit
 
 ## Audit Type
-quality
+security
 
 ## Content
 Corpus audit content

@@ -19,7 +19,8 @@ fn workspace(name: &str) -> PathBuf {
 }
 
 fn build_package(out: &Path) -> Output {
-    Command::new(root().join("scripts/build-package.sh"))
+    Command::new("bash")
+        .arg(root().join("scripts/build-package.sh"))
         .args(["--version", "1.2.3", "--out"])
         .arg(out)
         .output()
@@ -27,7 +28,8 @@ fn build_package(out: &Path) -> Output {
 }
 
 fn build_package_forced(out: &Path) -> Output {
-    Command::new(root().join("scripts/build-package.sh"))
+    Command::new("bash")
+        .arg(root().join("scripts/build-package.sh"))
         .args(["--version", "1.2.3", "--out"])
         .arg(out)
         .arg("--force")
@@ -344,7 +346,8 @@ fn h2_force_cleans_only_after_validation() {
 
 #[test]
 fn l4_deb_assembly_shares_the_repository_out_policy() {
-    let output = Command::new(root().join("scripts/build-deb.sh"))
+    let output = Command::new("bash")
+        .arg(root().join("scripts/build-deb.sh"))
         .args(["--version", "1.2.3", "--out"])
         .arg(root())
         .output()
@@ -361,7 +364,8 @@ fn l4_deb_assembly_shares_the_repository_out_policy() {
 fn l4_version_regex_rejects_a_non_three_component_version() {
     let workspace = workspace("version");
     let out = workspace.join("out");
-    let output = Command::new(root().join("scripts/build-package.sh"))
+    let output = Command::new("bash")
+        .arg(root().join("scripts/build-package.sh"))
         .args(["--version", "1.2", "--out"])
         .arg(&out)
         .output()
@@ -422,7 +426,8 @@ fn write_asset_version_tree(
 
 fn run_normal_deb_build(tree: &Path) -> (std::process::Output, PathBuf) {
     let out = tree.join("out");
-    let output = Command::new(tree.join("scripts/build-deb.sh"))
+    let output = Command::new("bash")
+        .arg(tree.join("scripts/build-deb.sh"))
         .args(["--version", "1.2.3", "--out"])
         .arg(&out)
         .output()

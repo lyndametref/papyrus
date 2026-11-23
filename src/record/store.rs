@@ -292,6 +292,21 @@ pub fn move_record(ctx: &Context, source: &Path, destination: &Path) -> Result<(
     fs::rename(&source, &destination).map_err(|e| AppError::Runtime(e.to_string()))
 }
 
+/// Refuse an archive or relocation whose destination already exists.
+///
+/// `symlink_metadata` treats a directory, a regular file, and a symlink
+/// (including a dangling one) as occupied, so no archive path can replace a
+/// pre-existing record of the same ID.
+fn ensure_free_archive_destination(destination: &Path) -> Result<(), AppError> {
+    if destination.symlink_metadata().is_ok() {
+        return Err(AppError::Validation(format!(
+            "archived record already exists: {}",
+            destination.display()
+        )));
+    }
+    Ok(())
+}
+
 pub fn write_atomic(
     ctx: &Context,
     cfg: &Config,
@@ -516,8 +531,6 @@ pub fn archive_inner(
     // Active folder with status archived: relocate using the same sequence.
     // (status patch is a no-op on the value.)
 
-    fs::create_dir_all(&archived_dir)
-        .map_err(|e| RelocateError::Other(AppError::Runtime(e.to_string())))?;
     let file_name = path
         .file_name()
         .ok_or_else(|| {
@@ -527,6 +540,11 @@ pub fn archive_inner(
         .to_string();
     let dest = Context::ensure_within(&ctx.project_dir, &archived_dir.join(&file_name))
         .map_err(RelocateError::Other)?;
+    if dest != path {
+        ensure_free_archive_destination(&dest).map_err(RelocateError::Other)?;
+    }
+    fs::create_dir_all(&archived_dir)
+        .map_err(|e| RelocateError::Other(AppError::Runtime(e.to_string())))?;
 
     let doc = crate::record::document::parse(&content_for_status).map_err(RelocateError::Other)?;
     let new_content = crate::record::patch::apply_patch(
@@ -615,8 +633,6 @@ pub fn relocate_if_archived(
             ))));
         }
     };
-    fs::create_dir_all(&archived_dir)
-        .map_err(|e| RelocateError::Other(AppError::Runtime(e.to_string())))?;
     let file_name = safe
         .file_name()
         .ok_or_else(|| {
@@ -626,6 +642,11 @@ pub fn relocate_if_archived(
         .to_string();
     let dest = Context::ensure_within(&ctx.project_dir, &archived_dir.join(&file_name))
         .map_err(RelocateError::Other)?;
+    if dest != safe {
+        ensure_free_archive_destination(&dest).map_err(RelocateError::Other)?;
+    }
+    fs::create_dir_all(&archived_dir)
+        .map_err(|e| RelocateError::Other(AppError::Runtime(e.to_string())))?;
 
     let doc = crate::record::document::parse(&content).map_err(RelocateError::Other)?;
     let new_content = crate::record::patch::apply_patch(
@@ -791,6 +812,9 @@ pub fn archive_content(
 ) -> Result<(), AppError> {
     let source_safe = resolve_path(ctx, source)?;
     let dest_safe = resolve_path(ctx, destination)?;
+    if dest_safe != source_safe {
+        ensure_free_archive_destination(&dest_safe)?;
+    }
     if let Some(parent) = dest_safe.parent()
         && !parent.exists()
     {
@@ -892,141 +916,6 @@ pub fn reassign_id(
         ))
     })?;
     Ok(destination)
-}
-
-// Provide a Store struct alias for hidden tests that prefer OO style.
-pub struct Store;
-
-impl Store {
-    pub fn resolve_path(ctx: &Context, target: &Path) -> Result<PathBuf, AppError> {
-        resolve_path(ctx, target)
-    }
-    pub fn read(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        target: &Path,
-    ) -> Result<(Document, String), AppError> {
-        read(ctx, cfg, registry, target)
-    }
-    pub fn read_document(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        target: &Path,
-    ) -> Result<(Document, String), AppError> {
-        read_document(ctx, cfg, registry, target)
-    }
-    pub fn read_document_normalized(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        target: &Path,
-    ) -> Result<NormalizedRead, AppError> {
-        read_document_normalized(ctx, cfg, registry, target)
-    }
-    pub fn valid_version_token(token: &str) -> bool {
-        let mut parts = token.split('.');
-        let (Some(seconds), Some(nanos), Some(length), None) =
-            (parts.next(), parts.next(), parts.next(), parts.next())
-        else {
-            return false;
-        };
-        !seconds.is_empty()
-            && !nanos.is_empty()
-            && !length.is_empty()
-            && seconds.bytes().all(|b| b.is_ascii_digit())
-            && nanos.bytes().all(|b| b.is_ascii_digit())
-            && length.bytes().all(|b| b.is_ascii_digit())
-    }
-
-    /// Move one record file atomically to another project-relative location.
-    ///
-    /// Relocation is a directory move, not a record write: the shared store is the
-    /// only place that may rename a record path.
-    pub fn move_record(ctx: &Context, source: &Path, destination: &Path) -> Result<(), AppError> {
-        let source = resolve_path(ctx, source).map_err(|_| {
-            AppError::Runtime(format!(
-                "path resolves outside project directory: {}",
-                source.display()
-            ))
-        })?;
-        let destination = resolve_path(ctx, destination).map_err(|_| {
-            AppError::Runtime(format!(
-                "path resolves outside project directory: {}",
-                destination.display()
-            ))
-        })?;
-        fs::rename(&source, &destination).map_err(|e| AppError::Runtime(e.to_string()))
-    }
-
-    pub fn write_atomic(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        target: &Path,
-        content: &str,
-    ) -> Result<(), AppError> {
-        write_atomic(ctx, cfg, registry, target, content)
-    }
-    pub fn archive(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        descriptor: &crate::record::descriptor::RecordDescriptor,
-        id: &str,
-    ) -> Result<PathBuf, AppError> {
-        archive(ctx, cfg, registry, descriptor, id)
-    }
-    pub fn set_status(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        descriptor: &crate::record::descriptor::RecordDescriptor,
-        id: &str,
-        value: &str,
-    ) -> Result<(), AppError> {
-        set_status(ctx, cfg, registry, descriptor, id, value)
-    }
-    pub fn relocate_if_archived(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        path: &Path,
-    ) -> Result<PathBuf, RelocateError> {
-        relocate_if_archived(ctx, cfg, registry, path)
-    }
-    pub fn delete(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        descriptor: &crate::record::descriptor::RecordDescriptor,
-        id: &str,
-    ) -> Result<(), AppError> {
-        delete(ctx, cfg, registry, descriptor, id)
-    }
-    pub fn archive_content(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        source: &Path,
-        destination: &Path,
-        content: &str,
-    ) -> Result<(), AppError> {
-        archive_content(ctx, cfg, registry, source, destination, content)
-    }
-    pub fn version_token(meta: &fs::Metadata) -> String {
-        version_token(meta)
-    }
-    pub fn reassign_id(
-        ctx: &Context,
-        cfg: &Config,
-        registry: &ArtifactRegistry,
-        path: &Path,
-        new_id: &str,
-    ) -> Result<PathBuf, AppError> {
-        reassign_id(ctx, cfg, registry, path, new_id)
-    }
 }
 
 #[cfg(test)]
@@ -1335,16 +1224,126 @@ mod tests {
         assert_eq!(doc.source, content);
     }
 
-    #[test]
-    fn store_struct_methods() {
-        let dir = tmpdir("struct");
+    fn milestone_fixture(name: &str, status: &str) -> (Context, Config, ArtifactRegistry, PathBuf) {
+        let dir = tmpdir(name);
         let c = ctx(&dir);
-        let p = dir.join("rec.md");
-        fs::write(&p, "# T\n").unwrap();
-        let (doc, tok) = Store::read(&c, &access(&c).0, &access(&c).1, &p).unwrap();
-        assert!(!tok.is_empty());
-        Store::write_atomic(&c, &access(&c).0, &access(&c).1, &p, "# T2\n").unwrap();
-        assert_eq!(fs::read_to_string(&p).unwrap(), "# T2\n");
-        let _ = doc;
+        fs::create_dir_all(dir.join("backlog/milestones")).unwrap();
+        let path = dir.join("backlog/milestones/MS-001.md");
+        let content = format!(
+            "---\nid: MS-001\ntitle: Existing\ncreated_date: '2026-01-01T00:00:00Z'\nupdated_date: '2026-01-01T00:00:00Z'\nlabels: []\nreferences: []\nrelease: null\nstatus: {status}\n---\n\n## Description\n\nBody\n"
+        );
+        fs::write(&path, &content).unwrap();
+        let (cfg, registry) = access(&c);
+        (c, cfg, registry, path)
+    }
+
+    #[test]
+    fn archive_refuses_an_existing_archived_destination() {
+        let (c, cfg, registry, active) = milestone_fixture("archive-conflict", "open");
+        let archived = c.project_dir.join("backlog/archive/milestones/MS-001.md");
+        fs::create_dir_all(archived.parent().unwrap()).unwrap();
+        fs::write(&archived, "sentinel archived bytes").unwrap();
+        let active_before = fs::read(&active).unwrap();
+
+        let descriptor = crate::record::descriptor::descriptor_for("milestone").expect("milestone");
+        let error = archive_inner(&c, &cfg, &registry, &descriptor, "MS-001").unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains(&archived.display().to_string()),
+            "the error names the destination: {message}"
+        );
+        assert_eq!(
+            fs::read(&active).unwrap(),
+            active_before,
+            "source untouched"
+        );
+        assert_eq!(
+            fs::read_to_string(&archived).unwrap(),
+            "sentinel archived bytes",
+            "destination untouched"
+        );
+    }
+
+    #[test]
+    fn relocation_refuses_an_existing_archived_destination() {
+        let (c, cfg, registry, active) = milestone_fixture("relocate-conflict", "archived");
+        let archived = c.project_dir.join("backlog/archive/milestones/MS-001.md");
+        fs::create_dir_all(archived.parent().unwrap()).unwrap();
+        fs::write(&archived, "sentinel archived bytes").unwrap();
+        let active_before = fs::read(&active).unwrap();
+
+        let error = relocate_if_archived(&c, &cfg, &registry, &active).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains(&archived.display().to_string()),
+            "the error names the destination: {message}"
+        );
+        assert_eq!(
+            fs::read(&active).unwrap(),
+            active_before,
+            "source untouched"
+        );
+        assert_eq!(
+            fs::read_to_string(&archived).unwrap(),
+            "sentinel archived bytes",
+            "destination untouched"
+        );
+    }
+
+    #[test]
+    fn read_path_relocation_refuses_an_existing_archived_destination() {
+        let (c, cfg, registry, active) = milestone_fixture("read-relocate-conflict", "archived");
+        let archived = c.project_dir.join("backlog/archive/milestones/MS-001.md");
+        fs::create_dir_all(archived.parent().unwrap()).unwrap();
+        fs::write(&archived, "sentinel archived bytes").unwrap();
+        let active_before = fs::read(&active).unwrap();
+
+        let error = read_document(&c, &cfg, &registry, &active).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains(&archived.display().to_string()),
+            "the automatic read-path relocation names the destination: {message}"
+        );
+        assert_eq!(
+            fs::read(&active).unwrap(),
+            active_before,
+            "source untouched"
+        );
+        assert_eq!(
+            fs::read_to_string(&archived).unwrap(),
+            "sentinel archived bytes",
+            "destination untouched"
+        );
+    }
+
+    #[test]
+    fn archive_content_refuses_an_existing_destination() {
+        let dir = tmpdir("archive-content-conflict");
+        let c = ctx(&dir);
+        let source = dir.join("active.md");
+        let destination = dir.join("archived/active.md");
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::write(&source, "source bytes").unwrap();
+        fs::write(&destination, "sentinel archived bytes").unwrap();
+
+        let error = archive_content(
+            &c,
+            &access(&c).0,
+            &access(&c).1,
+            &source,
+            &destination,
+            "rendered",
+        )
+        .unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains(&destination.display().to_string()),
+            "the error names the destination: {message}"
+        );
+        assert_eq!(fs::read_to_string(&source).unwrap(), "source bytes");
+        assert_eq!(
+            fs::read_to_string(&destination).unwrap(),
+            "sentinel archived bytes"
+        );
     }
 }

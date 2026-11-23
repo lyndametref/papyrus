@@ -271,6 +271,28 @@ pub fn config_get(ctx: &Context, key: &str) -> Result<CommandOutput, AppError> {
     })
 }
 
+#[cfg(test)]
+thread_local! {
+    static FAIL_NEXT_CONFIG_WRITE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Arm one injected configuration-write failure for the current test thread.
+#[cfg(test)]
+pub(crate) fn fail_next_config_write() {
+    FAIL_NEXT_CONFIG_WRITE.with(|flag| flag.set(true));
+}
+
+/// Persist a validated configuration atomically.
+fn write_config_atomically(path: &std::path::Path, content: &str) -> Result<(), AppError> {
+    #[cfg(test)]
+    if FAIL_NEXT_CONFIG_WRITE.with(|flag| flag.replace(false)) {
+        return Err(AppError::Runtime(
+            "injected configuration write failure".to_string(),
+        ));
+    }
+    crate::config::write_config_file(path, content)
+}
+
 pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput, AppError> {
     if !valid_config_selector(key) {
         return Err(AppError::Validation("invalid key".to_string()));
@@ -321,10 +343,12 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
 
     validate_candidate(&file_val, &ctx.project_dir)?;
 
-    // Folder relocation, if applicable, runs before persistence.
+    // Folder relocation, if applicable, runs before persistence. Its failure
+    // leaves the old file untouched; a failed persistence rolls it back.
     let mut relocation_cross_device = false;
+    let mut relocation: Option<(std::path::PathBuf, std::path::PathBuf)> = None;
     if Config::is_folder_key(key) {
-        let old_cfg = load_effective_config(&ctx.config_path, &ctx.project_dir).unwrap_or_default();
+        let old_cfg = load_effective_config(&ctx.config_path, &ctx.project_dir)?;
         let new_value = match &parsed {
             yaml_serde::Value::String(s) => s.clone(),
             _ => {
@@ -337,12 +361,24 @@ pub fn config_set(ctx: &Context, key: &str, value: &str) -> Result<CommandOutput
         let (source, destination) = folder_paths(ctx, &old_cfg, key, &new_value)?;
         let report = crate::record::relocate::relocate(ctx, &source, &destination)?;
         relocation_cross_device = report.cross_device;
+        relocation = Some((source, destination));
     }
 
-    // boundary check for config path? skip
-    // write
     let out_str = to_config_yaml(&file_val).map_err(AppError::Runtime)?;
-    crate::config::write_config_file(&ctx.config_path, &out_str)?;
+    if let Err(error) = write_config_atomically(&ctx.config_path, &out_str) {
+        if let Some((source, destination)) = relocation
+            && let Err(rollback) = crate::record::relocate::relocate(ctx, &destination, &source)
+        {
+            return Err(AppError::Runtime(format!(
+                "{}; failed to roll back relocation {} -> {}: {}",
+                error,
+                destination.display(),
+                source.display(),
+                rollback
+            )));
+        }
+        return Err(error);
+    }
 
     let text = if relocation_cross_device {
         "relocation: non-atomic operation (a single rename was impossible; used copy-then-remove)"
@@ -395,7 +431,7 @@ pub fn config_unset(ctx: &Context, key: &str) -> Result<CommandOutput, AppError>
         let _ = std::fs::remove_file(&ctx.config_path);
     } else {
         let out_str = to_config_yaml(&file_val).map_err(AppError::Runtime)?;
-        crate::config::write_config_file(&ctx.config_path, &out_str)?;
+        write_config_atomically(&ctx.config_path, &out_str)?;
     }
 
     let json = if ctx.json {

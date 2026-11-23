@@ -236,7 +236,7 @@ pub(crate) fn escape_text(value: &str) -> String {
 /// Encode one value for the fixed HTML comment block.
 ///
 /// `--` is broken so a value can never terminate or invalidate the comment.
-fn escape_comment(value: &str) -> String {
+pub(crate) fn escape_comment(value: &str) -> String {
     escape_text(value).replace("--", "-&#45;")
 }
 
@@ -1120,6 +1120,41 @@ mod tests {
             assert_eq!(parsed.task, "TASK-001");
             assert_eq!(parsed.title, title);
         }
+    }
+
+    #[test]
+    fn mockup_comment_refs_are_encoded_and_round_trip() {
+        let refs = vec![
+            "-->".to_string(),
+            "<script>alert(1)</script>".to_string(),
+            "a--b".to_string(),
+        ];
+        let record = Mockup {
+            id: "MOCK-001".to_string(),
+            raw_title: "T".to_string(),
+            title: "T".to_string(),
+            task: "TASK-001".to_string(),
+            specs: vec!["UI-001".to_string()],
+            refs: refs.clone(),
+            status: "pending".to_string(),
+            superseded_by: None,
+        };
+        let rendered = render_record(&record);
+        let refs_comment = rendered
+            .lines()
+            .find(|line| line.contains("<!-- refs:"))
+            .expect("one refs comment");
+        assert!(!refs_comment.contains("<script>"), "{refs_comment}");
+        assert_eq!(
+            refs_comment.matches("-->").count(),
+            1,
+            "the comment is never terminated early: {refs_comment}"
+        );
+        assert_eq!(
+            parse_browser_metadata(&rendered, "MOCK-001").refs,
+            refs,
+            "encoded refs round-trip"
+        );
     }
 
     #[test]

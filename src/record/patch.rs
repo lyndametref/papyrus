@@ -16,21 +16,6 @@ pub enum PatchOp {
     ClearHeading,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
-    pub ops: Vec<PatchOp>,
-}
-
-impl Patch {
-    pub fn new(ops: Vec<PatchOp>) -> Self {
-        Self { ops }
-    }
-
-    pub fn apply(&self, doc: &Document) -> Result<String, AppError> {
-        apply_patch(doc, &self.ops)
-    }
-}
-
 fn splice_heading(body: &str, heading: Option<&str>) -> String {
     let lines: Vec<&str> = body.split('\n').collect();
     let mut i = 0usize;
@@ -287,10 +272,6 @@ pub fn apply(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
     apply_patch(doc, ops)
 }
 
-pub fn patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
-    apply_patch(doc, ops)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,14 +381,6 @@ mod tests {
         let doc = document::parse(input).unwrap();
         let out = apply_patch(&doc, &[PatchOp::SetHeadingId("TECH-002".into())]).unwrap();
         assert_eq!(out, input);
-    }
-
-    #[test]
-    fn patch_struct_apply_matches() {
-        let input = "# T Title\n\n## Description\nBody\n";
-        let doc = document::parse(input).unwrap();
-        let p = Patch::new(vec![]);
-        assert_eq!(p.apply(&doc).unwrap(), input);
     }
 
     #[test]

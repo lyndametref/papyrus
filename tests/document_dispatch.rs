@@ -222,7 +222,7 @@ fn audit_create_applies_the_seed_default_and_edit_leaves_an_absent_field_unchang
         "{unchanged}"
     );
 
-    edit_args = args(&[("id", &[&id]), ("audit_type", &["quality"])]);
+    edit_args = args(&[("id", &[&id]), ("audit_type", &["licence"])]);
     document::run(
         &ctx,
         &cfg,
@@ -231,8 +231,8 @@ fn audit_create_applies_the_seed_default_and_edit_leaves_an_absent_field_unchang
     )
     .unwrap();
     let changed = fs::read_to_string(&path).unwrap();
-    assert!(changed.contains("type: quality\n"), "{changed}");
-    assert!(changed.contains("## Audit Type\nquality\n"), "{changed}");
+    assert!(changed.contains("type: licence\n"), "{changed}");
+    assert!(changed.contains("## Audit Type\nlicence\n"), "{changed}");
     assert!(!changed.contains("security"), "{changed}");
 
     cleanup(&dir);
