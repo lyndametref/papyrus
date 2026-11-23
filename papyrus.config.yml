@@ -14,9 +14,6 @@ decision_types:
   adr:
     prefix: ADR
     enabled: true
-  bdr:
-    prefix: BDR
-    enabled: false
 document_types:
   audit:
     prefix: AUD
