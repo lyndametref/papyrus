@@ -276,21 +276,6 @@ pub fn sanitize_path_string(input: &str) -> Option<String> {
     Some(trimmed.to_string())
 }
 
-/// Alias for callers that think in terms of references.
-pub fn sanitize_reference(input: &str) -> Option<String> {
-    sanitize_path_string(input)
-}
-
-/// Alias for callers that think in terms of documentation paths.
-pub fn sanitize_documentation(input: &str) -> Option<String> {
-    sanitize_path_string(input)
-}
-
-/// Alias matching the path-safe sanitizer wording.
-pub fn sanitize_path_value(input: &str) -> Option<String> {
-    sanitize_path_string(input)
-}
-
 /// Derive a kebab-case file-name slug from a record title.
 ///
 /// Lowercase ASCII alphanumerics are kept, every other run collapses to a

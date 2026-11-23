@@ -169,13 +169,6 @@ pub fn canonical_id(cfg: &Config, value: &str) -> Option<String> {
     })
 }
 
-/// Numeric identity key of a decision reference, used for tolerant matching.
-pub fn canonical_key(cfg: &Config, value: &str) -> Option<String> {
-    decision_prefixes(cfg).iter().find_map(|prefix| {
-        crate::record::identity::parse_id_parts(value, prefix, false).map(|parts| parts.key(prefix))
-    })
-}
-
 fn decision_dirs(ctx: &Context, cfg: &Config) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Ok(active) = active_dir(ctx, cfg) {

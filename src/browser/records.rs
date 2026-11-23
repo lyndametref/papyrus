@@ -86,10 +86,6 @@ impl Record {
         self.descriptor.handler().is_none()
     }
 
-    pub fn is_html_mockup(&self) -> bool {
-        self.descriptor.document_model == DocumentModel::SingleHtmlMockup
-    }
-
     pub fn type_label(&self) -> String {
         crate::browser::routes::label(&self.descriptor)
     }

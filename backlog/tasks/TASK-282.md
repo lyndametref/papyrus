@@ -2,13 +2,13 @@
 id: TASK-282
 title: "Remove the dead descriptor, sanitizer, and per-type test artifacts"
 created_date: '2026-11-20T17:43:51Z'
-updated_date: '2026-11-23T06:16:17Z'
+updated_date: '2026-11-23T06:40:17Z'
 labels: []
 references:
   - ADR-036
   - TECH-072
   - TECH-066
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-037
@@ -79,3 +79,6 @@ Every listed symbol is either removed with no remaining reference or confirmed a
 - [ ] No unused import or dead-code warning remains: clippy with `-D warnings` and `cargo fmt --check` are clean.
 - [ ] `cargo test` passes the full suite, and no Backlog or Decision behaviour test changes.
 - [ ] A task comment lists every symbol from the MS-037 AC-1 dead-code list as removed or already absent, with module and replacement path.
+## Comments
+- **rust-dev**: TASK-282 rust-dev evidence. REMOVED: all_descriptors, list_descriptors, is_managed_record (src.record.descriptor.rs; replacement descriptors() and descriptor_for); apply_patches (src.record.patch.rs; apply_patch and apply); read_store (src.record.store.rs; Store.read and read_document); to_text (src.record.document.rs; render); build_raw, format_scalar_pub (src.record.frontmatter.rs; patch_raw_value and format_scalar); canonical_key (src.decision.rs; canonical_id); matches_family_id, IdentitySpec.validate_input (src.record.identity.rs; parse_id_parts and IdSpec.parse_id); sanitize_reference, sanitize_documentation, sanitize_path_value (src.sanitize.rs; sanitize_path_string; plural sanitize_references kept). Record.is_html_mockup removed after inlining its 5 call sites (browser mod.rs lines 1970, 2003, 2141 and browser render.rs lines 2542, 2893) to record.descriptor.document_model == DocumentModel.SingleHtmlMockup. ALREADY ABSENT (no action): edit_page_test_case, edit_page_test_report, conflict_page_test_case, conflict_page_test_report; the last two remain only as negative strings in tests.browser_config_types_cli.rs lines 705-728, kept unchanged and passing. CHECKS: cargo build OK; cargo build --release OK, binary 8245400 bytes = 7.86 MiB (< 12 MiB gate); cargo test (env -u EDITOR -u VISUAL) 1398 passed, 0 failed, 27 ignored across 70 binaries; browser_config_types_cli 30 of 30 pass; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean. No public API, help text, JSON, or behaviour change (removed items were internal aliases only; cli_help_golden, characterization_replay, no_drift green). Status left In-Progress.
+- **orchestrator**: Acceptance met: 14 dead symbols removed, is_html_mockup inlined at 5 call sites then deleted, 4 symbols already absent and recorded; negative renderer assertions preserved; 1398 tests pass, clippy and fmt clean, release binary 7.86 MiB under the 12 MiB gate.

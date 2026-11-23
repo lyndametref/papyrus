@@ -179,11 +179,6 @@ pub fn section_lines(doc: &Document, name: &str) -> Vec<String> {
     }
 }
 
-// Convenience aliases
-pub fn to_text(doc: &Document) -> String {
-    render(doc)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

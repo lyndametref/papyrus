@@ -1967,7 +1967,7 @@ fn document_allowed_keys(record: &Record) -> Vec<String> {
     for field in &record.field_map.fields {
         keys.push(field.key.clone());
     }
-    if record.is_html_mockup() {
+    if record.descriptor.document_model == DocumentModel::SingleHtmlMockup {
         keys.push("specs".to_string());
         keys.push("refs".to_string());
     }
@@ -2000,7 +2000,7 @@ fn document_submitted_values(
             );
         }
     }
-    if record.is_html_mockup() {
+    if record.descriptor.document_model == DocumentModel::SingleHtmlMockup {
         if fields.iter().any(|(key, _)| key == "specs") {
             values.specs = records::submitted_tag_values(&form_fields(fields, "specs"));
         }
@@ -2138,7 +2138,7 @@ fn document_form_post(
         ));
     }
 
-    if record.is_html_mockup() {
+    if record.descriptor.document_model == DocumentModel::SingleHtmlMockup {
         return save_mockup_document(record, cfg, state, fields, group, chrome);
     }
 

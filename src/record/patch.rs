@@ -287,10 +287,6 @@ pub fn apply(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
     apply_patch(doc, ops)
 }
 
-pub fn apply_patches(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
-    apply_patch(doc, ops)
-}
-
 pub fn patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
     apply_patch(doc, ops)
 }
