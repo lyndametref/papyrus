@@ -1073,7 +1073,7 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
 <b style="color: light-dark(#0969da, #58a6ff);">Web UI</b>
 
        <b style="color: light-dark(#8250df, #d2a8ff);">browser_host</b>
-       Bind address. Default: <b>127.0.0.1</b>.
+       Bind address. Default: <b>127.0.0.1</b>. A non-loopback bind is unauthenticated: anyone who can reach the port can read and modify every record.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">browser_port</b>
        TCP port from <b>1</b> to <b>65535</b>. Default: <b>6420</b>.

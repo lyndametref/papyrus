@@ -149,9 +149,9 @@ and cache behavior follow ADR-0005 and ADR-0038.
    characters, `/`, `\`, `@`, `?`, `#`, `,`, or `%`; it must parse as
    `std::net::IpAddr` or match a host-name pattern and not end with `.` or `-`.
 9. A resolved host that is not a loopback address prints
-   `warning: binding to non-loopback address <host>; the interface is reachable from the network`
-   to standard error before binding. Loopback means `127.0.0.0/8`, `::1`, or
-   `localhost` (case-insensitive).
+   `warning: binding to non-loopback address <host> without authentication; anyone who can reach this port can read and modify every record`
+   to standard error before binding (ADR-044 decision 3). Loopback means
+   `127.0.0.0/8`, `::1`, or `localhost` (case-insensitive).
 10. Global options (`--json`, `--dir`, `--config`, `--no-color`) behave as for
     the existing commands. `--dir` and `--config` select the project directory
     and configuration file before the server starts. The command never writes

@@ -4457,6 +4457,46 @@ mod tests {
     }
 
     #[test]
+    fn config_set_and_unset_reject_an_unbudgeted_configuration_without_writing() {
+        // Oversized overlay: the file is one byte past the accepted budget.
+        let oversized = TempProject::new("config-set-oversized");
+        oversized.write_config(&format!(
+            "project_name: {}\n",
+            "x".repeat(MAX_CONFIG_YAML_BYTES)
+        ));
+        let before = oversized.read_config();
+        let ctx = oversized.context();
+        for (command, result) in [
+            ("set", config_set(&ctx, "project_name", "next")),
+            ("unset", config_unset(&ctx, "project_name")),
+        ] {
+            let error = result.err().unwrap_or_else(|| {
+                panic!("config {command} must reject an oversized configuration")
+            });
+            assert!(matches!(error, AppError::Validation(_)), "{error:?}");
+            assert!(error.message().contains("YAML limit"), "{}", error);
+            assert_eq!(oversized.read_config(), before, "nothing is written");
+        }
+
+        // Anchor/alias overlay: the same lexical budget rejects the syntax.
+        let aliased = TempProject::new("config-set-alias");
+        aliased.write_config("project_name: &p apyrus\nother: *p\n");
+        let before = aliased.read_config();
+        let ctx = aliased.context();
+        for (command, result) in [
+            ("set", config_set(&ctx, "project_name", "next")),
+            ("unset", config_unset(&ctx, "project_name")),
+        ] {
+            let error = result
+                .err()
+                .unwrap_or_else(|| panic!("config {command} must reject an aliased configuration"));
+            assert!(matches!(error, AppError::Validation(_)), "{error:?}");
+            assert!(error.message().contains("anchors or aliases"), "{}", error);
+            assert_eq!(aliased.read_config(), before, "nothing is written");
+        }
+    }
+
+    #[test]
     fn init_force_repairs_an_invalid_configuration() {
         let project = TempProject::new("init-force");
         project.write_config(

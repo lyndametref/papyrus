@@ -8384,6 +8384,26 @@ fn debug_path_strips_query_decodes_and_truncates() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// REL-001 security reissue L-3: a control character decoded from the path is
+// rejected at the request boundary and never reaches the debug log line.
+#[test]
+fn debug_log_sanitizes_decoded_control_characters_in_the_path() {
+    let dir = fixture("debug-path-control");
+    let server = Server::start(&dir, &["--no-open", "--debug"], &[]);
+
+    assert_eq!(get(&server, "/in%0Ajected").status, 400);
+    server.wait_for_stderr("- - 400");
+    let stderr = server.stderr_text();
+    assert_eq!(stderr.lines().count(), 1, "stderr: {stderr:?}");
+    assert!(stderr.starts_with("- - 400"), "stderr: {stderr:?}");
+    assert!(
+        !stderr.trim_end_matches('\n').chars().any(char::is_control),
+        "stderr: {stderr:?}"
+    );
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // TASK-96 AC #6: headers and bodies never reach the console.
 #[test]
 fn console_never_contains_headers_or_body() {
