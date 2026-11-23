@@ -2,7 +2,7 @@
 id: ADR-0020
 title: "Registry-Derived Browser Views for Config-Defined Document Types"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T19:58:54Z'
+updated_date: '2026-11-23T06:25:29Z'
 labels: []
 references: []
 ---
@@ -67,6 +67,11 @@ Forces: no new dependency, template engine, or asset (ADR-0005); no per-type cod
 - **Amended:** decision 1 (the descriptor is the only source of a document type's presentation facts) and decision 3 (seed-declared aliases and one document handler).
 - **Superseded:** decision 5, and the rejected alternative "Server-side rendering from a data-driven generic page for **all** types, dropping typed forms". The alternative is no longer rejected.
 - **Not changed:** decisions 2, 4, and 6 to 11, every downstream constraint, the route semantics, the security and write contracts, and this record's accepted status.
+
+### Clarification (2026-11-23) — the seed table is the only production naming of document slugs
+
+- **Decision 1.** `src/init.rs` holds `DOCUMENT_ARTIFACTS`, an 11-slug literal list of the built-in document types (`req`, `nfr`, `glossary`, `rule`, `ui-spec`, `ui-mockup`, `audit`, `tech-spec`, `use-case`, `test-case`, `test-report`). It is a second production naming of document slugs and is covered by decision 1's rule that no module may hold a second list of document-type keys; ADR-036 decision 28 makes the seed table the only definition of built-in document types. The interactive-init selectable document list must derive its slugs from `SEED_DOCUMENT_TYPES` in `src/config.rs`, in seed order. No exception is recorded. Tests and documentation remain exempt.
+- **Not changed:** decisions 2-11, every downstream constraint, the route semantics, the security and write contracts, and this record's accepted status.
 ## Consequences
 
 **Positive:**
