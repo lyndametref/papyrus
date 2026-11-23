@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, SEED_DOCUMENT_TYPES};
 use crate::error::AppError;
 use crate::sanitize::{sanitize_name, sanitize_path_string};
 use std::collections::BTreeMap;
@@ -17,20 +17,24 @@ pub struct InitOptions {
 const CORE_ARTIFACTS: [&str; 3] = ["task", "milestone", "release"];
 /// Decision types in configuration key order.
 const DECISION_ARTIFACTS: [&str; 2] = ["adr", "bdr"];
-/// Document types in schema (configuration declaration) order.
-const DOCUMENT_ARTIFACTS: [&str; 11] = [
-    "req",
-    "nfr",
-    "glossary",
-    "rule",
-    "ui-spec",
-    "ui-mockup",
-    "audit",
-    "tech-spec",
-    "use-case",
-    "test-case",
-    "test-report",
-];
+/// Document types in schema (configuration declaration) order. Derived from
+/// the single production definition, [`crate::config::SEED_DOCUMENT_TYPES`], so
+/// this module holds no second document-slug list (ADR-0020 decision 1
+/// clarification, 2026-11-23).
+const DOCUMENT_ARTIFACTS: [&str; SEED_DOCUMENT_TYPES.len()] = document_artifacts_from_seed();
+
+/// Build the selectable document order from the seed table in declaration
+/// order. `const` so an add, remove, reorder, or rename on either side is a
+/// compile-time and test-time failure.
+const fn document_artifacts_from_seed() -> [&'static str; SEED_DOCUMENT_TYPES.len()] {
+    let mut artifacts = [""; SEED_DOCUMENT_TYPES.len()];
+    let mut index = 0;
+    while index < SEED_DOCUMENT_TYPES.len() {
+        artifacts[index] = SEED_DOCUMENT_TYPES[index].slug;
+        index += 1;
+    }
+    artifacts
+}
 const SELECTABLE_ARTIFACT_COUNT: usize = DECISION_ARTIFACTS.len() + DOCUMENT_ARTIFACTS.len();
 
 type Activation = (BTreeMap<String, bool>, BTreeMap<String, bool>);
@@ -1220,6 +1224,24 @@ mod tests {
         assert!(!config.document_types["req"].enabled);
         assert!(config.document_types["nfr"].enabled);
         assert!(config.decision_types["adr"].enabled);
+    }
+
+    #[test]
+    fn document_artifacts_derive_from_the_seed_table_without_a_second_slug_list() {
+        // ADR-0020 decision 1 clarification (2026-11-23): the interactive-init
+        // list derives from `SEED_DOCUMENT_TYPES`; no production line in this
+        // module may restate a document slug.
+        let production = include_str!("init.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or_default();
+        for seed in crate::config::SEED_DOCUMENT_TYPES {
+            assert!(
+                !production.contains(&format!("\"{}\"", seed.slug)),
+                "init production code must not restate the document slug {}",
+                seed.slug
+            );
+        }
     }
 
     #[test]

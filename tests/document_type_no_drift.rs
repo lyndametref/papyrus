@@ -9,6 +9,18 @@
 //! excluded because they record past behaviour.
 //!
 //! Every violation reports `file:line: text`.
+//!
+//! Guards owned here after TASK-283:
+//!
+//! | Guard | Invariant | Failure format |
+//! |---|---|---|
+//! | D-05 | no document slug literal outside the `SEED_DOCUMENT_TYPES` block | `src/x.rs:12: <text>` |
+//! | D-05 (list) | no second document slug list | `src/x.rs:12: <text>` |
+//! | D-13 | per-type document modules stay deleted; `ui_mockup` remains | `src/x.rs must be deleted…` |
+//! | D-16 | `TypedHandler` is exactly Task, Milestone, Release, Decision | `src/registry.rs:25: TypedHandler …` |
+//! | D-17 | no document `TypedHandler` or `RequirementKind` in production | `src/x.rs:12: <text>` |
+//! | D-19 | `ArtifactCategory` is exactly Backlog, Decision, Document | `src/registry.rs:25: ArtifactCategory …` |
+//! | D-20 | only `document_conflict_page`/`document_not_found_page` remain | `src/x.rs:12: <text>` |
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -222,6 +234,124 @@ fn is_dispatch_line(line: &str, slugs: &[&str]) -> bool {
             || line.contains(".eq("))
 }
 
+/// Line range (1-based, inclusive) of the `SEED_DOCUMENT_TYPES` declaration:
+/// the only production place where a document slug literal is allowed.
+fn seed_constant_range(content: &str) -> Option<(usize, usize)> {
+    let lines: Vec<&str> = content.lines().collect();
+    let start = lines
+        .iter()
+        .position(|line| line.contains("SEED_DOCUMENT_TYPES: ["))?;
+    let mut depth = 0i32;
+    let mut opened = false;
+    for (index, line) in lines.iter().enumerate().skip(start) {
+        depth += bracket_delta(line);
+        if bracket_delta(line) > 0 {
+            opened = true;
+        }
+        if opened && depth <= 0 {
+            return Some((start + 1, index + 1));
+        }
+    }
+    None
+}
+
+/// Net square-bracket balance on one line, ignoring comments, strings, raw
+/// strings, and character literals, so a slug list can be delimited exactly.
+fn bracket_delta(line: &str) -> i32 {
+    let bytes = line.as_bytes();
+    let mut delta = 0i32;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'/' if bytes.get(i + 1) == Some(&b'/') => break,
+            b'/' if bytes.get(i + 1) == Some(&b'*') => match line[i + 2..].find("*/") {
+                Some(end) => i += 2 + end + 2,
+                None => break,
+            },
+            b'r' if is_raw_string_start(bytes, i) => i = skip_raw_string(bytes, i),
+            b'"' => i = skip_quoted(bytes, i, b'"'),
+            b'\'' => i = skip_char(bytes, i),
+            b'[' => {
+                delta += 1;
+                i += 1;
+            }
+            b']' => {
+                delta -= 1;
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    delta
+}
+
+/// Every production document slug literal outside the `SEED_DOCUMENT_TYPES`
+/// block, as `file:line: text`.
+fn slug_literal_violations(files: &[(String, String)]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (rel, content) in files {
+        let allowed = if rel == "src/config.rs" {
+            seed_constant_range(content)
+        } else {
+            None
+        };
+        for (lineno, line) in production_lines_in(content) {
+            if !has_slug_literal(&line, &DOCUMENT_SLUGS) {
+                continue;
+            }
+            if let Some((start, end)) = allowed
+                && lineno >= start
+                && lineno <= end
+            {
+                continue;
+            }
+            violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
+        }
+    }
+    violations
+}
+
+/// A second slug list: one production line naming two or more distinct
+/// document slugs. The seed declaration is written one slug per entry line and
+/// is the only allowed definition.
+fn second_slug_list_violations(files: &[(String, String)]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (rel, content) in files {
+        let allowed = if rel == "src/config.rs" {
+            seed_constant_range(content)
+        } else {
+            None
+        };
+        for (lineno, line) in production_lines_in(content) {
+            if let Some((start, end)) = allowed
+                && lineno >= start
+                && lineno <= end
+            {
+                continue;
+            }
+            let distinct = DOCUMENT_SLUGS
+                .iter()
+                .filter(|slug| line.contains(&format!("\"{slug}\"")))
+                .count();
+            if distinct >= 2 {
+                violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
+            }
+        }
+    }
+    violations
+}
+
+/// The source files the drift guards scan.
+fn source_files() -> Vec<(String, String)> {
+    src_files()
+        .into_iter()
+        .map(|path| {
+            let content = fs::read_to_string(&path).unwrap_or_default();
+            (relative(&path), content)
+        })
+        .collect()
+}
+
 // D-01 ---------------------------------------------------------------------
 #[test]
 fn d01_no_deprecated_folder_literal_in_src() {
@@ -286,31 +416,88 @@ fn d04_no_static_per_type_command_in_cli() {
 }
 
 // D-05 ---------------------------------------------------------------------
+// The slug guard owns the invariant across all of `src/`: a document slug
+// literal selects behaviour only in the seed table. Allowlist: the
+// `SEED_DOCUMENT_TYPES` declaration block in `src/config.rs` and nothing else.
+// Tests and `docs/` are exempt by construction (only `src/*.rs` production
+// lines are scanned).
 #[test]
-fn d05_no_slug_literal_dispatch_outside_type_modules() {
-    let mut violations = Vec::new();
-    for path in src_files() {
-        let rel = relative(&path);
-        // Browser and CLI surfaces and the document engine must never name a
-        // document slug: the seed table in `src/config.rs` and its derivation
-        // in `src/registry.rs` are the only production definitions.
-        let scanned = rel.starts_with("src/browser/")
-            || rel.starts_with("src/cli/")
-            || rel == "src/document.rs";
-        if !scanned {
-            continue;
-        }
-        let content = fs::read_to_string(&path).unwrap_or_default();
-        for (lineno, line) in production_lines_in(&content) {
-            if has_slug_literal(&line, &DOCUMENT_SLUGS) {
-                violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
-            }
-        }
-    }
+fn d05_no_slug_literal_outside_the_seed_table() {
+    let violations = slug_literal_violations(&source_files());
     assert!(
         violations.is_empty(),
-        "D-05 any document slug literal in the browser, CLI, or document engine:\n{}",
+        "D-05 any document slug literal outside SEED_DOCUMENT_TYPES in src/:\n{}",
         violations.join("\n")
+    );
+}
+
+#[test]
+fn d05_scanner_flags_a_planted_slug_match_in_a_new_module() {
+    let planted = [(
+        "src/new_module.rs".to_string(),
+        "pub fn pick(slug: &str) -> u8 {\n    match slug {\n        \"req\" => 1,\n        _ => 0,\n    }\n}\n"
+            .to_string(),
+    )];
+    let violations = slug_literal_violations(&planted);
+    assert!(
+        violations
+            .iter()
+            .any(|line| line.starts_with("src/new_module.rs:3: ")),
+        "a planted slug match must report file:line, got: {violations:?}"
+    );
+    assert!(
+        violations.iter().any(|line| line.contains("\"req\"")),
+        "the planted line text must be reported, got: {violations:?}"
+    );
+
+    // The seed block itself is the allowlist, and a literal outside it in the
+    // config module is still flagged.
+    let config = "const SEED_DOCUMENT_TYPES: [&str; 1] = [\n    \"req\",\n];\nfn other() { let _ = \"nfr\"; }\n";
+    let violations = slug_literal_violations(&[("src/config.rs".to_string(), config.to_string())]);
+    assert_eq!(violations.len(), 1, "got: {violations:?}");
+    assert!(
+        violations[0].starts_with("src/config.rs:4: "),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn d05_seed_constant_range_covers_the_seed_declaration() {
+    let content = fs::read_to_string("src/config.rs").expect("config.rs");
+    let (start, end) = seed_constant_range(&content).expect("seed declaration");
+    assert!(
+        content
+            .lines()
+            .nth(start - 1)
+            .unwrap()
+            .contains("SEED_DOCUMENT_TYPES")
+    );
+    assert!(
+        end > start + 11,
+        "the seed block must span the seed entries"
+    );
+    assert!(
+        content.lines().nth(end - 1).unwrap().trim() == "];",
+        "the seed block ends at the array close"
+    );
+}
+
+// D-05 (second list) -------------------------------------------------------
+#[test]
+fn d05_no_second_document_slug_list_in_src() {
+    let violations = second_slug_list_violations(&source_files());
+    assert!(
+        violations.is_empty(),
+        "a second document slug list in src/:\n{}",
+        violations.join("\n")
+    );
+    let planted = [(
+        "src/list.rs".to_string(),
+        "const DOCS: [&str; 2] = [\"req\", \"nfr\"];\n".to_string(),
+    )];
+    assert!(
+        !second_slug_list_violations(&planted).is_empty(),
+        "a planted second slug list must be detected"
     );
 }
 
@@ -797,27 +984,147 @@ fn d15_deferred_document_ops_builders_are_absent() {
 }
 
 // D-16 ---------------------------------------------------------------------
+/// The variants of the enum introduced by `header`, with the declaration line.
+fn enum_variants(production: &[(usize, String)], header: &str) -> (usize, Vec<String>) {
+    let (enum_line, _) = production
+        .iter()
+        .find(|(_, line)| line.contains(header))
+        .unwrap_or_else(|| panic!("missing enum: {header}"));
+    let mut variants = Vec::new();
+    for (_, line) in production.iter().filter(|(lineno, _)| lineno > enum_line) {
+        let trimmed = line.trim();
+        if trimmed == "}" {
+            break;
+        }
+        if !trimmed.is_empty() && !trimmed.starts_with("///") {
+            variants.push(trimmed.to_string());
+        }
+    }
+    (*enum_line, variants)
+}
+
 #[test]
 fn d16_only_backlog_and_decision_typed_handlers_exist() {
-    let registry = fs::read_to_string("src/registry.rs").expect("registry.rs");
-    let production: String = production_lines_in(&registry)
-        .into_iter()
-        .map(|(_, line)| line)
-        .collect::<Vec<_>>()
-        .join("\n");
-    let enum_start = production.find("pub enum TypedHandler").expect("enum");
-    let enum_text = &production[enum_start..];
-    let enum_end = enum_text.find('}').expect("enum end");
-    let variants: Vec<&str> = enum_text[..enum_end]
-        .lines()
-        .skip(1)
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with("///"))
-        .collect();
+    let rel = "src/registry.rs";
+    let registry = fs::read_to_string(rel).expect("registry.rs");
+    let (enum_line, variants) =
+        enum_variants(&production_lines_in(&registry), "pub enum TypedHandler");
     assert_eq!(
         variants,
-        vec!["Task,", "Milestone,", "Release,", "Decision,"],
-        "TypedHandler has exactly the four backlog/decision variants"
+        vec![
+            "Task,".to_string(),
+            "Milestone,".to_string(),
+            "Release,".to_string(),
+            "Decision,".to_string(),
+        ],
+        "{rel}:{enum_line}: TypedHandler must have exactly the four explicit \
+         backlog/decision variants, found {variants:?}"
+    );
+}
+
+// D-19 ---------------------------------------------------------------------
+#[test]
+fn d19_artifact_category_has_exactly_three_variants() {
+    let rel = "src/registry.rs";
+    let registry = fs::read_to_string(rel).expect("registry.rs");
+    let (enum_line, variants) =
+        enum_variants(&production_lines_in(&registry), "pub enum ArtifactCategory");
+    assert_eq!(
+        variants,
+        vec![
+            "Backlog,".to_string(),
+            "Decision,".to_string(),
+            "Document,".to_string(),
+        ],
+        "{rel}:{enum_line}: ArtifactCategory must be exactly Backlog, Decision, \
+         Document (three handlers), found {variants:?}"
+    );
+}
+
+#[test]
+fn d16_and_d19_variant_scanners_detect_planted_variants() {
+    let planted = vec![
+        (7, "pub enum TypedHandler {".to_string()),
+        (8, "    Task,".to_string()),
+        (9, "    Document,".to_string()),
+        (10, "}".to_string()),
+    ];
+    let (enum_line, variants) = enum_variants(&planted, "pub enum TypedHandler");
+    assert_eq!(enum_line, 7);
+    assert_eq!(variants, vec!["Task,".to_string(), "Document,".to_string()]);
+    assert!(variants.contains(&"Document,".to_string()));
+}
+
+// D-20 ---------------------------------------------------------------------
+/// The only conflict/not-found renderers allowed anywhere in `src/`. The
+/// backlog/decision conflict page is one bespoke page; documents share one
+/// conflict page and one not-found page.
+const ALLOWED_RENDERERS: [&str; 3] = [
+    "backlog_decision_conflict_page",
+    "document_conflict_page",
+    "document_not_found_page",
+];
+
+fn renderer_tokens(line: &str) -> Vec<String> {
+    line.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .filter(|token| token.contains("conflict_page") || token.contains("not_found_page"))
+        .map(str::to_string)
+        .collect()
+}
+
+fn renderer_violations(files: &[(String, String)]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (rel, content) in files {
+        for (lineno, line) in production_lines_in(content) {
+            for token in renderer_tokens(&line) {
+                if !ALLOWED_RENDERERS.contains(&token.as_str()) {
+                    violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
+                    break;
+                }
+            }
+        }
+    }
+    violations
+}
+
+#[test]
+fn d20_only_the_shared_document_renderers_exist() {
+    let files = source_files();
+    let violations = renderer_violations(&files);
+    assert!(
+        violations.is_empty(),
+        "D-20 per-type conflict/not-found renderer beyond \
+         document_conflict_page and document_not_found_page:\n{}",
+        violations.join("\n")
+    );
+
+    // The shared renderers really exist and keep their call sites.
+    let browser = fs::read_to_string("src/browser/mod.rs").expect("browser/mod.rs");
+    assert!(browser.contains("render::document_conflict_page"));
+    assert!(browser.contains("render::document_not_found_page"));
+
+    // Planted definitions and call sites are detected with file:line.
+    for planted in [
+        "pub fn conflict_page_audit_record() {}",
+        "pub fn tech_spec_not_found_page() {}",
+        "let page = render::test_case_not_found_page(id);",
+        "let page = conflict_page(id);",
+    ] {
+        let files = [("src/browser/render.rs".to_string(), format!("{planted}\n"))];
+        let violations = renderer_violations(&files);
+        assert!(
+            violations
+                .iter()
+                .any(|line| line.starts_with("src/browser/render.rs:1: ")),
+            "the planted renderer {planted:?} must be rejected, got: {violations:?}"
+        );
+    }
+
+    let allowed = "let page = render::document_not_found_page(slug);\n";
+    let files = [("src/browser/render.rs".to_string(), allowed.to_string())];
+    assert!(
+        renderer_violations(&files).is_empty(),
+        "the shared document renderer is allowed"
     );
 }
 
