@@ -130,11 +130,6 @@ impl DocumentArgs {
             .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
     }
 
-    pub fn require_text(&self, id: &str) -> Result<sanitize::Text, AppError> {
-        self.text(id)
-            .ok_or_else(|| AppError::Validation(format!("missing required argument: {}", id)))
-    }
-
     pub fn ids(&self) -> impl Iterator<Item = &str> {
         self.values.keys().map(String::as_str)
     }
@@ -340,6 +335,78 @@ fn field_long(field: &FieldSpec) -> String {
         .unwrap_or_else(|| sanitize::kebab_slug(&field.key))
 }
 
+/// The one scalar value-domain check shared by the CLI engine and the browser
+/// save paths (ADR-036 decision 17, AUD-151 M1).
+///
+/// Returns the declared allowed values when `value` is outside an allowed-value
+/// domain. A free or record-id domain accepts every scalar.
+pub(crate) fn scalar_domain_violation<'a>(
+    field: &'a FieldSpec,
+    value: &str,
+) -> Option<&'a [String]> {
+    if field.values.allows_scalar(value) {
+        return None;
+    }
+    field.values.allowed_values()
+}
+
+/// One list value outside a field's declared domain.
+pub(crate) enum ListDomainViolation<'a> {
+    /// The item is not a valid record ID.
+    RecordId(String),
+    /// The item is not one of the declared allowed values.
+    Allowed { allowed: &'a [String] },
+}
+
+/// The one list value-domain check shared by the CLI engine and the browser
+/// save paths (ADR-036 decision 17, AUD-151 M1).
+pub(crate) fn list_domain_violation<'a>(
+    field: &'a FieldSpec,
+    values: &[String],
+) -> Option<ListDomainViolation<'a>> {
+    if field.values.requires_record_ids()
+        && let Some(value) = values
+            .iter()
+            .find(|value| !crate::record::identity::is_valid_id_component(value))
+    {
+        return Some(ListDomainViolation::RecordId(value.clone()));
+    }
+    let allowed = field.values.allowed_values()?;
+    values
+        .iter()
+        .find(|value| !allowed.iter().any(|candidate| candidate == *value))
+        .map(|_| ListDomainViolation::Allowed { allowed })
+}
+
+/// Apply a field's declared scalar value domain (ADR-036 decision 17).
+fn ensure_field_scalar_domain(field: &FieldSpec, value: &str) -> Result<(), AppError> {
+    match scalar_domain_violation(field, value) {
+        Some(allowed) => Err(AppError::Validation(format!(
+            "field '{}' must be one of: {}",
+            field.key,
+            allowed.join(", ")
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// Apply a field's declared list value domain: allowed values, or every item as
+/// a record ID.
+fn ensure_field_list_domain(field: &FieldSpec, values: &[String]) -> Result<(), AppError> {
+    match list_domain_violation(field, values) {
+        Some(ListDomainViolation::RecordId(value)) => Err(AppError::Validation(format!(
+            "field '{}' must contain valid record IDs: {}",
+            field.key, value
+        ))),
+        Some(ListDomainViolation::Allowed { allowed, .. }) => Err(AppError::Validation(format!(
+            "field '{}' must be one of: {}",
+            field.key,
+            allowed.join(", ")
+        ))),
+        None => Ok(()),
+    }
+}
+
 fn field_offered(field: &FieldSpec, verb: DocumentVerb) -> bool {
     field.verbs.iter().any(|field_verb| match field_verb {
         crate::config::FieldVerb::Create => {
@@ -507,6 +574,7 @@ fn scalar_value(args: &DocumentArgs, field: &FieldSpec) -> Result<Option<String>
             field.key
         )));
     }
+    ensure_field_scalar_domain(field, value.trim())?;
     Ok(Some(value))
 }
 
@@ -518,6 +586,7 @@ fn list_values(args: &DocumentArgs, field: &FieldSpec) -> Result<Vec<String>, Ap
             values.push(value);
         }
     }
+    ensure_field_list_domain(field, &values)?;
     Ok(values)
 }
 
@@ -1274,6 +1343,7 @@ fn edit_document(
                     );
                 } else {
                     let value = text.resolve()?;
+                    ensure_field_scalar_domain(field, value.trim())?;
                     set_scalar_ops(
                         &mut ops,
                         field.heading.as_deref(),

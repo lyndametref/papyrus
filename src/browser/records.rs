@@ -7,7 +7,7 @@
 //! every record; behaviour is selected by `DocumentModel`/`TypedHandler`, never
 //! by a browser-local category enum or a slug literal.
 
-use crate::config::{Config, FieldKind, FieldSpec, FieldValues};
+use crate::config::{Config, FieldKind, FieldSpec};
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::document::{self, Document};
@@ -1723,10 +1723,24 @@ pub fn edit_ui_mockup(
     let specs_comment = comment_span(original, "specs");
     let refs_comment = comment_span(original, "refs");
     if let Some((start, end)) = specs_comment {
-        edits.push((start, end, format!("<!-- specs: {} -->", specs.join(" "))));
+        edits.push((
+            start,
+            end,
+            format!(
+                "<!-- specs: {} -->",
+                crate::ui_mockup::escape_comment(&specs.join(" "))
+            ),
+        ));
     }
     if let Some((start, end)) = refs_comment {
-        edits.push((start, end, format!("<!-- refs: {} -->", refs.join(" "))));
+        edits.push((
+            start,
+            end,
+            format!(
+                "<!-- refs: {} -->",
+                crate::ui_mockup::escape_comment(&refs.join(" "))
+            ),
+        ));
     }
     if let Some((start, end)) = visible_para_inner_span(original, "UI specifications") {
         edits.push((
@@ -1747,10 +1761,16 @@ pub fn edit_ui_mockup(
     if missing_specs || missing_refs {
         let mut block = String::new();
         if missing_specs {
-            block.push_str(&format!("<!-- specs: {} -->\n", specs.join(" ")));
+            block.push_str(&format!(
+                "<!-- specs: {} -->\n",
+                crate::ui_mockup::escape_comment(&specs.join(" "))
+            ));
         }
         if missing_refs {
-            block.push_str(&format!("<!-- refs: {} -->\n", refs.join(" ")));
+            block.push_str(&format!(
+                "<!-- refs: {} -->\n",
+                crate::ui_mockup::escape_comment(&refs.join(" "))
+            ));
         }
         match body_open_end(original) {
             Some(pos) => edits.push((pos, pos, format!("\n{}", block))),
@@ -1895,14 +1915,14 @@ pub fn validate_document_field_value(
     raw: &str,
 ) -> Result<Option<String>, String> {
     if let Some(spec) = document_field_spec(record, &field.key)
-        && let FieldValues::Allowed(values) = &spec.values
+        && let Some(allowed) = spec.values.allowed_values()
     {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
             return Err(format!("{} is required.", field.label));
         }
-        if !values.iter().any(|value| value == trimmed) {
-            return Err(allowed_values_error(&field.label, values));
+        if crate::document::scalar_domain_violation(spec, trimmed).is_some() {
+            return Err(allowed_values_error(&field.label, allowed));
         }
         return Ok(Some(trimmed.to_string()));
     }
@@ -1919,7 +1939,8 @@ pub fn validate_document_field_list(
     field: &ResolvedField,
     raw: &[String],
 ) -> Result<Vec<String>, String> {
-    if submitted_tag_values(raw)
+    let normalized = submitted_tag_values(raw);
+    if normalized
         .iter()
         .any(|value| value.chars().any(char::is_control))
     {
@@ -1928,10 +1949,21 @@ pub fn validate_document_field_list(
             field.label
         ));
     }
-    match document_field_spec(record, &field.key).map(|spec| &spec.values) {
-        Some(FieldValues::RecordIds) => validate_requirement_refs(raw),
-        _ => validate_list_items(&field.label, &raw.join("\n")),
+    if let Some(spec) = document_field_spec(record, &field.key) {
+        match crate::document::list_domain_violation(spec, &normalized) {
+            Some(crate::document::ListDomainViolation::Allowed { allowed }) => {
+                return Err(allowed_values_error(&field.label, allowed));
+            }
+            Some(crate::document::ListDomainViolation::RecordId(_)) => {
+                return validate_requirement_refs(raw);
+            }
+            None if spec.values.requires_record_ids() => {
+                return validate_requirement_refs(raw);
+            }
+            None => {}
+        }
     }
+    validate_list_items(&field.label, &raw.join("\n"))
 }
 
 /// The message for a scalar outside its declared allowed-value domain.
@@ -2311,6 +2343,32 @@ mod tests {
             validate_refs(&["docs/a.md".to_string(), "docs/a.md".to_string()]).unwrap_err(),
             "Duplicate reference: docs/a.md."
         );
+    }
+
+    #[test]
+    fn ui_mockup_comment_refs_are_encoded_and_round_trip() {
+        let original = "<!doctype html>\n<html><head><title>MOCK-001 — Old</title></head><body>\n<!-- mockup-id: MOCK-001 -->\n<!-- status: pending -->\n<!-- task: T -->\n<!-- specs: UI-001 -->\n<!-- refs: docs/old.md -->\n</body></html>\n";
+        let refs = vec![
+            "-->".to_string(),
+            "<script>alert(1)</script>".to_string(),
+            "a--b".to_string(),
+        ];
+        let output = edit_ui_mockup(original, "MOCK-001", "New", &["UI-002".to_string()], &refs);
+        let refs_comment = output
+            .lines()
+            .find(|line| line.contains("<!-- refs:"))
+            .expect("one refs comment");
+        assert!(
+            !refs_comment.contains("<script>"),
+            "angle brackets are encoded: {refs_comment}"
+        );
+        assert_eq!(
+            refs_comment.matches("-->").count(),
+            1,
+            "the comment is never terminated early: {refs_comment}"
+        );
+        let metadata = crate::ui_mockup::parse_browser_metadata(&output, "MOCK-001");
+        assert_eq!(metadata.refs, refs, "encoded refs round-trip");
     }
 
     #[test]

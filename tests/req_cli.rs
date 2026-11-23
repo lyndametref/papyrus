@@ -804,6 +804,7 @@ fn req_editor_body_round_trip() {
     }
     let out = bin()
         .env("EDITOR", script.to_str().unwrap())
+        .env_remove("VISUAL")
         .args(["--dir", p, "req", "edit", "REQ-001.001", "--editor"])
         .output()
         .unwrap();

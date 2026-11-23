@@ -570,11 +570,32 @@ fn fenced_command_slugs(content: &str) -> Vec<(usize, Vec<String>)> {
     blocks
 }
 
-fn table_command_slugs(content: &str) -> Vec<String> {
-    let mut slugs = Vec::new();
-    for line in content.lines() {
+fn table_command_slugs(content: &str) -> Vec<(usize, Vec<String>)> {
+    let mut tables = Vec::new();
+    let mut current: Option<(usize, Vec<String>, bool)> = None;
+    for (index, line) in content.lines().enumerate() {
         if !line.trim_start().starts_with('|') {
+            if let Some((start, slugs, migration)) = current.take()
+                && !migration
+            {
+                tables.push((start, slugs));
+            }
             continue;
+        }
+        let cells: Vec<&str> = line
+            .trim()
+            .trim_matches('|')
+            .split('|')
+            .map(str::trim)
+            .collect();
+        let migration_row = cells.iter().any(|cell| cell.eq_ignore_ascii_case("before"))
+            && cells.iter().any(|cell| cell.eq_ignore_ascii_case("after"));
+        if current.is_none() {
+            current = Some((index + 1, Vec::new(), migration_row));
+        }
+        let (_, slugs, migration) = current.as_mut().expect("table is present");
+        if migration_row {
+            *migration = true;
         }
         for slug in DOCUMENT_SLUGS {
             if line.contains(&format!("papyrus {slug} ")) && !slugs.iter().any(|s| s == slug) {
@@ -582,7 +603,12 @@ fn table_command_slugs(content: &str) -> Vec<String> {
             }
         }
     }
-    slugs
+    if let Some((start, slugs, migration)) = current
+        && !migration
+    {
+        tables.push((start, slugs));
+    }
+    tables
 }
 
 fn static_inventory_violation(content: &str) -> Option<String> {
@@ -594,12 +620,13 @@ fn static_inventory_violation(content: &str) -> Option<String> {
             ));
         }
     }
-    let table = table_command_slugs(content);
-    if table.len() >= 3 {
-        return Some(format!(
-            "table static document-command inventory: {}",
-            table.join(", ")
-        ));
+    for (line, slugs) in table_command_slugs(content) {
+        if slugs.len() >= 3 {
+            return Some(format!(
+                "table static document-command inventory at line {line}: {}",
+                slugs.join(", ")
+            ));
+        }
     }
     None
 }
@@ -701,6 +728,18 @@ fn scanner_flags_planted_violations_and_accepts_allowlisted_lines() {
     assert!(static_inventory_violation(planted).is_some());
     let allowed = "```sh\npapyrus req archive REQ-003\n```\n";
     assert!(static_inventory_violation(allowed).is_none());
+    // A migration table is not a command inventory: its Before/After columns
+    // show one mapping per row, not the command surface.
+    let migration = "| Before | After |\n|---|---|\n| `papyrus req archive <id>` | `papyrus req status <id> active` |\n| `papyrus nfr list` | `papyrus nfr view <id>` |\n| `papyrus glossary list` | `papyrus rule list` |\n";
+    assert!(
+        static_inventory_violation(migration).is_none(),
+        "a migration table must not count as a static inventory"
+    );
+    let inventory = "| Command | Meaning |\n|---|---|\n| `papyrus req list` | list |\n| `papyrus nfr list` | list |\n| `papyrus glossary list` | list |\n";
+    assert!(
+        static_inventory_violation(inventory).is_some(),
+        "a real command inventory must still be rejected"
+    );
 }
 
 // TASK-119 guards ----------------------------------------------------------

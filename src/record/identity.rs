@@ -384,6 +384,11 @@ impl Drop for ReservedId {
 
 fn try_reserve(active: &Path, id: &str, extension: &str) -> std::io::Result<Option<ReservedId>> {
     let path = active.join(format!("{}.{}", id, extension));
+    // Any occupied candidate is a conflict: a regular file, a directory, or a
+    // symlink (including a dangling one) must never be replaced.
+    if path.symlink_metadata().is_ok() {
+        return Ok(None);
+    }
     match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -399,6 +404,10 @@ fn try_reserve(active: &Path, id: &str, extension: &str) -> std::io::Result<Opti
     }
 }
 
+/// Upper bound on the occupied candidates a reservation may skip before it
+/// fails with a clear error instead of looping forever.
+const MAX_RESERVATION_ATTEMPTS: u32 = 10_000;
+
 /// Reserve the next plain ID atomically.
 pub fn reserve_number(
     active: &Path,
@@ -407,17 +416,30 @@ pub fn reserve_number(
     padding: usize,
     extension: &str,
 ) -> std::io::Result<ReservedId> {
-    loop {
-        let next = if extension == "html" {
-            next_html_number(active, archived, prefix)
-        } else {
-            next_number(active, archived, prefix)
-        };
+    let mut next = if extension == "html" {
+        next_html_number(active, archived, prefix)
+    } else {
+        next_number(active, archived, prefix)
+    };
+    for _ in 0..MAX_RESERVATION_ATTEMPTS {
         let id = format_id(prefix, next as i64, padding);
         if let Some(reserved) = try_reserve(active, &id, extension)? {
             return Ok(reserved);
         }
+        next = next.checked_add(1).ok_or_else(|| {
+            std::io::Error::other(format!(
+                "cannot reserve a record id for prefix {}: id space exhausted",
+                prefix
+            ))
+        })?;
     }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        format!(
+            "cannot reserve a record id for prefix {}: {} candidate paths are occupied",
+            prefix, MAX_RESERVATION_ATTEMPTS
+        ),
+    ))
 }
 
 /// Reserve the next dotted member ID atomically.
@@ -428,13 +450,26 @@ pub fn reserve_seq_number(
     padding: usize,
     extension: &str,
 ) -> std::io::Result<ReservedId> {
-    loop {
-        let next = next_seq_number(active, archived, group_id);
+    let mut next = next_seq_number(active, archived, group_id);
+    for _ in 0..MAX_RESERVATION_ATTEMPTS {
         let id = format_seq_id(group_id, next as i64, padding);
         if let Some(reserved) = try_reserve(active, &id, extension)? {
             return Ok(reserved);
         }
+        next = next.checked_add(1).ok_or_else(|| {
+            std::io::Error::other(format!(
+                "cannot reserve a member id for group {}: id space exhausted",
+                group_id
+            ))
+        })?;
     }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        format!(
+            "cannot reserve a member id for group {}: {} candidate paths are occupied",
+            group_id, MAX_RESERVATION_ATTEMPTS
+        ),
+    ))
 }
 
 /// Allocate `max(observed) + 1`, with a minimum of 1.
@@ -612,6 +647,61 @@ mod tests {
             std::fs::read_to_string(base.join("TECH-002.md")).unwrap(),
             "second"
         );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn reservation_advances_past_an_occupied_directory() {
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("identity-reserve-dir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("GLO-001.md")).unwrap();
+
+        let reserved = reserve_number(&base, &base, "GLO", 3, "md").unwrap();
+        assert_eq!(reserved.id, "GLO-002", "an occupied directory is skipped");
+        assert!(
+            base.join("GLO-001.md").is_dir(),
+            "the directory is untouched"
+        );
+        reserved.commit();
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn mockup_reservation_advances_past_an_occupied_directory() {
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("identity-reserve-mockup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("MOCK-001.html")).unwrap();
+
+        let reserved = reserve_number(&base, &base, "MOCK", 3, "html").unwrap();
+        assert_eq!(
+            reserved.id, "MOCK-002",
+            "an occupied mockup target is skipped"
+        );
+        assert!(
+            base.join("MOCK-001.html").is_dir(),
+            "the mockup directory is untouched"
+        );
+        reserved.commit();
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reservation_advances_past_an_occupied_symlink() {
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".tmp")
+            .join(format!("identity-reserve-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        std::os::unix::fs::symlink(base.join("missing.md"), base.join("GLO-001.md")).unwrap();
+
+        let reserved = reserve_number(&base, &base, "GLO", 3, "md").unwrap();
+        assert_eq!(reserved.id, "GLO-002", "an occupied symlink is skipped");
+        reserved.commit();
         let _ = std::fs::remove_dir_all(&base);
     }
 

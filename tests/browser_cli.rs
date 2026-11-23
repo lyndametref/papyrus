@@ -6206,6 +6206,42 @@ fn t26f_validation_422_no_write() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+// TASK-315 parity: the browser save path applies the declared FieldValues
+// domain exactly like the CLI (`audit_type: bogus`).
+#[test]
+fn document_save_rejects_a_value_outside_the_declared_domain_without_writing() {
+    let dir = audit_fixture("domain-parity");
+    let path = audit_record_path(&dir, "AUD-001");
+    let before = fs::read(&path).unwrap();
+    let server = Server::start(&dir, &["--no-open"], &[]);
+    let version = extract_version(&get(&server, "/doc/AUD-001/edit").text());
+
+    let body = form_body(&[
+        ("version", &version),
+        ("title", "Ok"),
+        ("audit_type", "bogus"),
+        ("content", "ok"),
+    ]);
+    let response = post_form(&server, "/doc/AUD-001", &body);
+    assert_eq!(response.status, 422);
+    let html = response.text();
+    let expected = "Audit type must be one of security, licence, or architecture.";
+    assert_eq!(summary_entry(&html, "audit_type"), expected);
+    assert_eq!(field_error(&html, "audit_type"), expected);
+    assert_eq!(fs::read(&path).unwrap(), before, "the form wrote nothing");
+
+    let json = format!(r#"{{"version":"{}","audit_type":"bogus"}}"#, version);
+    assert_eq!(post_json(&server, "/api/doc/AUD-001", &json).status, 422);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        before,
+        "the JSON API wrote nothing"
+    );
+
+    drop(server);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 // T-26g
 #[test]
 fn t26g_stale_and_malformed_versions() {

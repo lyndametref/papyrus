@@ -450,7 +450,7 @@ pub fn run_init_with_io<R: BufRead, W: Write>(
     // rendered as flow sequences by the shared config renderer (ADR-0024).
     let value = config.init_value().map_err(AppError::Runtime)?;
     let yaml = crate::config::to_config_yaml(&value).map_err(AppError::Runtime)?;
-    fs::write(&config_path, yaml.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::config::write_config_file(&config_path, &yaml)?;
 
     // Git init unless suppressed.
     if !opts.no_git {
@@ -938,6 +938,40 @@ mod tests {
         assert_eq!(
             effective.document_types["req"].statuses,
             Some(vec!["active".to_string(), "archived".to_string()])
+        );
+    }
+
+    #[test]
+    fn injected_write_failure_keeps_the_previous_configuration() {
+        let dir = tmpdir("write-failure");
+        let config_path = dir.join("papyrus.config.yml");
+        let previous = "project_name: Before\n";
+        fs::write(&config_path, previous).unwrap();
+        let opts = InitOptions {
+            name: "After".to_string(),
+            no_git: true,
+            force: true,
+        };
+        crate::config::fail_next_config_write_for_test();
+        let mut reader = Cursor::new(Vec::new());
+        let mut writer = Vec::new();
+        let error = run_init_with_io(dir.clone(), opts, false, &mut reader, &mut writer)
+            .expect_err("the injected write failure must fail init");
+        assert!(matches!(error, AppError::Runtime(_)), "{:?}", error);
+        assert_eq!(
+            fs::read_to_string(&config_path).unwrap(),
+            previous,
+            "the previous configuration must stay intact"
+        );
+        let leftovers: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|name| name.contains(".tmp"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "leftover temporary files: {leftovers:?}"
         );
     }
 

@@ -446,6 +446,7 @@ fn tc_053_editor_path_still_writes_multiline_description() {
         .arg("--dir")
         .arg(&dir)
         .env("EDITOR", script.to_str().unwrap())
+        .env_remove("VISUAL")
         .args(["request", "edit", &id, "--editor"])
         .output()
         .unwrap();
@@ -780,17 +781,19 @@ fn audit_and_glossary_literal_values_do_not_read_stdin() {
             "audit",
             "create",
             "--title",
-            "Literal audit",
+            "-",
             "--content",
             "literal content",
-            "--audit-type",
-            "-",
         ],
         b"\xff\xfe",
     ));
     let content = view(&dir, "audit", &audit_id);
     assert!(content.contains("## Content\nliteral content"), "{content}");
-    assert!(content.contains("## Audit Type\n-"), "{content}");
+    assert!(
+        content.contains(&format!("# {} -", audit_id)),
+        "a non-multiline value is literal: {content}"
+    );
+    assert!(content.contains("## Audit Type\nsecurity"), "{content}");
 
     let glossary_id = stdout(&run_stdin(
         &dir,

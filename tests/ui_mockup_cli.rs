@@ -64,6 +64,48 @@ fn record(d: &std::path::Path, id: &str) -> PathBuf {
 }
 
 #[test]
+fn archive_refuses_an_existing_archived_mockup() {
+    let d = tmpdir("archive-conflict");
+    init(&d);
+    let out = create(&d, "Login screen", "TASK-41", &["UI-001"], &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let active = record(&d, "MOCK-001");
+    let archived = d.join("docs/specifications/ui/mockups/archived/MOCK-001.html");
+    fs::create_dir_all(archived.parent().unwrap()).unwrap();
+    fs::write(&archived, "sentinel archived bytes").unwrap();
+    let active_before = fs::read(&active).unwrap();
+
+    let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains(&archived.display().to_string()),
+        "the error names the destination: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        fs::read(&active).unwrap(),
+        active_before,
+        "source untouched"
+    );
+    assert_eq!(
+        fs::read_to_string(&archived).unwrap(),
+        "sentinel archived bytes",
+        "destination untouched"
+    );
+
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
 fn basic_lifecycle() {
     let d = tmpdir("life");
     init(&d);
@@ -895,7 +937,7 @@ fn archive_supersede_and_edit_with_move_write_then_unlink() {
 }
 
 #[test]
-fn destination_write_failure_keeps_source_intact() {
+fn destination_conflict_keeps_source_intact() {
     // archive
     let d = tmpdir("dw-archive");
     init(&d);
@@ -903,7 +945,7 @@ fn destination_write_failure_keeps_source_intact() {
     let before = fs::read(record(&d, "MOCK-001")).unwrap();
     fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
     let out = run(&d, &["ui-mockup", "archive", "MOCK-001"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
     assert!(archived_record(&d, "MOCK-001").is_dir());
     assert_no_temp_files(&mockups_dir(&d).join("archived"));
@@ -917,7 +959,7 @@ fn destination_write_failure_keeps_source_intact() {
     let before = fs::read(record(&d, "MOCK-001")).unwrap();
     fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
     let out = run(&d, &["ui-mockup", "supersede", "MOCK-001", "MOCK-002"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
     assert_no_temp_files(&mockups_dir(&d).join("archived"));
     let _ = fs::remove_dir_all(&d);
@@ -939,7 +981,7 @@ fn destination_write_failure_keeps_source_intact() {
             "MOCK-002",
         ],
     );
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
     assert_no_temp_files(&mockups_dir(&d).join("archived"));
     let _ = fs::remove_dir_all(&d);
@@ -951,7 +993,7 @@ fn destination_write_failure_keeps_source_intact() {
     let before = fs::read(record(&d, "MOCK-001")).unwrap();
     fs::create_dir_all(archived_record(&d, "MOCK-001")).unwrap();
     let out = run(&d, &["ui-mockup", "delete", "MOCK-001", "--force"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert_eq!(fs::read(record(&d, "MOCK-001")).unwrap(), before);
     assert_no_temp_files(&mockups_dir(&d).join("archived"));
     let _ = fs::remove_dir_all(&d);

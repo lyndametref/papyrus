@@ -218,6 +218,30 @@ impl FieldValues {
     pub fn is_free(&self) -> bool {
         matches!(self, FieldValues::Free)
     }
+
+    /// Whether one scalar value is inside a declared allowed-value domain.
+    ///
+    /// A free domain and a record-id domain accept any scalar here; record IDs
+    /// are validated by [`FieldValues::validate_record_ids`].
+    pub fn allows_scalar(&self, value: &str) -> bool {
+        match self {
+            FieldValues::Allowed(values) => values.iter().any(|allowed| allowed == value),
+            FieldValues::Free | FieldValues::RecordIds => true,
+        }
+    }
+
+    /// The allowed values joined for a diagnostic, when the domain is a list.
+    pub fn allowed_values(&self) -> Option<&[String]> {
+        match self {
+            FieldValues::Allowed(values) => Some(values),
+            FieldValues::Free | FieldValues::RecordIds => None,
+        }
+    }
+
+    /// Whether this domain validates every list item as a record ID.
+    pub fn requires_record_ids(&self) -> bool {
+        matches!(self, FieldValues::RecordIds)
+    }
 }
 
 impl Serialize for FieldValues {
@@ -3227,11 +3251,103 @@ fn render_yaml_scalar(value: &yaml_serde::Value) -> String {
     }
 }
 
+// Force the next atomic configuration write to fail (unit-test seam).
+//
+// Production never honours this hook: it is compiled only under `cfg(test)`.
+#[cfg(test)]
+thread_local! {
+    static INJECTED_WRITE_FAILURE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+pub(crate) fn fail_next_config_write_for_test() {
+    INJECTED_WRITE_FAILURE.with(|flag| flag.set(true));
+}
+
+#[cfg(test)]
+fn injected_write_failure() -> bool {
+    INJECTED_WRITE_FAILURE.with(|flag| flag.replace(false))
+}
+
+/// Write the configuration file atomically: a same-directory temporary file is
+/// written, synced, and renamed over the target, so a reader never observes a
+/// partial configuration and a failed write leaves the old file intact.
 pub fn write_config_file(path: &Path, content: &str) -> Result<(), AppError> {
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+    let directory = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(directory).map_err(|error| AppError::Runtime(error.to_string()))?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| AppError::Runtime("configuration file name is unavailable".to_string()))?;
+
+    let original_permissions = std::fs::metadata(path)
+        .ok()
+        .map(|metadata| metadata.permissions());
+
+    let mut temporary: Option<std::path::PathBuf> = None;
+    let mut handle = None;
+    for suffix in 0..1000u32 {
+        let name = if suffix == 0 {
+            format!(".{file_name}.tmp")
+        } else {
+            format!(".{file_name}.tmp.{suffix}")
+        };
+        let candidate = directory.join(name);
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => {
+                temporary = Some(candidate);
+                handle = Some(file);
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(AppError::Runtime(error.to_string())),
+        }
     }
-    std::fs::write(path, content.as_bytes()).map_err(|e| AppError::Runtime(e.to_string()))
+    let (Some(temporary), Some(mut handle)) = (temporary, handle) else {
+        return Err(AppError::Runtime(
+            "cannot create a temporary configuration file".to_string(),
+        ));
+    };
+
+    let result = (|| -> Result<(), AppError> {
+        use std::io::Write;
+        handle
+            .write_all(content.as_bytes())
+            .map_err(|error| AppError::Runtime(error.to_string()))?;
+        handle
+            .sync_all()
+            .map_err(|error| AppError::Runtime(error.to_string()))?;
+        drop(handle);
+        if let Some(permissions) = original_permissions {
+            std::fs::set_permissions(&temporary, permissions)
+                .map_err(|error| AppError::Runtime(error.to_string()))?;
+        }
+        #[cfg(test)]
+        {
+            if injected_write_failure() {
+                return Err(AppError::Runtime(
+                    "injected configuration write failure".to_string(),
+                ));
+            }
+        }
+        std::fs::rename(&temporary, path).map_err(|error| AppError::Runtime(error.to_string()))?;
+        if let Ok(directory_handle) = std::fs::File::open(directory) {
+            let _ = directory_handle.sync_all();
+        }
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -4058,6 +4174,85 @@ mod tests {
             err
         );
         assert_eq!(project.read_config(), before);
+    }
+
+    #[test]
+    fn config_set_rolls_back_folder_relocation_when_the_write_fails() {
+        let project = TempProject::new("config-reloc-rollback");
+        project.write_config("doc_directory: docs\n");
+        std::fs::create_dir_all(project.path().join("docs/notes")).unwrap();
+        std::fs::write(project.path().join("docs/notes/GLO-001.md"), "term").unwrap();
+        let ctx = project.context();
+        let before = project.read_config();
+
+        crate::commands::fail_next_config_write();
+        let error = config_set(&ctx, "doc_directory", "docs2")
+            .err()
+            .expect("the injected write failure is propagated");
+        assert!(
+            error
+                .message()
+                .contains("injected configuration write failure"),
+            "{}",
+            error
+        );
+        assert_eq!(
+            project.read_config(),
+            before,
+            "the configuration is unchanged"
+        );
+        assert!(
+            project.path().join("docs/notes/GLO-001.md").exists(),
+            "the relocation is rolled back"
+        );
+        assert!(
+            !project.path().join("docs2/GLO-001.md").exists()
+                && !project.path().join("docs2/notes/GLO-001.md").exists(),
+            "no destination copy remains"
+        );
+    }
+
+    #[test]
+    fn config_set_propagates_an_old_configuration_load_error() {
+        let project = TempProject::new("config-reloc-load-error");
+        let ctx = project.context();
+        let error = config_set(&ctx, "doc_directory", "docs2")
+            .err()
+            .expect("a missing old configuration is an error");
+        assert!(
+            error.message().contains("configuration file not found"),
+            "{}",
+            error
+        );
+        assert!(!project.path().join("docs2").exists());
+    }
+
+    #[test]
+    fn write_config_file_is_atomic_and_leaves_no_temporary_file() {
+        let project = TempProject::new("config-atomic");
+        let path = project.config_path();
+        project.write_config("project_name: Before\n");
+        write_config_file(&path, "project_name: After\n").unwrap();
+        assert_eq!(project.read_config(), "project_name: After\n");
+        for entry in std::fs::read_dir(project.path()).unwrap() {
+            let name = entry.unwrap().file_name().to_string_lossy().to_string();
+            assert!(!name.contains(".tmp"), "leftover temporary file: {name}");
+        }
+    }
+
+    #[test]
+    fn write_config_file_failure_keeps_the_existing_entry() {
+        let project = TempProject::new("config-atomic-failure");
+        let target = project.config_path();
+        std::fs::create_dir_all(&target).unwrap();
+        let error = write_config_file(&target, "project_name: After\n")
+            .expect_err("a directory target cannot be replaced");
+        assert!(matches!(error, AppError::Runtime(_)), "{:?}", error);
+        assert!(target.is_dir(), "the existing entry stays a directory");
+        for entry in std::fs::read_dir(project.path()).unwrap() {
+            let name = entry.unwrap().file_name().to_string_lossy().to_string();
+            assert!(!name.contains(".tmp"), "leftover temporary file: {name}");
+        }
     }
 
     #[test]

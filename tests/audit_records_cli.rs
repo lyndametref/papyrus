@@ -140,7 +140,7 @@ fn audit_basic_lifecycle() {
 }
 
 #[test]
-fn audit_types_and_custom() {
+fn audit_types_apply_the_declared_domain() {
     let d = tmpdir("types");
     init(&d);
     assert!(create(&d, "Sec", "d", Some("security")).status.success());
@@ -150,15 +150,35 @@ fn audit_types_and_custom() {
             .status
             .success()
     );
+
+    // The declared allowed-value domain applies to create and edit.
+    let out = create(&d, "Custom", "d", Some("custom-type"));
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let message = String::from_utf8_lossy(&out.stderr);
+    assert!(message.contains("audit_type"), "{message}");
     assert!(
-        create(&d, "Custom", "d", Some("custom-type"))
-            .status
-            .success()
+        !record(&d, "AUD-004").exists(),
+        "the rejected create writes nothing"
     );
 
-    let out = run(&d, &["audit", "view", "AUD-004"]);
-    let s = stdout(&out);
-    assert!(s.contains("## Audit Type\ncustom-type"));
+    let before = fs::read_to_string(record(&d, "AUD-001")).unwrap();
+    let out = run(&d, &["audit", "edit", "AUD-001", "--audit-type", "bogus"]);
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(record(&d, "AUD-001")).unwrap(),
+        before,
+        "the rejected edit writes nothing"
+    );
 
     let out = run(&d, &["audit", "view", "AUD-001"]);
     let s = stdout(&out);

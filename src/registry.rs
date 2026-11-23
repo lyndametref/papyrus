@@ -5,9 +5,8 @@
 //! case-sensitive slug lookup. It is assembled from [`Config`] alone and has no
 //! filesystem, path, or environment access (ADR-0017 decision 9).
 //!
-//! No module consumes the registry yet. Wiring lands in TASK-107 (record
-//! layer), TASK-108 (command tree), TASK-110 (generic handler), TASK-113
-//! (search), and TASK-114 (browser).
+//! The registry feeds the record layer, the command tree, the generic document
+//! engine, search, and the browser; it is not a per-command model.
 
 use crate::config::{
     Config, DocTypeEntry, FieldSpec, RoleFields, Slot, TypeEntry, Visibility,
@@ -460,6 +459,14 @@ pub enum RegistryError {
     DerivedOptionDuplicate { slug: String, option: String },
     /// I21: the HTML mockup declares field options it cannot render.
     MockupFieldDeclared { slug: String, path: String },
+    /// I22: a generated argument id shadows a fixed engine argument.
+    GeneratedArgumentIdReserved {
+        slug: String,
+        path: String,
+        id: String,
+    },
+    /// I23: two generated arguments share one id.
+    GeneratedArgumentIdDuplicate { slug: String, id: String },
 }
 
 impl fmt::Display for RegistryError {
@@ -558,6 +565,16 @@ impl fmt::Display for RegistryError {
                 f,
                 "document_types.{}.{}: not allowed for a type without field options",
                 slug, path
+            ),
+            RegistryError::GeneratedArgumentIdReserved { slug, path, id } => write!(
+                f,
+                "document_types.{}.{}.option: reserved argument id: {}",
+                slug, path, id
+            ),
+            RegistryError::GeneratedArgumentIdDuplicate { slug, id } => write!(
+                f,
+                "document_types.{}.fields: duplicate generated argument id: {}",
+                slug, id
             ),
         }
     }
@@ -1796,38 +1813,97 @@ fn validate_derived_surface(
         DocumentModel::SingleHtmlMockup => {}
     }
 
-    let mut seen: Vec<(String, String)> = Vec::new();
+    struct GeneratedArgument {
+        id: String,
+        long: String,
+        key: String,
+        path: String,
+    }
+
+    let mut generated: Vec<GeneratedArgument> = Vec::new();
+    let mut seen_keys: Vec<String> = Vec::new();
     for (path, sequence) in sequences {
         for field in sequence {
+            if seen_keys.contains(&field.key) {
+                continue;
+            }
+            seen_keys.push(field.key.clone());
             let long = field
                 .option
                 .clone()
                 .unwrap_or_else(|| crate::sanitize::kebab_slug(&field.key));
+            let selector = format!("{}[{}]", path, field.key);
             if long.is_empty() {
                 return Err(RegistryError::DerivedOptionEmpty {
                     slug: slug.to_string(),
-                    path: format!("{}[{}]", path, field.key),
+                    path: selector,
                 });
             }
-            if crate::config::RESERVED_OPTION_NAMES.contains(&long.as_str()) {
-                return Err(RegistryError::DerivedOptionReserved {
-                    slug: slug.to_string(),
-                    path: format!("{}[{}]", path, field.key),
-                    option: long,
-                });
-            }
-            if let Some((_, other)) = seen
+            generated.push(GeneratedArgument {
+                id: field.key.clone(),
+                long: long.clone(),
+                key: field.key.clone(),
+                path: selector.clone(),
+            });
+            let offers_edit = field
+                .verbs
                 .iter()
-                .find(|(existing, key)| existing == &long && key != &field.key)
-            {
-                let _ = other;
+                .any(|verb| matches!(verb, crate::config::FieldVerb::Edit));
+            if field.kind == crate::config::FieldKind::List && offers_edit {
+                generated.push(GeneratedArgument {
+                    id: format!("no_{}", field.key),
+                    long: format!("no-{long}"),
+                    key: field.key.clone(),
+                    path: selector,
+                });
+            }
+        }
+    }
+
+    const FIXED_ENGINE_ARG_IDS: &[&str] = &[
+        "title",
+        "title_flag",
+        "id",
+        "value",
+        "force",
+        "editor",
+        "label",
+        "reference",
+        "group",
+        "help",
+    ];
+    for argument in &generated {
+        if FIXED_ENGINE_ARG_IDS.contains(&argument.id.as_str()) {
+            return Err(RegistryError::GeneratedArgumentIdReserved {
+                slug: slug.to_string(),
+                path: argument.path.clone(),
+                id: argument.id.clone(),
+            });
+        }
+        if crate::config::RESERVED_OPTION_NAMES.contains(&argument.long.as_str()) {
+            return Err(RegistryError::DerivedOptionReserved {
+                slug: slug.to_string(),
+                path: argument.path.clone(),
+                option: argument.long.clone(),
+            });
+        }
+    }
+    for (index, argument) in generated.iter().enumerate() {
+        for other in generated.iter().skip(index + 1) {
+            if argument.key == other.key {
+                continue;
+            }
+            if argument.id == other.id {
+                return Err(RegistryError::GeneratedArgumentIdDuplicate {
+                    slug: slug.to_string(),
+                    id: argument.id.clone(),
+                });
+            }
+            if argument.long == other.long {
                 return Err(RegistryError::DerivedOptionDuplicate {
                     slug: slug.to_string(),
-                    option: long,
+                    option: argument.long.clone(),
                 });
-            }
-            if !seen.iter().any(|(existing, _)| existing == &long) {
-                seen.push((long, field.key.clone()));
             }
         }
     }
@@ -3282,6 +3358,52 @@ mod tests {
             error
                 .to_string()
                 .contains("not allowed for a type without field options"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn build_rejects_a_field_key_that_shadows_a_generated_argument_id() {
+        use crate::config::{FieldKind, FieldSpec, FieldVerb};
+
+        let field = |key: &str, kind: FieldKind| FieldSpec {
+            key: key.to_string(),
+            heading: Some(format!("## {}", key)),
+            frontmatter_key: None,
+            option: None,
+            label: None,
+            kind,
+            required: false,
+            verbs: vec![FieldVerb::Create, FieldVerb::Edit],
+            help: None,
+            values: crate::config::FieldValues::Free,
+        };
+
+        let mut title_flag = entry("DEP", "deployment/");
+        title_flag.fields = Some(vec![field("title_flag", FieldKind::Text)]);
+        let error = ArtifactRegistry::build(&config_with("deploy", title_flag))
+            .expect_err("title_flag shadows the fixed title argument");
+        assert!(
+            error
+                .to_string()
+                .contains("reserved argument id: title_flag"),
+            "{error}"
+        );
+
+        // A list field's derived `--no-<option>` collides with a field keyed
+        // `no_<list-key>`: both the clap id and the long name would be shared.
+        let mut removal = entry("DEP", "deployment/");
+        removal.fields = Some(vec![
+            field("tags", FieldKind::List),
+            field("no_tags", FieldKind::Text),
+        ]);
+        let error = ArtifactRegistry::build(&config_with("deploy", removal))
+            .expect_err("the removal flag collides with a field");
+        assert!(
+            error.to_string().contains("generated argument id: no_tags")
+                || error
+                    .to_string()
+                    .contains("duplicate derived option across roles: no-tags"),
             "{error}"
         );
     }

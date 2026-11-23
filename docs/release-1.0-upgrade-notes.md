@@ -336,7 +336,7 @@ A field item has exactly these keys:
 - There is no `order` and no `enabled` field key.
 - The reserved field keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, and `metadata`. A field may use none of them as `key` or `frontmatter_key`.
 - Scalars fill from the seed when absent: `enabled`, `label`, `plural`, `order`, `summary`, `type_alias`, `default_status`, `reference_visibility`, and the model and roles. A present scalar overrides the seed.
-- Collections replace wholesale when present: `fields`, `group.fields`, `member.fields`, `statuses`, `slots`, and `api_aliases`. An absent collection inherits the seed collection; `fields: []` declares no field. Role blocks resolve independently.
+- The eleven seed slugs are always effective, so a present `document_types` map is an overlay, not a replacement: declaring one entry never removes the other seed types. Collections replace per declared entry: `fields`, `group.fields`, `member.fields`, `statuses`, `slots`, and `api_aliases`. An absent collection inherits the seed collection; `fields: []` declares no field. Role blocks resolve independently.
 
 #### Reading and changing fields
 
