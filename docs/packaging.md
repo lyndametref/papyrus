@@ -57,54 +57,73 @@ Expected:
 - `--version`: print `papyrus <version>` and exit `0`.
 - unknown flags/arguments: print usage to stderr and exit `2`.
 
-## Packaging
+## Packaging (Release 1.0, 2026-11-23)
 
-> **Mandatory build step.** `scripts/build-deb.sh` reuses an existing
-> `target/release/papyrus` and rebuilds only when the binary is missing. Always run
-> `cargo build --release` immediately before packaging, and confirm the fresh binary
-> exposes the current feature set, otherwise a stale binary can be shipped.
+`scripts/build-package.sh` is the packaging entry point. It builds the release binary and calls `scripts/build-deb.sh`, the Debian assembly step.
 
 ```sh
-cargo build --release
-./target/release/papyrus --help        # must list search and browser
-./scripts/build-deb.sh
+scripts/build-package.sh --version 1.0.0 --out builds/1.0.0/
 ```
 
-The script produces `papyrus_<version>_amd64.deb` in the project root (for example
-`papyrus_0.1.0_amd64.deb`), where `<version>` is taken from `Cargo.toml`. The package
-version is not bumped by packaging; release versioning belongs to release
-orchestration.
+- `--version` is authoritative for the `Version:` field in `DEBIAN/control` and the `papyrus_<version>_amd64.deb` artifact name. The version is injected while the package is staged; no tracked file is edited and `Cargo.toml` is not bumped.
+- The entry point runs `cargo build --release --locked`, validates the asset versions through the assembly step, and writes the package only under `--out`.
+- `--out` must be absent or empty. With `--force`, the contents of a non-empty directory are replaced.
+- Success prints the artifact path on standard output; diagnostics go to standard error.
 
-Inspect the package:
+### Output locations and the `--out` policy
+
+- `builds/<version>/` is the only publish location. It is git-ignored and is never staged or committed.
+- A release candidate is a discardable verification build in `builds/<version>/`; the release retains exactly one artifact in that directory.
+- `./.tmp/` is scratch only and is removed before the work ends.
+- The build scripts refuse, with exit `2`: the repository root; `builds/` without a version segment after it; any other path inside the repository; the filesystem root; system directories; `$HOME` and its subtree (except the two permitted in-repository roots); and any parent of the repository root.
+
+### Assembly only
+
+`scripts/build-deb.sh` can be run directly to assemble a package from an existing binary:
 
 ```sh
-dpkg-deb -I papyrus_0.1.0_amd64.deb
-dpkg-deb -c papyrus_0.1.0_amd64.deb
-dpkg-deb --fsys-tarfile papyrus_0.1.0_amd64.deb \
+scripts/build-deb.sh [--version <version>] [--out <dir>]
+```
+
+- Version: `--version`, then `PAPYRUS_DEB_VERSION`, then the `Cargo.toml` version.
+- Output: `--out`, then `PAPYRUS_DEB_OUT`, then the default `./.tmp/deb/`.
+- A direct run does not force a rebuild: it reuses `target/release/papyrus` and builds only when the binary is missing.
+- `--check-assets-only` verifies the asset versions and exits without assembling.
+
+### Asset-version guard
+
+The assembly step verifies every vendored package before staging:
+
+- The vendored tree `src/browser/vendor/<package>/` must hold exactly one version directory; that directory name is the asset version.
+- The manifest `src/browser/vendor/MANIFEST.md` must have a row for `/assets/<package>/` whose `version` column matches the directory version.
+- `packaging/deb/usr/share/doc/papyrus/copyright` must cite the same version for the package.
+
+Any mismatch, a missing version directory, a missing manifest row, or a missing citation refuses the build with exit `1`. The check runs on every assembly path, not only with the opt-in flag, and the asset version is independent of the Papyrus package version.
+
+### Package inventory
+
+`dpkg-deb -c` lists exactly two files, plus their directories:
+
+- `/usr/bin/papyrus`, mode `0755`.
+- `/usr/share/doc/papyrus/copyright`, mode `0644`.
+
+No man page is packaged. No asset, template, configuration, or other documentation file is packaged: browser assets are embedded at compile time and served from the static asset table, and document types are seed descriptors.
+
+### Inspect the package
+
+```sh
+dpkg-deb -I builds/1.0.0/papyrus_1.0.0_amd64.deb
+dpkg-deb -c builds/1.0.0/papyrus_1.0.0_amd64.deb
+dpkg-deb --fsys-tarfile builds/1.0.0/papyrus_1.0.0_amd64.deb \
   | tar -xO ./usr/share/doc/papyrus/copyright | grep GPL-3.0-or-later
 ```
 
-Expected metadata and contents:
-
-- `Package: papyrus`, `Version: <Cargo version>`, `Architecture: amd64`,
-  `Section: utils`, `Priority: optional`, `Depends: libc6 (>= 2.34)`,
-  `Maintainer`, `Homepage`, and a `Description` naming Papyrus as a project-level
-  backlog and documentation manager.
-- Copyright file in Debian copyright format declaring `GPL-3.0-or-later`
-  (matches `Cargo.toml`; NFR-06.001).
-- Only `/usr/bin/papyrus` (mode `0755`) and
-  `/usr/share/doc/papyrus/copyright` (mode `0644`), plus their directories. No
-  `.css`, `.js`, `.html`, template, configuration, or man page is packaged: the
-  browser assets are embedded at compile time and served from the static asset
-  table (`/assets/app.css`, `/assets/app.js`, `/assets/nav-state.js`, the KaTeX
-  stylesheet/script and WOFF2 fonts, and `/assets/mermaid/mermaid.min.js`). The
-  copyright file carries the Papyrus GPL-3.0-or-later block plus one section per
-  bundled asset family: KaTeX code MIT, KaTeX fonts OFL-1.1, and Mermaid MIT.
+Expected metadata: `Package: papyrus`, `Version: <requested version>`, `Architecture: amd64`, `Section: utils`, `Priority: optional`, `Depends: libc6 (>= 2.34)`, `Maintainer`, `Homepage`, and a `Description` naming Papyrus as a project-level backlog and documentation manager. The copyright file declares `GPL-3.0-or-later` (matching `Cargo.toml`) and one section per bundled asset family: KaTeX code MIT, KaTeX fonts OFL-1.1, and Mermaid MIT.
 
 ## Install
 
 ```sh
-sudo dpkg -i papyrus_<version>_amd64.deb
+sudo dpkg -i builds/<version>/papyrus_<version>_amd64.deb
 ```
 
 After installation, `papyrus` is available on `PATH` (installed to
@@ -123,7 +142,7 @@ mkdir -p "$ROOT/inst" "$ROOT/adm/info" "$ROOT/adm/updates" "$ROOT/adm/parts" "$R
 : > "$ROOT/adm/available"
 
 fakeroot dpkg --instdir="$ROOT/inst" --admindir="$ROOT/adm" --force-depends \
-  -i papyrus_<version>_amd64.deb
+  -i builds/<version>/papyrus_<version>_amd64.deb
 ```
 
 - The full `PATH` matters: dpkg needs `ldconfig` and `start-stop-daemon` from
@@ -168,6 +187,13 @@ Run every command against the installed binary (`$ROOT/inst/usr/bin/papyrus` on
 `PATH`) with `--dir` pointing at a scratch project under `./.tmp/`. Exit statuses
 follow the existing contract: `0` success, `1` IO/boundary, `2` usage, `3` not found,
 `4` validation.
+
+> **Historical checklist.** The long smoke checklist from here through the recorded
+> milestone sections predates the Release 1.0 document surface and command changes:
+> per-type document commands, `deprecate`/`restore`, `nfreq`, and the generic document
+> model. It is retained as verification history, not as a current procedure. For
+> current behaviour and migration, use the
+> [Release 1.0 upgrade notes](release-1.0-upgrade-notes.md).
 
 ### 3.1 CLI baseline and requirement lifecycle
 

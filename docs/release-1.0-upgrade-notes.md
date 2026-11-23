@@ -203,7 +203,7 @@ These behaviours were exercised end to end for Release 1.0 against an isolated s
 
 **Applies to:** every project that used a per-type document command, the `nfreq` alias, or a seeded `deploy` type, and every project with documents under a `deprecated/` folder.
 
-Release 1.0 makes the document command surface configuration. The command name is the `document_types` key, and only enabled keys exist as commands. `req` and `nfr` still work because they are default entries; the parser gives them no special treatment.
+Release 1.0 makes the document command surface configuration. The command name is the `document_types` key, and only enabled keys exist as commands. `req` and `nfr` still work because they are seed entries; the parser gives them no special treatment.
 
 ### Who must act
 
@@ -224,18 +224,24 @@ The static per-type command blocks are removed from the command tree. A slug tha
 | `papyrus req restore <id>` | No command. Move the file into the type's active directory and set `status: active` (or another declared non-`archived` status) in the front matter. |
 | `papyrus nfreq <verb> ...` | `papyrus nfr <verb> ...` |
 | `papyrus deploy <verb> ...` | Declare a `deploy` entry in `document_types` first (edit `papyrus.config.yml`); then `papyrus deploy <verb> ...`. |
+| `papyrus glossary ... --term "<text>"` | `--term` is removed and exits `2`. The glossary term is the document title: use the positional `TITLE` on create or `--title` on edit. |
+| `papyrus <slug> create --title "<title>"` | Still accepted. `create` and `create-group` also accept the first positional `TITLE`; supplying both positional `TITLE` and `--title` is rejected as conflicting sources. |
 | `papyrus <unknown-or-disabled-slug> ...` | Exit `2`. Enable or declare the slug in `document_types`. |
 | `papyrus <slug> restore <id>` | No document restore exists. |
 
-`req` and `nfr` are the default `document_types` entries `req` and `nfr`. Remove either entry and its command disappears.
+`req` and `nfr` are the seed `document_types` entries `req` and `nfr`. Remove a declared entry for a seed slug and its overrides disappear, but the seed type remains effective.
 
-### `document_types` is a whole map
+The title contract is uniform: the title is not a field, is required on create, must be single-line and non-empty, can never be cleared on edit, and `title` is a reserved field key. It is the first positional `TITLE` on `create` and `create-group`, and `--title` on create, create-group, and edit.
 
-- A `document_types` mapping in `papyrus.config.yml` replaces the default map wholesale. When the key is present, exactly its entries exist; no default entry is re-added.
-- Removing an entry stops managing its files. The files are not deleted and can be recovered by declaring the entry again.
-- `enabled: false` keeps the entry, its prefix reservation, and its files, but removes the command and the browser view.
-- `papyrus config set document_types.<slug>.<field>` materializes the eleven defaults when the key is absent and edits an existing entry. It cannot create a new entry; define a new entry by editing the file (see [Repairing an invalid configuration](#repairing-an-invalid-configuration)).
-- `papyrus init` writes these eleven defaults. `deploy` is not one of them:
+### Seed and user-defined slugs
+
+- The eleven seed slugs are always effective. They resolve from the seed table whether or not `papyrus.config.yml` declares them, so a partially declared `document_types` map does not remove the other seed types.
+- A declaration for a seed slug supplies overrides only. Scalars fill from the seed when absent; a present collection replaces the seed collection.
+- A user-defined slug exists only while it is declared. Removing its entry stops managing its files; the files are not deleted and can be recovered by declaring the entry again.
+- `enabled: false` keeps a declared entry, its prefix reservation, and its files, but removes the command and the browser view.
+- `prefix` and `directory` are never filled from the seed. Every declared entry, including an entry for a seed slug, must declare both; a missing or invalid value is rejected.
+- `papyrus config set document_types.<slug>.<field>` edits a declared entry and can materialize an override for an undeclared seed slug, because the seed supplies its `prefix` and `directory`. It cannot create a user-defined type, where a single set cannot supply both required keys. Declare a new entry by editing the file.
+- `papyrus init` writes these eleven seed entries. `deploy` is not one of them:
 
 | Slug | Prefix | Directory (relative to `doc_directory`) |
 |---|---|---|
@@ -251,14 +257,115 @@ The static per-type command blocks are removed from the command tree. A slug tha
 | `test-case` | `TC` | `test-cases/` |
 | `test-report` | `TR` | `test-reports/` |
 
+### Document fields are configuration data
+
+Fields are declared per type. A `SingleMarkdown` type uses one top-level `fields` sequence; a `GroupedMarkdown` type uses `group.fields` and `member.fields` and no top-level `fields`. Grouped and HTML models are seed-only, so `req` and `nfr` are the only grouped types and `ui-mockup` is the only HTML type; every user-defined slug is `SingleMarkdown`.
+
+Before 1.0 a user-defined type used the fixed generic content model and had no field declaration:
+
+```yaml
+document_types:
+  request:
+    prefix: RQS
+    directory: requests/
+```
+
+After 1.0 the same type can declare its fields:
+
+```yaml
+document_types:
+  request:
+    prefix: RQS
+    directory: requests/
+    fields:
+      - key: requester
+        heading: "## Requester"
+        frontmatter_key: requested_by
+        label: Requester
+        help: Person who raised the request.
+        kind: text
+        required: true
+        verbs: [create]
+      - key: description
+        heading: "## Description"
+        label: Description
+        kind: multiline
+```
+
+A grouped seed type used to be fixed. After 1.0 it declares each role:
+
+```yaml
+document_types:
+  req:
+    prefix: REQ
+    directory: requirements/business/
+    group:
+      fields:
+        - key: story
+          heading: "## User Story"
+          kind: multiline
+    member:
+      fields:
+        - key: story
+          heading: "## User Story"
+          kind: multiline
+        - key: description
+          heading: "## Description"
+          kind: multiline
+```
+
+A present `group` or `member` block replaces only that role's seed collection, so declare every field the role still needs.
+
+A field item has exactly these keys:
+
+| Key | Meaning |
+|---|---|
+| `key` | Required stable identity, unique within a role. |
+| `heading` | Level-2 Markdown heading, written with its `## ` prefix. |
+| `frontmatter_key` | Front-matter key that stores the value; may differ from `key`. |
+| `option` | Long CLI option without `--`; derived from `key` in kebab case when absent. |
+| `label` | Human-facing label for help and the browser form. |
+| `help` | Option help text. |
+| `kind` | `text`, `multiline`, or `list`; defaults to `text`. `multiline` accepts `-` from standard input. |
+| `required` | Whether `create` must supply the field; defaults to `false`. A required field may be changed but not cleared on edit. |
+| `verbs` | Subset of `[create, edit]`; defaults to both. |
+| `values` | Optional value domain: a non-empty list of allowed strings, or `record-ids` for a list field. Absent means no restriction. |
+
+- A field must declare `heading`, `frontmatter_key`, or both; a field with both writes both locations.
+- Sequence position is the only order: body sections, CLI options, help, the browser form, and field maps all follow it.
+- There is no `order` and no `enabled` field key.
+- The reserved field keys are `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, and `metadata`. A field may use none of them as `key` or `frontmatter_key`.
+- Scalars fill from the seed when absent: `enabled`, `label`, `plural`, `order`, `summary`, `type_alias`, `default_status`, `reference_visibility`, and the model and roles. A present scalar overrides the seed.
+- Collections replace wholesale when present: `fields`, `group.fields`, `member.fields`, `statuses`, `slots`, and `api_aliases`. An absent collection inherits the seed collection; `fields: []` declares no field. Role blocks resolve independently.
+
+#### Reading and changing fields
+
+Field leaves are addressable with dotted keys and a keyed or indexed selector:
+
+```text
+document_types.glossary.fields[definition].heading
+document_types.req.member.fields[1].kind
+```
+
+- `papyrus config get <selector>` resolves field selector paths; `papyrus config list` prints every field leaf in the keyed form.
+- `papyrus config set` and `papyrus config unset` reject every selector inside `fields`, `group.fields`, or `member.fields`. Fields are configuration file data: add, remove, reorder, or edit a field only by editing `papyrus.config.yml`.
+- Validation is fail-closed. An invalid entry produces one diagnostic naming the exact selector path `document_types.<slug>.<path>`, for example `document_types.req.group.fields[story]: must declare heading or frontmatter_key`. Unknown keys and unknown enum values are rejected the same way.
+
 ### Statuses
 
 - Every front-matter-backed document type has the fixed main statuses `active` and `archived`. Any explicit `statuses` list must declare each exactly once.
 - Custom statuses are optional, ordered front-matter values. They do not control visibility or location.
-- `default_status` is the status of a new record. It defaults to `active`, must be a declared status, and must not be `archived`.
+- `create` writes the declared `default_status`, or `active` when no default is declared. `default_status` must be a declared status and must not be `archived`.
 - `papyrus <slug> status <id> <value>` sets `active` or a declared custom status in place. It rejects `archived` with exit `4` and names `archive` as the way to archive.
 - `archive` is the only command that sets `archived`. It replaces any custom status with `archived`.
-- UI mockups are HTML records whose state lives in file metadata (`pending`, `approved`, `archived`). They have no `status` command, and declaring `statuses` or `default_status` on `ui-mockup` is invalid.
+- The `audit` seed type supplies an `audit_type` field default of `security`. When `papyrus audit create` is run without `--audit-type`, the stored value is `security`; on edit, an absent value stays absent.
+- UI mockups are HTML records whose state lives in file metadata (`pending`, `approved`, `archived`). Approval is recorded with `papyrus ui-mockup edit <id> --status approved`. They have no `status` command, and declaring `statuses` or `default_status` on `ui-mockup` is invalid. `edit --status archived` exits `4` and names `archive`; `archive` is the only writer of `archived`.
+
+### Group membership
+
+- A grouped member stores its owning group in the member's front-matter `group` key. The engine writes and maintains that key, and membership cannot be changed after creation.
+- The browser record view falls back to a legacy `## Group` body section when the front-matter `group` key is absent, so records written before the front-matter link stay readable.
+- Archiving or deleting a group does not archive, delete, or otherwise change its members.
 
 ### Archive location and no restore
 
@@ -277,12 +384,12 @@ A `deprecated/` folder is inert: Papyrus does not read, migrate, or inventory it
 
 ### Repairing an invalid configuration
 
-Configuration validation is fail-closed: while the configuration is invalid, every command that validates it exits `4` with a message naming `document_types.<slug>.<field>`.
+Configuration validation is fail-closed: while the configuration is invalid, every command that validates it exits `4` with a message naming the exact selector path `document_types.<slug>.<path>`.
 
 - Inspect values with `papyrus config get <key>` and `papyrus config list`. These read the configuration without running registry validation.
 - Repair an existing entry with `papyrus config set <key> <value>` or `papyrus config unset <key>`. Both validate the merged configuration and write nothing when it is invalid.
-- Define a malformed or new entry by editing `papyrus.config.yml` directly. A single `config set` cannot create a new type because the entry would still lack its required `prefix` or `directory`.
-- `papyrus init --force` replaces the configuration file in full (the eleven defaults when non-interactive). It is a last resort and discards custom entries and statuses.
+- Define a malformed or new entry by editing `papyrus.config.yml` directly. A single `config set` cannot create a new type because the entry would still lack its required `prefix` or `directory`. The same file edit is the only way to add, remove, reorder, or change a field.
+- `papyrus init --force` replaces the configuration file in full (the eleven seed entries with prefix and directory only when non-interactive). It is a last resort and discards custom entries and statuses.
 
 List-valued status keys (`statuses` and `document_types.<slug>.statuses`) take a comma-separated value:
 
@@ -291,6 +398,27 @@ papyrus config set document_types.audit.statuses "active, archived, review"
 ```
 
 Each element is trimmed and stored as a YAML flow sequence (`[active, archived, review]`). An empty value, an element that is empty after trimming, and a value containing a control character are rejected and nothing is written. Commas, quotes, and backslashes are not escaped: every comma separates elements, so a status that must contain a comma can only be written by editing `papyrus.config.yml` directly. An invalid list is refused and the file is unchanged.
+
+### Browser cache headers
+
+The browser assigns each response exactly one cache class:
+
+| Response | `Cache-Control` | Validator | `304` |
+|---|---|---|---|
+| Every HTML response, every JSON response, every error and not-found response | `no-store` | none | no |
+| `/assets/app.css`, `/assets/app.js`, `/assets/nav-state.js` | `no-cache` | strong `ETag` of the SHA-256 (`"<64 lowercase hex characters>"`) | yes, on a matching `If-None-Match` |
+| Every file under `/assets/<package>/<asset-version>/` | `public, max-age=31536000, immutable` | none; the URL is the validator | no |
+
+- A matching `If-None-Match` on a first-party asset returns a bodyless `304` with the same `ETag` and `Cache-Control`, no `Content-Type`, no `Content-Length`, and no CSP. A stale, weak, or unparseable tag returns the full `200`.
+- Immutable vendor assets are served only from versioned paths such as `/assets/katex/0.16.11/katex.min.css` and `/assets/mermaid/11.17.2/mermaid.min.js`.
+- The unversioned vendor paths such as `/assets/katex/katex.min.css` and `/assets/mermaid/mermaid.min.js` return `404`. There is no redirect or alias.
+
+### Per-type modules are gone
+
+- The per-type document modules and their static field and verb tables are removed. One descriptor-driven engine serves every document model.
+- Verb about lines are generated from the model and field sequence. Per-verb help prose changed for every document type and is not a behaviour change.
+- Help and list order follow the effective `document_types` map order, not the seed `order`.
+- Fields, headings, options, required flags, per-field verbs, and status sets are configuration and seed data. Changing one is a YAML edit; `config set` cannot edit a field.
 
 ### Man pages and NFR-03.003
 
@@ -319,8 +447,8 @@ The document command family is generated from project configuration. Config-defi
 
 - [`../README.md`](../README.md) — command reference, including the `papyrus import backlog` man page section.
 - [`packaging.md`](packaging.md) — build, install, and recorded Release 1.0 verification evidence.
-- [`specifications/import-backlog-md-records.md`](specifications/import-backlog-md-records.md) — the import contract.
-- [`specifications/release-1.0-native-layout-verification-and-packaging.md`](specifications/release-1.0-native-layout-verification-and-packaging.md) — what was verified for this release.
+- [`../decisions/ADR-0011-one-way-backlog-md-import.md`](../decisions/ADR-0011-one-way-backlog-md-import.md) — the import contract.
+- [`../decisions/ADR-0010-papyrus-native-on-disk-record-layout.md`](../decisions/ADR-0010-papyrus-native-on-disk-record-layout.md) — the native record layout that Release 1.0 verifies and packages.
 
 ---
 
