@@ -2,7 +2,7 @@
 id: TASK-315
 title: "Correct AUD-151 release audit findings"
 created_date: '2026-11-23T07:52:49Z'
-updated_date: '2026-11-23T08:17:07Z'
+updated_date: '2026-11-23T08:42:02Z'
 labels: []
 references:
   - AUD-151
@@ -84,3 +84,6 @@ Every finding has a recorded result and test, or a recorded narrowing with a tes
 ## Comments
 - **rust-dev**: -
 - **orchestrator**: Acceptance met: B1 archive overwrite refused on all four paths, H1 guard scoped so the suite is green, H2 generated clap ids namespaced and validated, H3 bounded reservation against directories and symlinks, H4 mockup refs encoded, M1 field domains on CLI, M2 fail-closed mockup saves, M3 atomic config with rollback, M4 and M5 hermetic tests, L1 hooks gated, L2 dead code removed; 1427 tests pass.
+- **orchestrator**: Reopened for close-out residuals: C-1 ambient editor in tests, C-2 non-atomic init config write, C-3 unused aliases, C-4 whole-file guard exemption, plus browser field-domain parity.
+- **rust-dev**: Close-out residuals fixed. C-1: config_editor_json_null_when_unset clears EDITOR and VISUAL, suite also run green with EDITOR=nano. C-2: init writes the config through config::write_config_file; an injected write failure regression proves the previous configuration stays intact and no temporary file remains. C-3: removed the unused patch apply alias, the two relocation aliases, and their re-export after verifying no call sites. C-4: no_drift config.rs exemptions for fs::rename, write_atomic and .tmp are scoped to the write_config_file block; a planted record rename in the same module is reported. Parity: one shared FieldValues domain validator in document.rs is used by the CLI engine and by the browser form and JSON document save paths; a browser test saving audit_type bogus is rejected with 422 and writes nothing. Full suite green env -u EDITOR -u VISUAL and with EDITOR=nano; clippy all targets D warnings clean; fmt check clean.
+- **orchestrator**: Close-out residuals closed: C-1 hermetic editor test (suite green with EDITOR=nano), C-2 atomic init config write with regression, C-3 unused aliases removed, C-4 guard exemption scoped, and field-domain validation unified across CLI and browser saves; 1430 tests pass.

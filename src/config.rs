@@ -3251,6 +3251,24 @@ fn render_yaml_scalar(value: &yaml_serde::Value) -> String {
     }
 }
 
+// Force the next atomic configuration write to fail (unit-test seam).
+//
+// Production never honours this hook: it is compiled only under `cfg(test)`.
+#[cfg(test)]
+thread_local! {
+    static INJECTED_WRITE_FAILURE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+pub(crate) fn fail_next_config_write_for_test() {
+    INJECTED_WRITE_FAILURE.with(|flag| flag.set(true));
+}
+
+#[cfg(test)]
+fn injected_write_failure() -> bool {
+    INJECTED_WRITE_FAILURE.with(|flag| flag.replace(false))
+}
+
 /// Write the configuration file atomically: a same-directory temporary file is
 /// written, synced, and renamed over the target, so a reader never observes a
 /// partial configuration and a failed write leaves the old file intact.
@@ -3310,6 +3328,14 @@ pub fn write_config_file(path: &Path, content: &str) -> Result<(), AppError> {
         if let Some(permissions) = original_permissions {
             std::fs::set_permissions(&temporary, permissions)
                 .map_err(|error| AppError::Runtime(error.to_string()))?;
+        }
+        #[cfg(test)]
+        {
+            if injected_write_failure() {
+                return Err(AppError::Runtime(
+                    "injected configuration write failure".to_string(),
+                ));
+            }
         }
         std::fs::rename(&temporary, path).map_err(|error| AppError::Runtime(error.to_string()))?;
         if let Ok(directory_handle) = std::fs::File::open(directory) {

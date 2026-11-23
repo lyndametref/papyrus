@@ -267,11 +267,6 @@ pub fn apply_patch(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> 
     Ok(rendered)
 }
 
-// aliases
-pub fn apply(doc: &Document, ops: &[PatchOp]) -> Result<String, AppError> {
-    apply_patch(doc, ops)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

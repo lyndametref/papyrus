@@ -29,7 +29,7 @@ pub use store::{
 };
 pub use view::RecordView;
 
-pub use relocate::{RelocationReport, move_folder, relocate, relocate_folder};
+pub use relocate::{RelocationReport, relocate};
 
 pub use store::RelocateError;
 

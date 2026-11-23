@@ -45,24 +45,6 @@ pub fn relocate(
     relocate_impl(ctx, source, destination)
 }
 
-/// Alias for [`relocate`].
-pub fn relocate_folder(
-    ctx: &Context,
-    source: &Path,
-    destination: &Path,
-) -> Result<RelocationReport, AppError> {
-    relocate(ctx, source, destination)
-}
-
-/// Alias for [`relocate`].
-pub fn move_folder(
-    ctx: &Context,
-    source: &Path,
-    destination: &Path,
-) -> Result<RelocationReport, AppError> {
-    relocate(ctx, source, destination)
-}
-
 fn relocate_impl(
     ctx: &Context,
     source_raw: &Path,

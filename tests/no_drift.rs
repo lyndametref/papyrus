@@ -10,13 +10,13 @@
 //!
 //! | # | Condition | Allowlist |
 //! |---|---|---|
-//! | 1 | `fs::write` on a record path or `fs::rename` outside the store | `src/config.rs`, `src/init.rs`, `src/record/` |
+//! | 1 | `fs::write` on a record path or `fs::rename` outside the store | `fs::write`: `src/config.rs`, `src/init.rs`, `src/record/`; `fs::rename`: `src/record/`, the `write_config_file` block in `src/config.rs` |
 //! | 2 | front-matter delimiter construction (`format!("---`) | `src/record/` |
 //! | 3 | ID formatting and prefix-shaped ID parsing | `src/record/identity.rs` |
 //! | 4 | storage-ID / translation symbols and offsets | none |
 //! | 5 | hardcoded record-directory literals | `src/record/descriptor.rs`, `src/config.rs`, `src/init.rs`, `src/import.rs` |
 //! | 6 | Backlog-shaped stem detection or storage prefix construction | `src/record/identity.rs`, `src/record/descriptor.rs` |
-//! | 7 | a second record writer (`.tmp` + rename) | `src/record/store.rs` |
+//! | 7 | a second record writer (`.tmp` + rename) | `src/record/store.rs`, the `write_config_file` block in `src/config.rs` |
 //! | 8 | a second section parser or front-matter delimiter detection | `src/record/`, `src/import.rs` |
 //!
 //! Every violation reports `file:line: text`.
@@ -218,13 +218,55 @@ fn scan_files(
     files: &[(String, String)],
     matches: impl Fn(&str) -> bool,
 ) -> Result<(), String> {
+    scan_files_scoped(label, allowed, files, matches)
+}
+
+/// Line range (1-based, inclusive) of the atomic configuration writer.
+///
+/// This is the only production block in `src/config.rs` allowed to create a
+/// temporary file and rename it; a record write elsewhere in the module is
+/// still reported.
+fn config_writer_range(content: &str) -> Option<(usize, usize)> {
+    let lines: Vec<&str> = content.lines().collect();
+    let start = lines
+        .iter()
+        .position(|line| line.contains("fn write_config_file("))?;
+    let mut depth = 0i32;
+    let mut opened = false;
+    for (index, line) in lines.iter().enumerate().skip(start) {
+        let delta = brace_delta(line);
+        if delta > 0 {
+            opened = true;
+        }
+        depth += delta;
+        if opened && depth <= 0 {
+            return Some((start + 1, index + 1));
+        }
+    }
+    None
+}
+
+/// Scan production lines, exempting a file prefix or a single declaration
+/// block in `src/config.rs`.
+fn scan_files_scoped(
+    label: &str,
+    allowed: &[&str],
+    files: &[(String, String)],
+    matches: impl Fn(&str) -> bool,
+) -> Result<(), String> {
     let mut violations = Vec::new();
     for (rel, content) in files {
         if allowed.iter().any(|prefix| rel.starts_with(prefix)) {
             continue;
         }
+        let block = if rel == "src/config.rs" {
+            config_writer_range(content)
+        } else {
+            None
+        };
         for (lineno, line) in production_lines_in(content) {
-            if matches(&line) {
+            let inside_block = block.is_some_and(|(start, end)| lineno >= start && lineno <= end);
+            if matches(&line) && !inside_block {
                 violations.push(format!("{}:{}: {}", rel, lineno, line.trim()));
             }
         }
@@ -247,10 +289,10 @@ fn no_record_writes_outside_the_store() {
     .unwrap();
     // A record file may only be renamed by the shared store. The configuration
     // writer owns its own atomic rename because a configuration file is not a
-    // record (AUD-151 M3).
+    // record (AUD-151 M3); the exemption is scoped to that one block.
     check(
         "fs::rename outside src/record/ or the configuration writer:",
-        &["src/record/", "src/config.rs"],
+        &["src/record/"],
         |line| line.contains("fs::rename"),
     )
     .unwrap();
@@ -371,13 +413,65 @@ fn no_reimplemented_backlog_stem_detection() {
 #[test]
 fn no_second_record_writer() {
     // The configuration writer uses a temporary file + rename, but it never
-    // writes a record (AUD-151 M3).
+    // writes a record (AUD-151 M3); the exemption is scoped to that one block.
     check(
         "second record writer outside src/record/store.rs or the configuration writer:",
-        &["src/record/store.rs", "src/config.rs"],
+        &["src/record/store.rs"],
         |line| line.contains("fn write_atomic") || line.contains(".tmp"),
     )
     .unwrap();
+}
+
+#[test]
+fn config_writer_exemption_is_scoped_to_the_atomic_writer_block() {
+    let content = fs::read_to_string("src/config.rs").expect("config.rs");
+    let (start, end) = config_writer_range(&content).expect("write_config_file block");
+    assert!(
+        content
+            .lines()
+            .nth(start - 1)
+            .unwrap()
+            .contains("fn write_config_file"),
+        "the block starts at the writer declaration"
+    );
+    assert_eq!(
+        content.lines().nth(end - 1).unwrap().trim(),
+        "}",
+        "the block ends at the function close"
+    );
+
+    // The real writer body is exempt.
+    let writer = [("src/config.rs".to_string(), content.clone())];
+    assert!(
+        scan_files_scoped(
+            "fs::rename in the configuration writer:",
+            &["src/record/"],
+            &writer,
+            |line| line.contains("fs::rename"),
+        )
+        .is_ok(),
+        "the atomic writer keeps its one rename"
+    );
+
+    // A record write anywhere else in the same module is reported.
+    let planted = [(
+        "src/config.rs".to_string(),
+        format!(
+            "{}\nfn record_write() {{ let _ = std::fs::rename(\"a\", \"b\"); }}\n",
+            content
+        ),
+    )];
+    let error = scan_files_scoped(
+        "fs::rename outside the configuration writer:",
+        &["src/record/"],
+        &planted,
+        |line| line.contains("fs::rename"),
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("record_write"),
+        "a record write in config.rs must be caught, got: {error}"
+    );
 }
 
 #[test]

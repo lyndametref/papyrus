@@ -7,7 +7,7 @@
 //! every record; behaviour is selected by `DocumentModel`/`TypedHandler`, never
 //! by a browser-local category enum or a slug literal.
 
-use crate::config::{Config, FieldKind, FieldSpec, FieldValues};
+use crate::config::{Config, FieldKind, FieldSpec};
 use crate::context::Context;
 use crate::error::AppError;
 use crate::record::document::{self, Document};
@@ -1915,14 +1915,14 @@ pub fn validate_document_field_value(
     raw: &str,
 ) -> Result<Option<String>, String> {
     if let Some(spec) = document_field_spec(record, &field.key)
-        && let FieldValues::Allowed(values) = &spec.values
+        && let Some(allowed) = spec.values.allowed_values()
     {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
             return Err(format!("{} is required.", field.label));
         }
-        if !values.iter().any(|value| value == trimmed) {
-            return Err(allowed_values_error(&field.label, values));
+        if crate::document::scalar_domain_violation(spec, trimmed).is_some() {
+            return Err(allowed_values_error(&field.label, allowed));
         }
         return Ok(Some(trimmed.to_string()));
     }
@@ -1939,7 +1939,8 @@ pub fn validate_document_field_list(
     field: &ResolvedField,
     raw: &[String],
 ) -> Result<Vec<String>, String> {
-    if submitted_tag_values(raw)
+    let normalized = submitted_tag_values(raw);
+    if normalized
         .iter()
         .any(|value| value.chars().any(char::is_control))
     {
@@ -1948,10 +1949,21 @@ pub fn validate_document_field_list(
             field.label
         ));
     }
-    match document_field_spec(record, &field.key).map(|spec| &spec.values) {
-        Some(FieldValues::RecordIds) => validate_requirement_refs(raw),
-        _ => validate_list_items(&field.label, &raw.join("\n")),
+    if let Some(spec) = document_field_spec(record, &field.key) {
+        match crate::document::list_domain_violation(spec, &normalized) {
+            Some(crate::document::ListDomainViolation::Allowed { allowed }) => {
+                return Err(allowed_values_error(&field.label, allowed));
+            }
+            Some(crate::document::ListDomainViolation::RecordId(_)) => {
+                return validate_requirement_refs(raw);
+            }
+            None if spec.values.requires_record_ids() => {
+                return validate_requirement_refs(raw);
+            }
+            None => {}
+        }
     }
+    validate_list_items(&field.label, &raw.join("\n"))
 }
 
 /// The message for a scalar outside its declared allowed-value domain.

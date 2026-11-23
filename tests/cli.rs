@@ -521,6 +521,8 @@ fn config_editor_json_null_when_unset() {
         .output()
         .unwrap();
     let out = bin()
+        .env_remove("EDITOR")
+        .env_remove("VISUAL")
         .args([
             "--dir",
             d.to_str().unwrap(),
