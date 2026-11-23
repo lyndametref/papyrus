@@ -2,7 +2,7 @@
 id: TASK-288
 title: "Produce the single release package and verify its contents"
 created_date: '2026-11-20T17:44:23Z'
-updated_date: '2026-11-23T06:32:49Z'
+updated_date: '2026-11-23T12:32:56Z'
 labels: []
 references:
   - TECH-069
@@ -15,7 +15,7 @@ references:
   - MS-037
   - AUD-146
   - REL-001
-status: ToDo
+status: Done
 assignee:
   - rust-dev
 milestone: MS-037
@@ -76,3 +76,11 @@ The single final `.deb` is produced and retained, its metadata, inventory, and c
 ## Comments
 - **task-refiner**: Reproduced at refinement: the build-package script with a verify version and an out directory under the repository builds path exits 2 with the project-local temp directory error, confirming the ADR-043 decision 7 conflict.
 - **planner**: planner resolution: ADR-043 decision 7 as amended 2026-11-23 permits an in-repository --out strictly below the builds directory with a segment after it; TASK-283 implements and tests the guard. The output-path escalation and open question are cleared.
+- **rust-dev**: test comment
+- **rust-dev**: Version pinned 1.0.0 in Cargo.toml.
+- **rust-dev**: RELEASE 1.0.0 (rust-dev): version pinned in Cargo.toml and Cargo.lock (papyrus 1.0.0), built with cargo build --release --locked; target release binary prints papyrus 1.0.0. Stale tracked root artifact papyrus_0.1.0_amd64.deb removed from the tree (git rm --cached and file deleted) and *.deb added to .gitignore. builds 0.2.0-rc.1 kept (package output not deleted) and marked superseded in its SUPERSEDED.md.
+- **rust-dev**: FINAL ARTIFACT: out builds 1.0.0 .build papyrus; file papyrus_1.0.0_amd64.deb; size 2431328 bytes; sha256 e59150d011582fa57f8e9bc13e7e36460019d0886132c188bd8a4e20ac3312b6. Command: scripts build-package.sh --version 1.0.0 --out builds 1.0.0 .build papyrus (path written with slashes when run; slashes omitted here because the record rejects them). Exactly one artifact exists for 1.0.0.
+- **rust-dev**: METADATA (dpkg-deb -I): Package papyrus, Version 1.0.0, Architecture amd64, Section utils, Priority optional, Depends libc6 (>= 2.34), Maintainer Papyrus Maintainers <maintainers@papyrus.example>, Homepage present, Description 'Project-level backlog and documentation manager' with the Papyrus paragraph. INVENTORY (dpkg-deb -c): only usr bin papyrus mode 0755 and usr share doc papyrus copyright mode 0644 plus directories; no man page, asset, template or configuration file. Packaged binary is stripped (file reports stripped, readelf shows no debug sections) and byte-identical to target release papyrus.
+- **rust-dev**: INSTALL ROUND TRIP: isolated fakeroot dpkg --instdir and --admindir under project-local .tmp; dpkg-query reports 'papyrus 1.0.0 install ok installed'; installed binary prints papyrus 1.0.0; config list succeeds; task create then task edit persisted TASK-001; isolated root and scratch project removed afterwards. Host package database untouched.
+- **rust-dev**: CHECKS: cargo test 1443 passed, 0 failed, 27 ignored across 70 suites; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean; asset-version guard passes on both assembly paths. AUD-153 L-4 closed: build-deb.sh now always runs cargo build --release --locked before staging and calls package_prepare_out, so a direct run refuses a non-empty out with exit 2 (--force replaces it); new guard tests l4_direct_deb_build_rebuilds_with_a_locked_cargo_build and l4_direct_deb_build_refuses_a_non_empty_out_before_any_build. cargo audit unavailable in the toolchain; no new dependencies and the Cargo.lock dependency set is unchanged. Docs corrected where they named a version or the old reuse-binary behaviour. HEAD f4fab85; working tree left uncommitted per instruction; status left In-Progress.
+- **orchestrator**: Acceptance met: version pinned 1.0.0 (binary and package), single artifact builds 1.0.0 .build papyrus papyrus_1.0.0_amd64.deb, size 2431328 bytes, sha256 e59150d0...12b6, metadata and two-file inventory verified, isolated install round trip prints papyrus 1.0.0, tracked root deb removed, deb files ignored, stale RC marked superseded, direct build-deb now locked and output-policy checked; 1443 tests pass.

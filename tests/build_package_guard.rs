@@ -2,6 +2,7 @@
 //! before creating or removing anything.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -358,6 +359,120 @@ fn l4_deb_assembly_shares_the_repository_out_policy() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+/// Create a fake `cargo` on PATH that records its arguments to the path in
+/// `CARGO_SHIM_LOG` and exits with `exit_code`, so the packaging script's
+/// cargo invocation is observable without a long compile.
+fn cargo_shim(workspace: &Path, exit_code: u8) -> (PathBuf, PathBuf) {
+    let shim_dir = workspace.join("bin");
+    fs::create_dir_all(&shim_dir).expect("create shim directory");
+    let log = workspace.join("cargo.log");
+    let shim = shim_dir.join("cargo");
+    fs::write(
+        &shim,
+        format!(
+            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$CARGO_SHIM_LOG\"\nexit {exit_code}\n"
+        ),
+    )
+    .expect("write cargo shim");
+    fs::set_permissions(&shim, fs::Permissions::from_mode(0o755))
+        .expect("make cargo shim executable");
+    (shim_dir, log)
+}
+
+fn path_with(shim_dir: &Path) -> String {
+    match std::env::var_os("PATH") {
+        Some(path) => format!("{}:{}", shim_dir.display(), path.to_string_lossy()),
+        None => shim_dir.display().to_string(),
+    }
+}
+
+fn run_build_deb(out: &Path, extra: &[&str], shim_dir: &Path, log: &Path) -> Output {
+    Command::new("bash")
+        .arg(root().join("scripts/build-deb.sh"))
+        .args(["--version", "1.2.3", "--out"])
+        .arg(out)
+        .args(extra)
+        .env("PATH", path_with(shim_dir))
+        .env("CARGO_SHIM_LOG", log)
+        .output()
+        .expect("run build-deb.sh")
+}
+
+/// AUD-153 L-4: a direct `build-deb.sh` run rebuilds the release binary with
+/// `cargo build --release --locked` before staging, so a stale
+/// `target/release/papyrus` is never packaged. The fake cargo exits non-zero
+/// to prove the build happens before any staging or packaging work.
+#[test]
+fn l4_direct_deb_build_rebuilds_with_a_locked_cargo_build() {
+    let workspace = workspace("deb-rebuild");
+    let (shim_dir, log) = cargo_shim(&workspace, 1);
+    let out = workspace.join("out");
+
+    let output = run_build_deb(&out, &[], &shim_dir, &log);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "a failed rebuild must stop the assembly, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let calls = fs::read_to_string(&log).expect("cargo shim log");
+    assert_eq!(
+        calls.trim(),
+        "build --release --locked",
+        "a direct build must rebuild with `cargo build --release --locked`"
+    );
+    assert!(
+        !out.join("papyrus_1.2.3_amd64.deb").exists(),
+        "no package may be produced when the rebuild fails"
+    );
+    let _ = fs::remove_dir_all(&workspace);
+}
+
+/// AUD-153 L-4: a direct `build-deb.sh` run applies the output-emptiness
+/// policy: a non-empty `--out` is refused with exit 2 before the rebuild, and
+/// `--force` replaces its contents before the rebuild.
+#[test]
+fn l4_direct_deb_build_refuses_a_non_empty_out_before_any_build() {
+    let workspace = workspace("deb-non-empty");
+    let (shim_dir, log) = cargo_shim(&workspace, 1);
+    let out = workspace.join("out");
+    fs::create_dir_all(&out).expect("create out directory");
+    let marker = out.join("keep.txt");
+    fs::write(&marker, b"do not remove").expect("write marker");
+
+    let output = run_build_deb(&out, &[], &shim_dir, &log);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "a non-empty out must be refused: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--force"), "{stderr}");
+    assert!(stderr.contains("not empty"), "{stderr}");
+    assert_eq!(
+        fs::read(&marker).expect("marker retained"),
+        b"do not remove",
+        "a refused out keeps its contents"
+    );
+    assert!(
+        !log.exists(),
+        "the refusal must happen before any cargo build"
+    );
+
+    let output = run_build_deb(&out, &["--force"], &shim_dir, &log);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "the forced run reaches the rebuild: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!marker.exists(), "--force replaces the stale contents");
+    let calls = fs::read_to_string(&log).expect("cargo shim log");
+    assert_eq!(calls.trim(), "build --release --locked");
+    let _ = fs::remove_dir_all(&workspace);
 }
 
 #[test]

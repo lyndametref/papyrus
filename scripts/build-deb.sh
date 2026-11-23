@@ -4,7 +4,14 @@ set -euo pipefail
 # Debian assembly step for the Papyrus package.
 #
 # Usage:
-#   scripts/build-deb.sh [--version <version>] [--out <dir>]
+#   scripts/build-deb.sh [--version <version>] [--out <dir>] [--force]
+#   scripts/build-deb.sh --check-assets-only
+#
+# Every assembly run rebuilds the release binary with
+# `cargo build --release --locked` (AUD-153 L-4), so a direct run can never
+# package a stale binary, and it applies the shared output-emptiness policy:
+# the --out directory must be absent or empty unless --force removes its
+# contents (AUD-153 L-4).
 #
 # Version precedence: --version, then PAPYRUS_DEB_VERSION, then the Cargo.toml
 # package version. Output directory precedence: --out, then PAPYRUS_DEB_OUT,
@@ -15,24 +22,26 @@ set -euo pipefail
 # in-repository path, the filesystem root, system directories, $HOME and its
 # subtree, and any parent of the repository root are refused with exit 2.
 #
-# Run directly with no version to derive the version from Cargo.toml and write
-# the .deb to the project root, as before. The version and output options are
-# the interface used by scripts/build-package.sh; they never edit a tracked
-# file.
+# The version and output options are the interface used by
+# scripts/build-package.sh; they never edit a tracked file.
 
 usage() {
     cat <<'EOF'
-Usage: scripts/build-deb.sh [--version <version>] [--out <dir>]
+Usage: scripts/build-deb.sh [--version <version>] [--out <dir>] [--force]
 
-Assemble the Papyrus Debian package from the release binary.
+Assemble the Papyrus Debian package from a fresh release binary.
 
   --version <version>  Package version. Defaults to the Cargo.toml package
                        version (or PAPYRUS_DEB_VERSION when set).
   --out <dir>          Directory that receives the .deb. Defaults to the
                        project-local .tmp/deb directory (or PAPYRUS_DEB_OUT
-                       when set).
+                       when set). It must be absent or empty.
+  --force              Remove the contents of a non-empty --out directory.
   --check-assets-only  Verify vendor asset versions and exit without building.
   -h, --help           Print this help and exit.
+
+Every assembly rebuilds with `cargo build --release --locked`, so a stale
+target/release/papyrus is never packaged.
 
 --out policy (ADR-043 decision 7, amended 2026-11-23):
   permitted  <repo>/.tmp/<path>            scratch, removed before the work ends
@@ -50,6 +59,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION=""
 OUT_DIR=""
 CHECK_ASSETS_ONLY=0
+FORCE="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -62,6 +72,10 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "error: --out requires a value" >&2; exit 2; }
             OUT_DIR="$2"
             shift 2
+            ;;
+        --force)
+            FORCE="true"
+            shift
             ;;
         --check-assets-only)
             CHECK_ASSETS_ONLY=1
@@ -208,17 +222,18 @@ package_validate_version "$VERSION" || exit 2
 if [[ -z "$OUT_DIR" ]]; then
     OUT_DIR="${PAPYRUS_DEB_OUT:-$ROOT/.tmp/deb}"
 fi
-OUT_DIR="$(package_validate_out "$OUT_DIR")" || exit $?
-mkdir -p -- "$OUT_DIR"
+# AUD-153 L-4: a direct run obeys the same output-emptiness policy as the
+# packaging entry point; an existing non-empty directory needs --force.
+OUT_DIR="$(package_prepare_out "$OUT_DIR" "$FORCE")" || exit $?
 
 ARCH="amd64"
 PKG="papyrus_${VERSION}_${ARCH}"
 STAGE="${ROOT}/target/deb/${PKG}"
 
-# Ensure release binary exists.
-if [[ ! -x "${ROOT}/target/release/papyrus" ]]; then
-    cargo build --release
-fi
+# AUD-153 L-4: rebuild before staging on every assembly path. A stale
+# target/release/papyrus is never packaged, and the locked build keeps the
+# dependency set fixed.
+cargo build --release --locked >&2
 
 rm -rf "$STAGE"
 mkdir -p "${STAGE}/DEBIAN" "${STAGE}/usr/bin" "${STAGE}/usr/share/doc/papyrus"

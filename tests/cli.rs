@@ -23,7 +23,10 @@ fn version_prints_package_version() {
     let out = bin().arg("--version").output().unwrap();
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert_eq!(stdout.trim(), "papyrus 0.1.0");
+    assert_eq!(
+        stdout.trim(),
+        format!("papyrus {}", env!("CARGO_PKG_VERSION"))
+    );
 }
 
 #[test]
@@ -361,7 +364,10 @@ fn config_json_error() {
 fn version_output() {
     let out = bin().arg("--version").output().unwrap();
     assert!(out.status.success());
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "papyrus 0.1.0");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        format!("papyrus {}", env!("CARGO_PKG_VERSION"))
+    );
 }
 
 #[test]
