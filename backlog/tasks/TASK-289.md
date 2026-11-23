@@ -2,7 +2,7 @@
 id: TASK-289
 title: "Verify MS-037 and confirm the single release is ready"
 created_date: '2026-11-20T17:44:23Z'
-updated_date: '2026-11-23T06:32:50Z'
+updated_date: '2026-11-23T14:05:49Z'
 labels: []
 references:
   - REQ-07.004
@@ -15,7 +15,7 @@ references:
   - TECH-008
   - AUD-150
   - MS-036
-status: ToDo
+status: In-Progress
 assignee:
   - quality-gatekeeper
 milestone: MS-037
@@ -75,3 +75,4 @@ Every MS-037 acceptance criterion and cross-milestone gate has a recorded pass v
 ## Comments
 - **task-refiner**: Reproduced at refinement: the RC command output directory is refused by package-out, so the RC gate is blocked on the TASK-288 escalation.
 - **planner**: planner resolution: the TASK-288 output-path escalation is cleared; ADR-043 decision 7 as amended 2026-11-23 permits the versioned builds path and TASK-283 implements and tests the guard. MS-036 AC-8 wording was corrected by the planner on 2026-11-23.
+- **rust-dev**: RC EVIDENCE (rust-dev): version 1.0.0-rc.1 built from the committed verified tree at HEAD 440b9fe; command: scripts build-package.sh --version 1.0.0-rc.1 --out builds 1.0.0-rc.1 .build papyrus; artifact: builds 1.0.0-rc.1 .build papyrus papyrus_1.0.0-rc.1_amd64.deb; size 2431408 bytes; sha256 00a950ab78cec75c7ca0329e9cfedd8abf48aa936e4c85d3719552f3e55ac319; dpkg-deb -I reports Version 1.0.0-rc.1 and Architecture amd64; inventory is exactly two files, usr bin papyrus mode 0755 and usr share doc papyrus copyright mode 0644 plus directories; the packaged binary reports papyrus 1.0.0 (Cargo version) and is byte-identical, sha256 430a6e538fcdc9ccc3b59d7c4b8ab9b53fc0410016b5b6224777ce9b0671e2ba, to the final package binary; the RC differs from the final package only in the Debian Version field and the artifact name; the RC is discardable and is not a release artifact. FINAL PACKAGE: builds 1.0.0 .build papyrus papyrus_1.0.0_amd64.deb unchanged, 2431328 bytes, sha256 e59150d011582fa57f8e9bc13e7e36460019d0886132c188bd8a4e20ac3312b6 (owner shorthand e59150d0...12b3 matched on the e59150d0 prefix; the full digest ends 3312b6); exactly one release artifact remains for 1.0.0. FIXES: F6 removed the deferred debug print eprintln DEBUG closed at src browser mod.rs line 1497; no debug-log mechanism exists in the browser module, so the line was deleted; F8 corrected docs packaging.md artifact paths to builds version .build component papyrus version amd64.deb and recorded release commit cceed99 (merged at 440b9fe) for the retained 1.0.0 package. CHECKS: env -u EDITOR -u VISUAL cargo test --locked 1443 passed, 0 failed, 27 ignored across 70 suites; cargo clippy --all-targets -- -D warnings clean; cargo fmt --check clean; cargo audit unavailable in the toolchain and this task changes no dependency. Working tree left uncommitted as instructed; task status remains In-Progress.

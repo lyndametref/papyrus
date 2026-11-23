@@ -1494,7 +1494,6 @@ fn board_release_cleanup_submit(
                 && m.status.as_deref() != Some("closed")
         })
         .map(|m| m.id.clone());
-    eprintln!("DEBUG closed={:?}", closed);
     let mut archived = 0usize;
     let total = closed.len();
     let mut failures: Vec<String> = Vec::new();

@@ -62,18 +62,19 @@ Expected:
 `scripts/build-package.sh` is the packaging entry point. It builds the release binary and calls `scripts/build-deb.sh`, the Debian assembly step.
 
 ```sh
-scripts/build-package.sh --version 1.0.0 --out builds/1.0.0/
+scripts/build-package.sh --version 1.0.0 --out builds/1.0.0/.build/papyrus
 ```
 
 - `--version` is authoritative for the `Version:` field in `DEBIAN/control` and the `papyrus_<version>_amd64.deb` artifact name. The version is injected while the package is staged; no tracked file is edited. Release 1.0 pins `Cargo.toml` to `1.0.0`, and the supplied `--version` matches it.
+- The retained Release 1.0 package is `builds/1.0.0/.build/papyrus/papyrus_1.0.0_amd64.deb`, built from release commit `cceed99` (the TASK-288 release-package commit, merged at `440b9fe`).
 - The entry point runs `cargo build --release --locked`, validates the asset versions through the assembly step, and writes the package only under `--out`.
 - `--out` must be absent or empty. With `--force`, the contents of a non-empty directory are replaced.
 - Success prints the artifact path on standard output; diagnostics go to standard error.
 
 ### Output locations and the `--out` policy
 
-- `builds/<version>/` is the only publish location. It is git-ignored and is never staged or committed.
-- A release candidate is a discardable verification build in `builds/<version>/`; the release retains exactly one artifact in that directory.
+- `builds/<version>/.build/<component>/` is the only publish location. It is git-ignored and is never staged or committed.
+- A release candidate is a discardable verification build in `builds/<version>/.build/<component>/`; the release retains exactly one artifact in that directory.
 - `./.tmp/` is scratch only and is removed before the work ends.
 - The build scripts refuse, with exit `2`: the repository root; `builds/` without a version segment after it; any other path inside the repository; the filesystem root; system directories; `$HOME` and its subtree (except the two permitted in-repository roots); and any parent of the repository root.
 
@@ -113,9 +114,9 @@ No man page is packaged. No asset, template, configuration, or other documentati
 ### Inspect the package
 
 ```sh
-dpkg-deb -I builds/1.0.0/papyrus_1.0.0_amd64.deb
-dpkg-deb -c builds/1.0.0/papyrus_1.0.0_amd64.deb
-dpkg-deb --fsys-tarfile builds/1.0.0/papyrus_1.0.0_amd64.deb \
+dpkg-deb -I builds/1.0.0/.build/papyrus/papyrus_1.0.0_amd64.deb
+dpkg-deb -c builds/1.0.0/.build/papyrus/papyrus_1.0.0_amd64.deb
+dpkg-deb --fsys-tarfile builds/1.0.0/.build/papyrus/papyrus_1.0.0_amd64.deb \
   | tar -xO ./usr/share/doc/papyrus/copyright | grep GPL-3.0-or-later
 ```
 
@@ -124,7 +125,7 @@ Expected metadata: `Package: papyrus`, `Version: <requested version>`, `Architec
 ## Install
 
 ```sh
-sudo dpkg -i builds/<version>/papyrus_<version>_amd64.deb
+sudo dpkg -i builds/<version>/.build/<component>/papyrus_<version>_amd64.deb
 ```
 
 After installation, `papyrus` is available on `PATH` (installed to
@@ -143,7 +144,7 @@ mkdir -p "$ROOT/inst" "$ROOT/adm/info" "$ROOT/adm/updates" "$ROOT/adm/parts" "$R
 : > "$ROOT/adm/available"
 
 fakeroot dpkg --instdir="$ROOT/inst" --admindir="$ROOT/adm" --force-depends \
-  -i builds/<version>/papyrus_<version>_amd64.deb
+  -i builds/<version>/.build/<component>/papyrus_<version>_amd64.deb
 ```
 
 - The full `PATH` matters: dpkg needs `ldconfig` and `start-stop-daemon` from
