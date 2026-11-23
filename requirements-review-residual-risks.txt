@@ -1,0 +1,452 @@
+REQUIREMENTS REVIEW — RESIDUAL RISKS
+Session: 2026-11-23
+Scope: business requirements, group by group. Working goal: smaller corpus, no duplication, full coverage.
+
+====================================================================
+GROUP REQ-005 — Project Documentation Management  (reviewed, changes applied)
+====================================================================
+
+State after review: 8 active atomics (REQ-005.001, .007, .008, .010, .011, .015,
+.016, .017), 9 archived atomics (.002 .003 .004 .005 .006 .009 .012 .013 .014).
+Active atomics: 19,326 -> 7,834 words.
+
+R1. Stale references to archived requirement IDs
+    Severity: high (traceability)
+    72 files outside the archived set still cite REQ-005.002/.003/.004/.005/.006/
+    .009/.012/.013/.014. Each archived record carries a "Superseded by" banner, so a
+    reader can follow on, but machine traceability now points at retired records.
+    Affected: business rules BR-009..BR-020, other requirements, specifications.
+    Action: re-point to REQ-005.015 (all SingleMarkdown types) or REQ-005.001
+    (GroupedMarkdown), after all groups are reviewed.
+
+R2. Cross-group changes agreed but not yet written
+    Severity: high (the corpus is currently inconsistent with the agreed target)
+    a) REQ-001.006: init must write only the selected Seed entries; "enabled" is
+       removed; non-interactive runs write every entry. DONE (REQ-001 review).
+    b) REQ-007.002: configuration is the only source of document types; unknown
+       attributes are accepted, ignored, and reported as warnings; key list gains
+       "model" and "field_defaults" and loses "enabled". DONE (REQ-007 review).
+    c) REQ-007.004: the document model becomes configuration data; the "GroupedMarkdown
+       and SingleHtmlMockup are seed-only" restriction is deleted. DONE.
+    d) REQ-007.001: document types are addressed as configured, not as seeded. DONE.
+    e) REQ-001.002: "config set" can no longer add a document type (see R19). DONE.
+
+R3. ADR amendments outstanding
+    Severity: high (requirements now contradict accepted decisions)
+    - ADR-036: decisions 6, 28, 29, 31, 32, 33 and the 2026-11-22 clarification
+      ("seed slugs are always effective").
+    - ADR-041: seed slots become init template content.
+    - ADR-042: ruling 1 ("field_defaults is not a configuration key") reversed.
+    - ADR-0019: fail-closed on unknown keys replaced by warn-and-ignore.
+    - RE-010: D6 (grouped and HTML models seed-only) superseded.
+
+R4. Glossary terms used as normative but not verified
+    Severity: medium
+    GLO-013 .. GLO-022 (Document Type, Document Model, SingleMarkdown,
+    GroupedMarkdown, SingleHtmlMockup, Field Specification, Role, Group Record,
+    Member Record, Seed) carry no "status" in front matter. REQ-005 now cites them
+    as normative vocabulary. They must be verified.
+    Also: the project owner says "seed document type list"; GLO-022 canonical term
+    is "Seed" (aliases: seed table, seed entry). The alias should be added, or the
+    requirements keep using "Seed".
+
+R5. Open product questions carried inside requirements
+    Severity: medium
+    a) REQ-005.008: what triggers the "approved" transition of a SingleHtmlMockup
+       record — a command option or direct editing of the metadata block?
+    b) REQ-005.008: may a project define additional SingleHtmlMockup types now that
+       the model is configuration data? (Same question applies to GroupedMarkdown.)
+
+R6. REQ-005.016 encodes per-type facts that must stay in step with implementation
+    Severity: low
+    The Seed table states prefixes, field sequences, per-field verbs, reference
+    visibility, statuses, and the audit field default. Any change to the seed data
+    in code must be mirrored here, and vice versa. No automated check exists yet.
+
+R7. Corpus still larger than the stated goal
+    Severity: low
+    Each active atomic now runs ~800-1,200 words because acceptance criteria are
+    stated verbatim rather than by reference. A second pass could trim repeated
+    criteria to pointers, but only at the cost of losing directly testable text.
+
+====================================================================
+GROUP REQ-007 — Artifact Categories and Config-Defined Document Types
+(reviewed, changes applied)
+====================================================================
+
+State after review: 4 active atomics rewritten in place, no new IDs, no
+deprecations. 9,361 -> 5,092 words (-46%).
+REQ-007.002 and REQ-007.004 titles shortened to "Configure Document Types" and
+"Define the Document Content Model".
+
+Resolved by the rewrite: R8 (enabled/seed overlay/model rejection), R9 (duplicated
+seed list), R10 (unknown-key handling), R11 (seed-only verb restrictions), R12
+(field-option and title duplication), R13 (model non-configurable, seed-only
+models, rejected keys), R14 (restated archive and mockup rules), R15 (open
+questions closed: 3a B, 3b A, 3c B, 3d A), R16 (historical clauses), R18 (model
+and role validation now stated).
+
+R19. "config set" cannot add a document type any more
+    Severity: high (cross-group conflict with REQ-001.002)
+    REQ-007.002 now says adding a document type is a configuration file edit and
+    "config set" changes a declared entry. REQ-001.002 still says "config set
+    document_types.<slug>.<path>" materializes an absent entry. Under a
+    configuration-only model a materialized entry would lack "prefix" and
+    "directory" and could not validate, so REQ-001.002 must adopt the same rule.
+
+R20. "papyrus check" must report files of unconfigured types
+    Severity: medium (implementation gap)
+    REQ-007.002 requires a finding for every file that carries managed record front
+    matter but belongs to no configured document type. No check rule exists yet, and
+    the finding needs a stable diagnostic code. It must not fire on prose Markdown
+    (REQ-005.010) or on the former "deprecated/" folders (REQ-005.007).
+
+R21. Field semantics split across two requirements
+    Severity: low
+    REQ-007.002 owns the configuration syntax and validation of field items;
+    REQ-007.004 owns their semantics (storage locations, required and clearing
+    rules, sequence order). Deliberate, but a change to one must be mirrored in the
+    other.
+
+R22. Two behaviours newly required, not yet implemented
+    Severity: medium
+    a) Shorthand dispatch: "papyrus <slug> <ID>" means view when no verb is given
+       and the token is an identifier of the type.
+    b) Renaming a slug is configuration-only, with no migration; nothing warns the
+       user that the former records become unmanaged.
+
+R23. ADR amendments still outstanding for this group
+    Severity: high
+    ADR-0016 (dispatch from the seed), ADR-0019 (fail-closed unknown keys, enabled),
+    ADR-0024 (list-valued keys), ADR-036 decisions 28-34 (seed fill, overlay,
+    validation, seed-only models).
+
+====================================================================
+GROUP REQ-006 — Search and Local Web Interface
+(reviewed, changes applied)
+====================================================================
+
+State after review: 10 active atomics, 9 deprecations. 11,992 -> 5,846 words
+(-51%). Active: .001 .002 .004 .007 .010 .011 .013 .014 .016 .017.
+Archived: .006 .009 .012 .015 .018 .019 .020 .021 .022.
+Titles changed: .010 "Present Record References as Links"; .013 keeps its title and
+now owns ordering, lifecycle markers, and milestone/release cleanup.
+
+Resolved by the rewrite: R24 (duplicated surface), R25 (duplicated reference
+visibility), R26 (subsumed .006), R28 (negative .018), R29 (fragmented Backlog
+view), R30 (seed language), R31 (disabled types), R32 (implementation concepts),
+R33 (stale UI artefacts), R34 (README line ranges). R27 (.011) kept deliberately:
+the project owner chose not to generalise the glossary exception.
+
+R24. Duplicated document surface
+    Severity: high
+    REQ-006.014 (1,980 words) restates the field-map, single-record layout,
+    list-layout, reference-visibility, and mockup rules owned by REQ-006.004,
+    .012, .016, .019, REQ-005.017 and REQ-005.008.
+
+R25. Reference visibility stated twice
+    Severity: high
+    REQ-006.019 (750 words) states the reference-visibility rule for document list
+    rows, which REQ-005.017 now owns. One of the two must go; REQ-005.017 is the
+    model-level owner.
+
+R26. Requirement subsumed by the model requirements
+    Severity: medium
+    REQ-006.006 asks that NFR atomics appear under their group in the browser. After
+    REQ-005.001 (GroupedMarkdown merged order) and REQ-006.014 (one document
+    surface), this is generic behaviour, not a requirement.
+
+R27. Per-type UI exception
+    Severity: low
+    REQ-006.011 makes the glossary landing page omit dates and show labels as tags
+    while other types are unchanged. A per-type exception in a uniform-layout
+    product; either generalise it in the list requirement or keep it deliberately.
+
+R28. Negative requirement
+    Severity: medium
+    REQ-006.018 states that three browser sections are removed. A product requirement
+    should not describe absent features; the absence follows from the navigation
+    requirement.
+
+R29. Backlog view fragmented into four atomics
+    Severity: medium
+    REQ-006.013 (board), .020 (ordering), .021 (markers), .022 (cleanup) describe one
+    view. Ordering belongs to the board; markers and cleanup are one lifecycle
+    affordance.
+
+R30. Seed language survives in the browser requirements
+    Severity: high
+    REQ-006.014 and .019 say reference visibility and presentation facts are "seed
+    data" and that a user-defined type "defaults" to them. Under the configuration-
+    only model they are entry keys with model-level defaults.
+
+R31. "Disabled type" no longer exists
+    Severity: high
+    REQ-006.014 refers to disabled types and to disabled entries having no views. The
+    "enabled" key is removed; an absent entry is simply absent.
+
+R32. Implementation concepts in requirements
+    Severity: medium
+    REQ-006.004 states "field map", "extra_metadata", "version token" and route
+    status codes; REQ-006.014 states "one list builder, one view builder", "no static
+    presentation table", and HTTP status codes. These belong to the technical
+    specification.
+
+R33. Stale UI artefacts cited as sources
+    Severity: low
+    REQ-006.020/.021/.022 cite UI-002 and MOCK-0016 and describe them as "requiring
+    revision"; the citations will be stale once the requirements change.
+
+R34. Traceability lists drive the wording
+    Severity: low
+    Several REQ-006 traceability sections cite line ranges of README man pages
+    ("lines 720-733"), which rot on every README edit. REMOVED in the rewrite.
+
+R35. Layout requirements moved to UI design
+    Severity: high
+    REQ-006.009 (branding), .012 (single-record layout), and .015 (content width
+    and navigation visibility) are deprecated because the UI specification owns
+    presentation. No requirement now states them, so the UI specification set
+    (UI-001 .. UI-012) must cover header branding, the single-record layout, the
+    width rules, and the navigation toggle. Until it does, those behaviours have no
+    normative home.
+
+R36. Asymmetry between list layout and single-record layout
+    Severity: medium
+    REQ-006.016 remains a requirement for the shared list layout while the
+    single-record layout was moved to UI design. Either both belong to the UI
+    specification or both stay requirements; the current split is deliberate but
+    inconsistent.
+
+R37. REQ-006.013 is now the largest atomic
+    Severity: medium
+    The board requirement (1,646 words) owns structure, ordering, markers, task
+    status change, task cleanup, and milestone/release cleanup. When Gherkin test
+    cases are written it may need splitting again along those six behaviours.
+
+R38. UI specifications still cite the deprecated Backlog atomics
+    Severity: medium
+    UI-002 references REQ-006.020, .021 and .022, which are now archived. UI-002
+    must be re-pointed to REQ-006.013.
+
+R39. Reference links need a declared reference kind
+    Severity: medium (implementation gap)
+    REQ-006.010 requires every reference to a record to be a link, including the
+    items of any list-valued field whose values are record identifiers. Backlog
+    references are bespoke fields (dependencies, milestone, release); document
+    fields identify record references only through the optional "values:
+    record-ids" restriction. The rule needs a single source of truth for "this value
+    is a record reference".
+
+R40. Acceptance criteria of .013 cite glyph names in one place only
+    Severity: low
+    The description says "a ring marker" and "a check marker" while the acceptance
+    criteria and the open question mention the glyphs. If the UI specification
+    changes the glyphs, the requirement must be reworded rather than only restyled.
+
+====================================================================
+GROUP REQ-001 — Project Setup and CLI Access
+(reviewed, changes applied)
+====================================================================
+
+State after review: 7 active atomics, 1 deprecation. 8,242 -> 5,416 words (-34%).
+Active: .001 .002 .003 .004 .005 .006 .008. Archived: .007.
+
+Resolved by the rewrite: init writes the selected Seed entries (R2a); "config set"
+cannot add a type (R2e, R19); `enabled` and seed-minimal entries removed; the false
+"milestones are never archived" statement fixed in .005; the seed-only identifier
+shape replaced by the configured model; `id_padding` now lives once, in .005.
+
+R41. Exit status now depends on finding severity
+    Severity: high (behaviour change)
+    REQ-001.008 states that an error-level finding gives exit 4 while warnings alone
+    give 0. The previous rule was "exit 4 whenever any finding exists". Commands,
+    business rules and test cases that assume any finding fails must adopt severity.
+
+R42. Deliberate deviation from D2 on the "deprecated/" sentence
+    Severity: medium
+    D2 asked to drop the inert `deprecated/` sentence from REQ-005.007. It was kept:
+    without it, files in such a folder have no defined behaviour (they are neither
+    archived nor unmanaged). Only the legacy conflict checks and `--fix` legacy
+    refusals were removed from REQ-001.008.
+
+R43. Unclaimed-record finding can be noisy
+    Severity: medium
+    REQ-001.008 reports every file that carries managed metadata but belongs to no
+    configured type. Removing a document type on purpose therefore produces findings
+    for its former records until they are moved or deleted. This is the intended
+    reading of decision 3a-B, but it will surprise a user who removes a type.
+
+R44. Business rules still describe the old configuration model
+    Severity: high
+    BR-016 (configuration keys and precedence) still describes `enabled`, seed fill
+    and collection replace; BR-001/BR-004/BR-009..BR-020 still cite requirement IDs
+    that are now archived. The re-pointing pass is still owed.
+
+R45. The init offer is fixed to the Seed
+    Severity: low
+    REQ-001.006 offers only task, milestone, release, the decision types and the Seed
+    entries. A project that wants its own type at init must add it by editing the
+    configuration afterwards. This is deliberate but worth stating in user
+    documentation.
+
+R46. `id_padding` change no longer states a re-display rule
+    Severity: low
+    REQ-001.005 says existing identifiers are never re-padded and the wider number is
+    used, but does not say whether a changed `id_padding` changes how existing
+    identifiers are displayed. Current reading: identifiers are stored values and
+    changing `id_padding` affects only newly allocated numbers.
+
+====================================================================
+GROUP REQ-002 — Task and Board Management
+(reviewed, changes applied)
+====================================================================
+
+State after review: 2 active atomics, 2 deprecations. 1,200 -> 1,364 words.
+Active: .001 Manage Tasks (absorbs .004), .002 View and List Tasks (absorbs .003).
+Archived: .003, .004.
+
+R47. `--ready` is required but not implemented
+    Severity: high (conformance gap)
+    REQ-002.002 specifies `--ready` with fail-closed readiness rules. `papyrus task
+    list --help` offers no `--ready` option and no readiness code exists. Either the
+    option is implemented or the requirement is dropped.
+
+R48. `--documentation` and `--type` must leave the CLI
+    Severity: high (product change)
+    The requirements no longer define a documentation or type attribute for tasks
+    (references and labels replace them), but `papyrus task create|edit` still accept
+    `--documentation` and `--type`. Removing them from the CLI is a product change,
+    and existing task files that carry `documentation:` or `type:` must keep those
+    keys as preserved, read-only metadata (REQ-005.011).
+
+R49. Task references are not validated
+    Severity: medium (gap)
+    REQ-002.001 lets a task reference any managed record, but `papyrus check` only
+    validates `milestone` and `release` references (REQ-001.008). A task reference to
+    a record that does not exist is not reported.
+
+R50. Task comments are under-specified
+    Severity: low
+    REQ-002.001 says a comment is appended with an optional author, but nothing states
+    where comments are stored or how they are displayed. The view requirement lists
+    "comments" without defining them.
+
+R51. Business rules still cite the archived task requirements
+    Severity: medium
+    BR-005 and other rules reference REQ-002.003 and REQ-002.004, which are now
+    archived. Part of the deferred re-pointing pass (see R44).
+
+====================================================================
+GROUP REQ-003 — Milestone and Release Planning
+(merged into REQ-002 Backlog Management; group archived)
+====================================================================
+
+REQ-002 was renamed "Backlog Management" and now owns the whole backlog category:
+.001 Manage Tasks, .002 View and List Backlog Items, .005 Manage Milestones,
+.006 Manage Releases. REQ-003.001, REQ-003.002 and the group REQ-003 are archived.
+
+Words: REQ-002 + REQ-003 were 2,169; the merged group is 2,976 (+37%), because the
+merge also added three capabilities (see R52-R54).
+
+R52. Releases gain archive and delete (new capability)
+    Severity: high (product change)
+    No `release archive` or `release delete` exists today, and the lifecycle was
+    `planned -> released` with "releases are never archived". REQ-002.004 defines
+    `planned -> released -> archived`, an archive folder `backlog/archive/releases/`,
+    and a delete with confirmation. REQ-007.001 was updated accordingly.
+    Consequences: CLI verbs, ADR/BR-007 ("document archive semantics never apply to a
+    release") and the board (archived releases hidden) must follow.
+
+R53. Milestones gain acceptance criteria (new capability)
+    Severity: high (product change)
+    `papyrus milestone create|edit` accept no `--ac` today. REQ-002.005 now defines
+    repeatable acceptance criteria stored as bullets in the milestone body. BR-006,
+    the milestone browser view (UI-002) and any templates must follow.
+
+R54. `--ac` view option is new for tasks and milestones
+    Severity: medium
+    `papyrus task view --ac` and `papyrus milestone view --ac` are required by
+    REQ-002.002 but exist for neither verb.
+
+R55. Identifier gap in the REQ-002 numbering
+    Severity: low
+    The new atomics are .005 and .006, not .003 and .004, because archived records
+    keep their numbers (identifiers are never reused). The group now reads
+    .001, .002, .005, .006; the gap is intentional and should not be filled.
+
+R56. Business rules contradict the new release and milestone behaviour
+    Severity: high
+    BR-006 and BR-007 cite archived REQ-003.001/.002; BR-007 states that archive
+    semantics never apply to a release, which REQ-002.004 now contradicts. BR-006
+    predates milestone acceptance criteria.
+
+R57. UI specifications still describe the pre-merge model
+    Severity: medium
+    UI-002 cites the archived Backlog atomics and the old milestone shape (no
+    acceptance criteria, no release archive). It must be revised with the merge.
+
+====================================================================
+GROUP REQ-004 — Decision Records
+(reviewed, changes applied)
+====================================================================
+
+State after review: 3 active atomics. 634 -> 1,718 words (+171%) because the review
+also added a status-verb model, frozen content, delete, and archiving.
+Active: .001 Manage Decisions, .002 Change Decision Status, .003 Inspect Decisions.
+
+R58. Decision status verbs are new
+    Severity: high (product change)
+    REQ-004.002 requires `decision accept|reject|deprecate|supersede --by|archive`.
+    The CLI exposes only `edit --status` and `edit --superseded-by`, which must be
+    removed in favour of the verbs.
+
+R59. `decision delete` is new
+    Severity: high (product change)
+    There is no delete verb today. REQ-004.001 requires one, allowed only while the
+    status is `proposed`.
+
+R60. Content freeze outside `proposed` is new
+    Severity: high (product change)
+    `decision edit` currently edits any decision. REQ-004.001 requires editing and
+    deleting only while `proposed`, and every other state to reject with no write.
+
+R61. "archived" now means two different things
+    Severity: medium
+    For decisions it is a status value that moves no file; for documents it is a
+    storage location. REQ-007.001 and REQ-004.002 state the distinction, but the CLI
+    help, business rules, and UI must not conflate them.
+
+R62. BR-008 contradicts the new decision model
+    Severity: high
+    BR-008 states that `decision archive` is dropped and that decisions use exactly
+    five statuses. Both are now false.
+
+R63. Supersession status mismatch
+    Severity: high (correctness)
+    The implementation stores the `## Status` value "Superseded by ADR-XXX" while the
+    requirements say the value is `superseded` and the successor lives in the
+    front-matter `superseded_by` key. The implementation must change, or every existing
+    decision file carries a value outside the vocabulary.
+
+R64. Archived decisions stay viewable — assumption to confirm
+    Severity: medium
+    REQ-004.003 states that an archived decision remains viewable by identifier (it
+    stays in place and is historical). Documents behave differently: an archived
+    document is unreachable. If decisions should instead be unreachable, that
+    requirement clause must be inverted.
+
+====================================================================
+SESSION TOTAL
+====================================================================
+
+Before: 7 groups, 60 records, 51,573 words.
+After:  6 groups, 42 records, 29,542 words (-43%).
+Archived records: 27 in docs/requirements/business/archived/ (24 from this session,
+3 pre-existing).
+
+Capabilities added while shrinking the corpus (all recorded above): release archive
+and delete (R52), milestone acceptance criteria (R53), the `--ac` view option (R54),
+decision status verbs and delete (R58-R60), decision archiving (R61).
+
+
