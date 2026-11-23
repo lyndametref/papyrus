@@ -343,14 +343,6 @@ pub fn descriptors() -> Vec<RecordDescriptor> {
     ]
 }
 
-pub fn all_descriptors() -> Vec<RecordDescriptor> {
-    descriptors()
-}
-
-pub fn list_descriptors() -> Vec<RecordDescriptor> {
-    descriptors()
-}
-
 pub fn descriptor_for(name: &str) -> Option<RecordDescriptor> {
     let needle = name.to_lowercase();
     descriptors().into_iter().find(|d| {
@@ -359,10 +351,6 @@ pub fn descriptor_for(name: &str) -> Option<RecordDescriptor> {
             || d.type_name.to_lowercase() == needle
             || d.label.to_lowercase() == needle
     })
-}
-
-pub fn is_managed_record(name: &str) -> bool {
-    descriptor_for(name).is_some()
 }
 
 #[cfg(test)]

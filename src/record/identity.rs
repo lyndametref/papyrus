@@ -40,10 +40,6 @@ impl IdSpec {
     pub fn format_id(&self, number: i64) -> String {
         format_id(&self.prefix, number, self.padding)
     }
-
-    pub fn validate_input(&self, input: &str) -> Result<(), IdentityError> {
-        self.parse_id(input).map(|_| ())
-    }
 }
 
 /// A file stem is Backlog-shaped, and therefore not a Papyrus record, when
@@ -477,11 +473,6 @@ pub fn is_valid_id_component(id: &str) -> bool {
     }
     id.bytes()
         .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
-}
-
-/// Whether `id` matches a family prefix and numeric shape.
-pub fn matches_family_id(id: &str, prefix: &str, dotted: bool) -> bool {
-    !prefix.is_empty() && parse_id_parts(id, prefix, dotted).is_some()
 }
 
 /// Join a prefix and an already formatted suffix without reimplementing the

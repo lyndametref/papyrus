@@ -1029,16 +1029,6 @@ impl Store {
     }
 }
 
-// aliases
-pub fn read_store(
-    ctx: &Context,
-    cfg: &Config,
-    registry: &ArtifactRegistry,
-    target: &Path,
-) -> Result<(Document, String), AppError> {
-    read(ctx, cfg, registry, target)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

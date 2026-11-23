@@ -2539,7 +2539,9 @@ impl DocumentFormValues {
             title: record.title.clone(),
             fields,
             labels: record.labels.clone(),
-            references: if record.is_html_mockup() {
+            references: if record.descriptor.document_model
+                == crate::registry::DocumentModel::SingleHtmlMockup
+            {
                 Vec::new()
             } else {
                 record.refs.clone()
@@ -2890,7 +2892,7 @@ fn document_form(
         &values.title,
         errors.title.as_deref(),
     ));
-    if record.is_html_mockup() {
+    if record.descriptor.document_model == crate::registry::DocumentModel::SingleHtmlMockup {
         form.push_str(&document_mockup_form(record, values, errors));
     } else {
         for field in &record.field_map.fields {
