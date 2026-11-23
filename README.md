@@ -114,7 +114,7 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        papyrus browser [--host &lt;host&gt;] [--port &lt;port&gt;] [--no-open] [--debug]
        </code>
        <b style="color: light-dark(#1a7f37, #3fb950);">--host &lt;host&gt;</b>
-       Bind address. Default: <b>127.0.0.1</b>. A non-loopback address is allowed but prints a warning.
+       Bind address. Default: <b>127.0.0.1</b>. A non-loopback address is allowed but prints a warning. A non-loopback bind is unauthenticated: anyone who can reach the port can read and modify every record.
 
        <b style="color: light-dark(#1a7f37, #3fb950);">--port &lt;port&gt;</b>
        TCP port. Default: <b>6420</b>.

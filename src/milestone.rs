@@ -827,6 +827,11 @@ pub fn close(
 /// removed again before returning an error, so only the source copy remains.
 /// Title, description, labels, references, and release assignment are
 /// preserved.
+/// Whether a destination path is occupied, including by a dangling symlink.
+fn destination_occupied(path: &std::path::Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok()
+}
+
 pub fn archive(
     ctx: &Context,
     cfg: &Config,
@@ -898,7 +903,7 @@ pub fn archive(
         let safe_write = Context::ensure_within(&ctx.project_dir, &path)?;
         crate::record::store::write_atomic(ctx, cfg, registry, &safe_write, &new_content)?;
     } else {
-        if dest.exists() {
+        if destination_occupied(&dest) {
             return Err(AppError::Validation(format!("already archived: {}", id)));
         }
         crate::record::store::write_atomic(ctx, cfg, registry, &dest, &new_content)?;
@@ -1228,6 +1233,23 @@ mod tests {
             "close must not change created_date: {}",
             closed
         );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn archive_destination_occupancy_sees_a_dangling_symlink() {
+        let dir = tmpdir("archive-dangling-symlink");
+        fs::create_dir_all(dir.join("backlog/archive/milestones")).unwrap();
+        let destination = dir.join("backlog/archive/milestones/MS-001.md");
+        std::os::unix::fs::symlink(dir.join("missing-target.md"), &destination).unwrap();
+
+        assert!(
+            destination_occupied(&destination),
+            "a dangling symlink must count as an occupied destination"
+        );
+        assert!(!destination_occupied(
+            &dir.join("backlog/archive/milestones/missing.md")
+        ));
     }
 
     #[test]

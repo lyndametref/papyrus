@@ -64,6 +64,8 @@ fn read_raw_config(config_path: &Path) -> Result<yaml_serde::Value, AppError> {
         )));
     }
     let raw = std::fs::read_to_string(config_path).map_err(|e| AppError::Runtime(e.to_string()))?;
+    crate::config::validate_yaml_input(&raw, crate::config::MAX_CONFIG_YAML_BYTES, "configuration")
+        .map_err(AppError::Validation)?;
     yaml_serde::from_str(&raw).map_err(|e| AppError::Validation(e.to_string()))
 }
 

@@ -1,5 +1,6 @@
 //! Leading YAML front-matter detection, parsing, and patching.
 
+use crate::config::{MAX_FRONT_MATTER_YAML_BYTES, validate_yaml_input};
 use crate::error::AppError;
 use std::str;
 
@@ -78,6 +79,14 @@ pub fn find_block(content: &str) -> Option<(usize, usize, usize)> {
     Some((inner_start, inner_end, body_start))
 }
 
+/// Parse a front-matter block after applying the YAML input limits.
+fn parse_yaml(raw: &str) -> Result<yaml_serde::Value, AppError> {
+    validate_yaml_input(raw, MAX_FRONT_MATTER_YAML_BYTES, "front matter")
+        .map_err(AppError::Validation)?;
+    yaml_serde::from_str(raw)
+        .map_err(|e| AppError::Validation(format!("malformed front matter: {}", e)))
+}
+
 /// Parse the leading block if present.
 pub fn parse(content: &str) -> Result<Option<FrontMatter>, AppError> {
     let Some((is, ie, _)) = find_block(content) else {
@@ -90,8 +99,7 @@ pub fn parse(content: &str) -> Result<Option<FrontMatter>, AppError> {
     } else {
         inner.to_string()
     };
-    let value: yaml_serde::Value = yaml_serde::from_str(&raw)
-        .map_err(|e| AppError::Validation(format!("malformed front matter: {}", e)))?;
+    let value = parse_yaml(&raw)?;
     Ok(Some(FrontMatter {
         text: raw.clone(),
         raw,
@@ -110,8 +118,7 @@ pub fn parse_block(content: &str) -> Result<Option<(FrontMatter, usize)>, AppErr
     } else {
         inner.to_string()
     };
-    let value: yaml_serde::Value = yaml_serde::from_str(&raw)
-        .map_err(|e| AppError::Validation(format!("malformed front matter: {}", e)))?;
+    let value = parse_yaml(&raw)?;
     Ok(Some((
         FrontMatter {
             text: raw.clone(),
@@ -243,7 +250,7 @@ pub fn current_key_block(raw: &str, key: &str) -> Option<String> {
 }
 
 pub fn current_value_string(raw: &str, key: &str) -> Option<String> {
-    let data = yaml_serde::from_str::<yaml_serde::Value>(raw).ok()?;
+    let data = parse_yaml(raw).ok()?;
     value_string(&data, key)
 }
 
@@ -738,6 +745,28 @@ mod tests {
         let content = "---\n: bad\n---\n";
         let err = parse(content).unwrap_err();
         assert!(matches!(err, crate::error::AppError::Validation(_)));
+    }
+
+    #[test]
+    fn hostile_front_matter_alias_bomb_is_rejected() {
+        let content =
+            "---\nbase: &base [one, two, three]\ncopy: [*base, *base, *base]\n---\n\nBody\n";
+        let error = parse(content).expect_err("anchors and aliases must be rejected");
+        assert!(
+            error.to_string().contains("anchors or aliases"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn oversized_front_matter_is_rejected() {
+        let value = "a".repeat(MAX_FRONT_MATTER_YAML_BYTES + 1);
+        let content = format!("---\nid: {value}\n---\n\nBody\n");
+        let error = parse(&content).expect_err("front matter must be size capped");
+        assert!(
+            error.to_string().contains("byte YAML limit"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

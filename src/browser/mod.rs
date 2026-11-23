@@ -337,7 +337,7 @@ pub fn run(
 
     if !is_loopback_host(&options.host) {
         eprintln!(
-            "warning: binding to non-loopback address {}; the interface is reachable from the network",
+            "warning: binding to non-loopback address {} without authentication; anyone who can reach this port can read and modify every record",
             options.host
         );
     }
@@ -451,6 +451,32 @@ fn reject_over_capacity(mut stream: TcpStream) {
     eprintln!("- - 503");
 }
 
+/// The method token used in the request log.
+///
+/// Known methods map to their canonical token. Any other token is reduced to
+/// printable ASCII and capped, so a hostile request line cannot inject control
+/// characters into the log or grow it without bound.
+fn log_method(request: &Request) -> String {
+    match request.method {
+        Method::Get => "GET".to_string(),
+        Method::Head => "HEAD".to_string(),
+        Method::Post => "POST".to_string(),
+        Method::Other => {
+            let token: String = request
+                .raw_method
+                .chars()
+                .filter(|character| character.is_ascii_graphic())
+                .take(16)
+                .collect();
+            if token.is_empty() {
+                "OTHER".to_string()
+            } else {
+                token
+            }
+        }
+    }
+}
+
 fn handle_connection(mut stream: TcpStream, state: &ServerState) {
     let started = Instant::now();
     let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
@@ -470,7 +496,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) {
         }
     };
 
-    let method = request.raw_method.clone();
+    let method = log_method(&request);
     let log_path: String = request.target.path.chars().take(200).collect();
     let head_only = request.method == Method::Head;
     let api = request.target.path.starts_with("/api/");
@@ -4052,6 +4078,140 @@ mod tests {
         assert!(is_loopback_host("LOCALHOST"));
         assert!(!is_loopback_host("0.0.0.0"));
         assert!(!is_loopback_host("example.test"));
+    }
+
+    type HeaderList<'a> = &'a [(&'a str, &'a str)];
+    type HostCase<'a> = (HeaderList<'a>, Option<u16>);
+    type OriginCase<'a> = (Method, HeaderList<'a>, Option<u16>);
+
+    fn request_for(method: Method, headers: &[(&str, &str)]) -> Request {
+        Request {
+            method,
+            raw_method: method.as_str().to_string(),
+            target: http::Target {
+                path: "/".to_string(),
+                query: None,
+                raw: "/".to_string(),
+            },
+            version: http::Version::Http11,
+            headers: headers
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+            body: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn validate_host_is_table_driven() {
+        let dir = snapshot_project("validate-host");
+        write_snapshot_config(&dir, "project_name: Validation\n");
+        let state = snapshot_state(&dir);
+        let request_state = state.request_state();
+        let cases: &[HostCase<'_>] = &[
+            (&[("Host", "127.0.0.1:6420")], None),
+            (&[("Host", "localhost:6420")], None),
+            (&[("Host", "LOCALHOST:6420")], None),
+            (&[("Host", " 127.0.0.1:6420 ")], None),
+            (&[("Host", "[::1]:6420")], None),
+            (&[], Some(400)),
+            (
+                &[("Host", "127.0.0.1:6420"), ("Host", "127.0.0.1:6420")],
+                Some(400),
+            ),
+            (&[("Host", "evil.example:6420")], Some(400)),
+            (&[("Host", "127.0.0.1")], Some(400)),
+            (&[("Host", "")], Some(400)),
+            (&[("Host", "   ")], Some(400)),
+        ];
+        for &(headers, expected) in cases {
+            let request = request_for(Method::Get, headers);
+            let status = validate_host(&request, &request_state)
+                .err()
+                .map(|error| error.status);
+            assert_eq!(status, expected, "headers: {headers:?}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn validate_origin_is_table_driven() {
+        let dir = snapshot_project("validate-origin");
+        write_snapshot_config(&dir, "project_name: Validation\n");
+        let state = snapshot_state(&dir);
+        let request_state = state.request_state();
+        let cases: &[OriginCase<'_>] = &[
+            (Method::Get, &[("Origin", "http://evil.example")], None),
+            (Method::Head, &[("Origin", "http://evil.example")], None),
+            (Method::Post, &[], None),
+            (Method::Post, &[("Origin", "http://127.0.0.1:6420")], None),
+            (Method::Post, &[("Origin", "https://127.0.0.1:6420")], None),
+            (Method::Post, &[("Origin", "http://localhost:6420")], None),
+            (
+                Method::Post,
+                &[("Origin", "http://evil.example:6420")],
+                Some(403),
+            ),
+            (Method::Post, &[("Origin", "null")], Some(403)),
+            (
+                Method::Post,
+                &[("Origin", "null"), ("Sec-Fetch-Site", "same-origin")],
+                None,
+            ),
+            (
+                Method::Post,
+                &[("Origin", "null"), ("Sec-Fetch-Site", "cross-site")],
+                Some(403),
+            ),
+            (
+                Method::Post,
+                &[("Origin", "ftp://127.0.0.1:6420")],
+                Some(403),
+            ),
+            (
+                Method::Post,
+                &[("Origin", "http://127.0.0.1:6420/")],
+                Some(403),
+            ),
+            (
+                Method::Post,
+                &[("Origin", "http://user@127.0.0.1:6420")],
+                Some(403),
+            ),
+            (
+                Method::Post,
+                &[("Origin", "http://127.0.0.1:9999")],
+                Some(403),
+            ),
+        ];
+        for &(method, headers, expected) in cases {
+            let request = request_for(method, headers);
+            let status = validate_origin(&request, &request_state)
+                .err()
+                .map(|error| error.status);
+            assert_eq!(status, expected, "method: {method:?}, headers: {headers:?}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn log_method_uses_the_mapped_or_sanitized_token() {
+        let cases: &[(Method, &str, &str)] = &[
+            (Method::Get, "GET", "GET"),
+            (Method::Head, "HEAD", "HEAD"),
+            (Method::Post, "POST", "POST"),
+            (Method::Other, "PUT", "PUT"),
+            (Method::Other, "bad\u{1b}[31m", "bad[31m"),
+            (Method::Other, "\u{7}custom", "custom"),
+            (Method::Other, "abcdefghijklmnopq", "abcdefghijklmnop"),
+            (Method::Other, "\u{7}\u{1b}", "OTHER"),
+            (Method::Other, "", "OTHER"),
+        ];
+        for &(method, raw, expected) in cases {
+            let mut request = request_for(method, &[]);
+            request.raw_method = raw.to_string();
+            assert_eq!(log_method(&request), expected, "raw: {raw:?}");
+        }
     }
 
     #[test]
