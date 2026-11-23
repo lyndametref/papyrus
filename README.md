@@ -429,41 +429,98 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
 
 <b style="color: light-dark(#0969da, #58a6ff);">&lt;document-slug&gt;</b>
 
-        Manage documents of a configured type. The command name is the enabled
+        Manage documents of a configured type. Artifacts belong to three
+        categories, each with one handler: <b>Backlog</b> (<b>task</b>,
+        <b>milestone</b>, <b>release</b>), <b>Decision</b> (<b>adr</b>,
+        <b>bdr</b>), and <b>Document</b> (every <b>document_types</b> slug).
+        Backlog and decision commands are bespoke; every document type is one
+        descriptor handled by one engine. The command name is the enabled
         <b>document_types</b> key. <b>papyrus --help</b> lists the enabled slugs
-        and <b>papyrus &lt;document-slug&gt; --help</b> lists that type's verbs.
-        <b>req</b> and <b>nfr</b> exist only because they are default entries.
+        and <b>papyrus &lt;document-slug&gt; --help</b> lists that type's verbs
+        and field options. <b>req</b> and <b>nfr</b> exist only because they are
+        seed entries.
+
+        A document type has one <b>DocumentModel</b>:
+
+          <b>SingleMarkdown</b>
+          One record per plain ID and one top-level <b>fields</b> sequence.
+          Every user-defined slug uses this model.
+
+          <b>GroupedMarkdown</b>
+          A group record with a plain ID and member records with dotted IDs
+          (for example <b>REQ-01</b> and <b>REQ-01.001</b>), with
+          <b>group.fields</b> and <b>member.fields</b> sequences. Seed-only:
+          <b>req</b> and <b>nfr</b>.
+
+          <b>SingleHtmlMockup</b>
+          One HTML record per plain ID, with state in the HTML metadata.
+          Seed-only: <b>ui-mockup</b>.
+
+        The model selects the verbs. Every type has the baseline <b>create</b>,
+        <b>list</b>, <b>view</b>, <b>edit</b>, <b>archive</b>, and
+        <b>delete</b>. <b>status</b> is added for the two Markdown models.
+        <b>create-group</b> and <b>--group</b> are added only for
+        <b>GroupedMarkdown</b>. <b>supersede</b> is added only for
+        <b>SingleHtmlMockup</b>, which has no <b>status</b> verb. Verbs are
+        derived from the model and are never declared in configuration.
 
        <code style="font-weight: bold;">
        papyrus &lt;document-slug&gt; create &lt;title&gt; [options]
+       papyrus &lt;document-slug&gt; create-group &lt;title&gt; [options]  # grouped only
        papyrus &lt;document-slug&gt; list
        papyrus &lt;document-slug&gt; view &lt;id&gt;
        papyrus &lt;document-slug&gt; edit &lt;id&gt; [options]
        papyrus &lt;document-slug&gt; archive &lt;id&gt;
-       papyrus &lt;document-slug&gt; status &lt;id&gt; &lt;value&gt;
+       papyrus &lt;document-slug&gt; status &lt;id&gt; &lt;value&gt;              # Markdown models only
+       papyrus &lt;document-slug&gt; supersede &lt;old&gt; &lt;new&gt;        # mockup only
        papyrus &lt;document-slug&gt; delete &lt;id&gt; [--force]
        </code>
 
-        A type with no built-in schema (a user-defined slug) uses the generic
-        baseline: <b>create &lt;title&gt; [-d, --description &lt;text&gt;]
-        [--label &lt;label&gt;...] [--reference &lt;value&gt;...]</b> and
-        <b>edit &lt;id&gt; [--title &lt;title&gt;] [-d, --description &lt;text&gt;]
-        [--label &lt;label&gt;...] [--reference &lt;value&gt;...] [--editor]</b>.
-        Built-in types keep their typed fields; <b>papyrus &lt;document-slug&gt; --help</b>
-        is authoritative for the selected type.
+        <b>Title contract:</b> the title is fixed, is not a field, and is not
+        configurable. Supply it as the first positional <b>TITLE</b> on
+        <b>create</b> and <b>create-group</b>, or with <b>--title</b> on
+        <b>create</b>, <b>create-group</b>, and <b>edit</b>. It is required on
+        create, must be single-line and non-empty, and can never be cleared on
+        edit. Supplying positional <b>TITLE</b> and <b>--title</b> together is
+        rejected as conflicting sources. <b>title</b> is a reserved field key.
+        There is no <b>--term</b> option; a glossary term is the title.
 
-        <b>Multiline stdin:</b> <b>create</b> and <b>edit</b> accept
-        <b>-d, --description &lt;text&gt;</b> from standard input when the value
-        is exactly <b>-</b>. This applies to the generic model and to every
-        typed document type that declares <b>--description</b>. It also applies
-        to <b>audit</b> create and edit <b>--content</b> and to <b>glossary</b>
-        create and edit <b>--definition</b>.
+        Each declared field contributes one long option, in field sequence
+        order; <b>papyrus &lt;document-slug&gt; --help</b> is authoritative for
+        the selected type. The field vocabulary is defined in
+        papyrus-config(5).
+
+        <b>Multiline stdin:</b> a field of kind <b>multiline</b> accepts a
+        value of exactly <b>-</b> from standard input on <b>create</b> and
+        <b>edit</b>. For the seed types this covers <b>--description</b>,
+        <b>audit --content</b>, and <b>glossary --definition</b>, and it applies
+        to every declared <b>multiline</b> field.
         Use "-" to read multiline text from standard input.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">status &lt;id&gt; &lt;value&gt;</b>
-        Set <b>active</b> or a declared custom status in place. Front-matter-backed
-        types have this verb; <b>ui-mockup</b> does not. <b>archived</b> is rejected;
-        use <b>archive</b>.
+        Set <b>active</b> or a declared custom status in place. Present on
+        <b>SingleMarkdown</b> and <b>GroupedMarkdown</b> types; <b>ui-mockup</b>
+        has no status verb. <b>archived</b> is rejected (exit 4); use
+        <b>archive</b>.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">create-group &lt;title&gt; [options]</b>
+        Create a group record. Present only on <b>GroupedMarkdown</b> types.
+        On those types <b>create</b> creates a member and requires
+        <b>--group &lt;id&gt;</b> naming an existing active group of the same
+        type. The engine owns the <b>group</b> front-matter link; membership
+        cannot be changed after creation, and archiving or deleting a group
+        leaves its members untouched.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">supersede &lt;old&gt; &lt;new&gt;</b>
+        Record that one <b>SingleHtmlMockup</b> record supersedes another.
+        Present only on <b>ui-mockup</b>.
+
+       <b style="color: light-dark(#8250df, #d2a8ff);">edit &lt;id&gt; [options]</b>
+        Edit field values, the title, labels, and references. On <b>ui-mockup</b>,
+        <b>edit --status approved</b> records approval. The fixed mockup states
+        are <b>pending</b>, <b>approved</b>, and <b>archived</b>; an explicit
+        <b>--status archived</b> is rejected (exit 4) in favour of
+        <b>archive</b>.
 
        <b style="color: light-dark(#8250df, #d2a8ff);">archive &lt;id&gt;</b>
         Move a document to the <b>archived/</b> subfolder of its type directory.
@@ -476,21 +533,24 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
           <b style="color: light-dark(#1a7f37, #3fb950);">--force</b>
           Skip confirmation prompt.
 
-        Type-specific additions:
+        Type-specific additions, derived from the model:
 
           <b style="color: light-dark(#1a7f37, #3fb950);">req</b> and <b>nfr</b>
-          add <b>create-group --title &lt;title&gt; [--story &lt;text&gt;] [-d &lt;description&gt;]</b>;
+          are <b>GroupedMarkdown</b> and add
+          <b>create-group &lt;title&gt; [--story &lt;text&gt;] [--description &lt;text&gt;]</b>;
           <b>create</b> requires <b>--group &lt;id&gt;</b>.
 
-          <b style="color: light-dark(#1a7f37, #3fb950);">ui-mockup</b>
-          adds <b>supersede</b> and has no <b>status</b>; its HTML metadata
-          states <b>pending</b>, <b>approved</b>, or <b>archived</b>.
+          <b style="color: light-dark(#1a7f37, #3fb950);">ui-mockup</b> is
+          <b>SingleHtmlMockup</b> and adds <b>supersede</b> and has no
+          <b>status</b>; its HTML metadata states <b>pending</b>,
+          <b>approved</b>, or <b>archived</b>.
 
-        The eleven defaults below are configuration written by <b>papyrus init</b>,
-        not a fixed command list. <b>deploy</b> is not seeded; declare it in
-        <b>document_types</b> to use <b>papyrus deploy</b>. A hand-written
-        <b>document_types</b> map replaces the defaults wholesale, so keep every
-        entry you still use.
+        The eleven seed types below are always effective, whether or not
+        <b>papyrus.config.yml</b> declares them. <b>papyrus init</b> writes
+        minimal entries (prefix and directory) for them, and declaration
+        supplies only overrides. A user-defined type, such as <b>deploy</b>,
+        exists only while it is declared; declaring it makes
+        <b>papyrus deploy</b> available. See papyrus-config(5).
 
        <code style="font-weight: bold;">
        req          REQ   requirements/business/
@@ -728,13 +788,20 @@ PAPYRUS(1)                      Papyrus Manual                      PAPYRUS(1)
        papyrus req status REQ-004 review
        </code>
 
-       Add a document type by editing papyrus.config.yml, then use its command.
-       A hand-written document_types map replaces the defaults wholesale, so keep
-       every entry you still use:
+       Add a user-defined document type by editing papyrus.config.yml, then use
+       its command. Seed types stay effective without a declaration, and a
+       user-defined type exists only while declared. Add fields as a sequence:
        <code style="font-weight: bold;">
        document_types:
-         # ... your existing entries ...
-         deploy: { prefix: DEP, directory: architecture/deployment/, enabled: true }
+         deploy:
+           prefix: DEP
+           directory: architecture/deployment/
+           fields:
+             - key: summary
+               heading: "## Summary"
+               label: Summary
+               kind: text
+               required: true
        </code>
        <code style="font-weight: bold;">
        papyrus deploy list
@@ -849,63 +916,144 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
 
        <b style="color: light-dark(#8250df, #d2a8ff);">document_types</b>
        Document types keyed by slug. The slug is the command name:
-       <b>papyrus &lt;slug&gt;</b>. When this key is present in
-       <b>papyrus.config.yml</b>, exactly its entries exist: the default map is
-       replaced wholesale and no default entry is re-added. Removing an entry
-       stops managing its files without deleting them. <b>enabled: false</b>
-       keeps the entry, its prefix reservation, and its files, but removes the
-       command and the browser view.
+       <b>papyrus &lt;slug&gt;</b>. The eleven seed slugs are always effective:
+       they resolve from the seed table whether or not the file declares them,
+       and a declaration overrides only the keys it sets. A user-defined slug
+       exists only while it is declared; removing its entry stops managing its
+       files without deleting them. <b>enabled: false</b> keeps a declared
+       entry, its prefix reservation, and its files, but removes the command and
+       the browser view.
 
-       Each entry has these fields:
+       Each declared entry may set:
 
-         <b>prefix</b>        ID prefix. Required. Unique across all entries,
-                     including disabled entries (case-insensitive); no
-                     whitespace, control characters, path separators, or "..".
-         <b>directory</b>     Directory relative to <b>doc_directory</b>. Required.
-                     Must stay inside the project and be unique among enabled
-                     entries.
+         <b>prefix</b>        ID prefix. Required on every declared entry, seed or
+                     user-defined, and never filled from the seed. Unique across
+                     all entries, including disabled entries (case-insensitive);
+                     no whitespace, control characters, path separators, or "..".
+         <b>directory</b>     Directory relative to <b>doc_directory</b>. Required
+                     on every declared entry and never filled from the seed. Must
+                     stay inside the project and be unique among enabled entries.
          <b>enabled</b>       Whether the type is active. Default: <b>true</b>.
+         <b>label</b>, <b>plural</b>, <b>order</b>, <b>summary</b>, <b>type_alias</b>
+                     Presentation facts. Unset values come from the seed for a
+                     seed slug.
          <b>statuses</b>      Optional ordered status list. Must contain
                      <b>active</b> and <b>archived</b> exactly once, with no
                      duplicates. Values use the slug character set. Not allowed
                      on <b>ui-mockup</b>.
          <b>default_status</b>
-                     Status of a new record. Optional; defaults to <b>active</b>.
-                     Must be a declared status and must not be <b>archived</b>.
-                     Not allowed on <b>ui-mockup</b>.
+                     Status written when a record is created. Optional; defaults
+                     to <b>active</b>. Must be a declared status and must not be
+                     <b>archived</b>. Not allowed on <b>ui-mockup</b>.
+         <b>reference_visibility</b>
+                     <b>visible</b> or <b>hidden</b>, per role in a grouped type.
+         <b>slots</b>, <b>api_aliases</b>
+                     Declarative list data. File data only; never comma-set.
+         <b>fields</b>        Field sequence for a <b>SingleMarkdown</b> type.
+         <b>group</b>, <b>member</b>
+                     Role blocks for a <b>GroupedMarkdown</b> type, each with a
+                     <b>fields</b> sequence and optional
+                     <b>reference_visibility</b>.
+
+       <b>model</b>, <b>title</b>, <b>content</b>, and <b>id_shape</b> are not
+       configuration keys and are rejected.
+
+       The model is seed data, not a key. <b>GroupedMarkdown</b>
+       (<b>req</b> and <b>nfr</b>) declares <b>group.fields</b> and
+       <b>member.fields</b> and no top-level <b>fields</b>.
+       <b>SingleHtmlMockup</b> (<b>ui-mockup</b>) declares no fields. Grouped
+       and HTML models are seed-only; every user-defined slug is
+       <b>SingleMarkdown</b>.
+
+       <b>Resolution:</b> scalars fill from the seed when absent, and a present
+       scalar overrides it. Collections replace wholesale when present:
+       <b>fields</b>, <b>group.fields</b>, <b>member.fields</b>, <b>statuses</b>,
+       <b>slots</b>, and <b>api_aliases</b>. An absent collection inherits the
+       seed collection; <b>fields: []</b> declares no field. A present
+       <b>group</b> or <b>member</b> block replaces only that role's collection.
+       A user-defined slug has no seed: it is <b>SingleMarkdown</b>,
+       <b>enabled: true</b>, with statuses <b>[active, archived]</b>, no
+       <b>default_status</b>, and one optional <b>description</b> field
+       (<b>## Description</b>, kind <b>multiline</b>) unless the declaration
+       replaces it.
+
+       A field item has exactly these keys:
+
+         <b>key</b>             Required stable identity. Unique within a role.
+         <b>heading</b>         Level-2 body heading, written with its <b>## </b> prefix.
+         <b>frontmatter_key</b> Front-matter key that stores the value. May
+                        differ from <b>key</b>.
+         <b>option</b>          Long CLI option without <b>--</b>; derived from
+                        <b>key</b> in kebab case when absent.
+         <b>label</b>, <b>help</b> Presentation-only text.
+         <b>kind</b>            <b>text</b>, <b>multiline</b>, or <b>list</b>.
+                        Default: <b>text</b>. <b>multiline</b> accepts <b>-</b>
+                        from standard input.
+         <b>required</b>        Whether <b>create</b> must supply the field.
+                        Default: <b>false</b>. A required field may be changed
+                        but not cleared on <b>edit</b>.
+         <b>verbs</b>           Subset of <b>[create, edit]</b>. Default: both.
+         <b>values</b>          Optional value domain: a non-empty list of
+                        allowed strings, or <b>record-ids</b> for a list field.
+                        Absent: no restriction.
+
+       A field must declare <b>heading</b>, <b>frontmatter_key</b>, or both; a
+       field with both writes both. Sequence position is the only order: body
+       sections, CLI options, help, browser form, and field maps all follow it.
+       There is no <b>order</b> or <b>enabled</b> field key.
+
+       Reserved field keys, for both <b>key</b> and <b>frontmatter_key</b>:
+       <b>id</b>, <b>title</b>, <b>status</b>, <b>labels</b>, <b>references</b>,
+       <b>created_date</b>, <b>updated_date</b>, <b>group</b>, <b>version</b>,
+       <b>kind</b>, <b>form</b>, <b>path</b>, and <b>metadata</b>. The
+       <b>group</b> key is engine-owned; membership is never a field.
+
+       <b>Selector paths.</b> Field leaves are addressable with dotted keys and
+       a keyed or indexed sequence selector, for example
+       <b>document_types.glossary.fields[definition].heading</b> or
+       <b>document_types.req.member.fields[1].kind</b>.
+       <b>papyrus config get</b> resolves them; <b>papyrus config list</b> prints
+       every field leaf in the keyed form.
+       <b>papyrus config set</b> and <b>papyrus config unset</b> reject every
+       selector inside <b>fields</b>, <b>group.fields</b>, or
+       <b>member.fields</b>. Fields are configuration file data: adding,
+       removing, reordering, or editing a field property is done only by editing
+       <b>papyrus.config.yml</b>.
 
        The slug must use ASCII letters, digits, <b>_</b>, and <b>-</b>, must not
        start with <b>-</b>, and must not match a built-in command name
        (case-insensitive). A repeated YAML key is rejected.
 
-       The eleven defaults written by <b>papyrus init</b> (<b>deploy</b> is not
-       one of them):
+       The eleven seed types (<b>deploy</b> is not one of them):
 
        <code style="font-weight: bold;">
        document_types:
-         req:      { prefix: REQ, directory: requirements/business/,       enabled: true, statuses: [active, archived] }
-         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true, statuses: [active, archived] }
-         glossary: { prefix: GLO, directory: glossary/,                    enabled: true, statuses: [active, archived] }
-         rule:     { prefix: RUL, directory: business-rules/,              enabled: true, statuses: [active, archived] }
-         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true, statuses: [active, archived] }
-         ui-mockup: { prefix: MOCK, directory: specifications/ui/mockups/, enabled: true }
-         audit:    { prefix: AUD, directory: audit-records/,               enabled: true, statuses: [active, archived] }
-         tech-spec: { prefix: TECH, directory: technical/,                 enabled: true, statuses: [active, archived] }
-         use-case: { prefix: UC,  directory: use-cases/,                   enabled: true, statuses: [active, archived] }
-         test-case: { prefix: TC, directory: test-cases/,                 enabled: true, statuses: [active, archived] }
-         test-report: { prefix: TR, directory: test-reports/,             enabled: true, statuses: [active, archived] }
+         req:         { prefix: REQ,  directory: requirements/business/ }
+         nfr:         { prefix: NFR,  directory: requirements/non-functional/ }
+         glossary:    { prefix: GLO,  directory: glossary/ }
+         rule:        { prefix: RUL,  directory: business-rules/ }
+         ui-spec:     { prefix: UI,   directory: specifications/ui/ }
+         ui-mockup:   { prefix: MOCK, directory: specifications/ui/mockups/ }
+         audit:       { prefix: AUD,  directory: audit-records/ }
+         tech-spec:   { prefix: TECH, directory: technical/ }
+         use-case:    { prefix: UC,   directory: use-cases/ }
+         test-case:   { prefix: TC,   directory: test-cases/ }
+         test-report: { prefix: TR,   directory: test-reports/ }
        </code>
 
        Validation is fail-closed: an invalid configuration makes every command
-       that validates it exit <b>4</b> with a message naming
-       <b>document_types.&lt;slug&gt;.&lt;field&gt;</b>. Repair it with
-       <b>papyrus config get|set|unset|list</b>; <b>set</b> and <b>unset</b>
-       validate the merged configuration and write nothing when it is invalid.
-       A malformed or new entry must be defined by editing
-       <b>papyrus.config.yml</b>: a single <b>config set</b> cannot create a new
-       type because the entry would still lack its <b>prefix</b> or
-       <b>directory</b>. <b>papyrus init --force</b> replaces the configuration
-       file in full (the eleven defaults when non-interactive).
+       that validates it exit <b>4</b> with a one-line diagnostic naming the
+       exact selector path <b>document_types.&lt;slug&gt;.&lt;path&gt;</b>, for
+       example
+       <b>document_types.req.group.fields[story]: must declare heading or frontmatter_key</b>.
+       Unknown keys and unknown enum values are rejected the same way.
+       <b>papyrus config set</b> and <b>unset</b> validate the merged
+       configuration and write nothing when it is invalid. A malformed or new
+       entry must be defined by editing <b>papyrus.config.yml</b>: a single
+       <b>config set</b> cannot create a new type because the entry would still
+       lack its <b>prefix</b> or <b>directory</b>. <b>papyrus init</b> writes the
+       eleven seed entries with <b>prefix</b> and <b>directory</b> only, and
+       <b>papyrus init --force</b> replaces the configuration file in full.
 
        <b>statuses</b> and <b>document_types.&lt;slug&gt;.statuses</b> are
        list-valued keys. Write them with a comma-separated value, for example
@@ -918,9 +1066,9 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
        that must contain a comma can only be written by editing
        <b>papyrus.config.yml</b> directly.
 
-       <b>req</b> and <b>nfr</b> are the default entries <b>req</b> and
-       <b>nfr</b>, not special commands; there is no <b>nfreq</b>. Disabled types
-       cannot be created and are hidden from lists and search.
+       <b>req</b> and <b>nfr</b> are seed entries, not special commands; there
+       is no <b>nfreq</b>. A disabled type cannot be created and is hidden from
+       lists and search.
 
 <b style="color: light-dark(#0969da, #58a6ff);">Web UI</b>
 
@@ -953,20 +1101,51 @@ PAPYRUS-CONFIG(5)           Papyrus Manual           PAPYRUS-CONFIG(5)
          bdr: { prefix: BDR, enabled: true }
 
        document_types:
-         req:      { prefix: REQ, directory: requirements/business/,       enabled: true, statuses: [active, archived] }
-         nfr:      { prefix: NFR, directory: requirements/non-functional/, enabled: true, statuses: [active, archived] }
-         glossary: { prefix: GLO, directory: glossary/,                    enabled: true, statuses: [active, archived] }
-         rule:     { prefix: RUL, directory: business-rules/,              enabled: true, statuses: [active, archived] }
-         ui-spec:  { prefix: UI,  directory: specifications/ui/,           enabled: true, statuses: [active, archived] }
-         ui-mockup: { prefix: MOCK, directory: specifications/ui/mockups/, enabled: true }
-         audit:    { prefix: AUD, directory: audit-records/,               enabled: true, statuses: [active, archived, review], default_status: review }
-         tech-spec: { prefix: TECH, directory: technical/,                 enabled: true, statuses: [active, archived] }
-         use-case: { prefix: UC,  directory: use-cases/,                   enabled: true, statuses: [active, archived] }
-         test-case: { prefix: TC, directory: test-cases/,                 enabled: true, statuses: [active, archived] }
-         test-report: { prefix: TR, directory: test-reports/,             enabled: true, statuses: [active, archived] }
-       # Optional user-defined type. A hand-written map replaces the defaults,
-       # so keep the entries above when adding this one.
-       # deploy: { prefix: DEP, directory: architecture/deployment/, enabled: true }
+         # Seed entry: only the keys you override. prefix and directory are
+         # required on every declared entry.
+         glossary:
+           prefix: GLO
+           directory: glossary/
+
+         # Grouped seed entry: one field sequence per role.
+         req:
+           prefix: REQ
+           directory: requirements/business/
+           group:
+             fields:
+               - key: story
+                 heading: "## User Story"
+                 label: User story
+                 kind: multiline
+               - key: description
+                 heading: "## Description"
+                 label: Description
+                 kind: multiline
+           member:
+             fields:
+               - key: story
+                 heading: "## User Story"
+                 label: User story
+                 kind: multiline
+               - key: description
+                 heading: "## Description"
+                 label: Description
+                 kind: multiline
+
+         # User-defined type: always SingleMarkdown, and it exists only while
+         # declared.
+         deploy:
+           prefix: DEP
+           directory: architecture/deployment/
+           fields:
+             - key: summary
+               heading: "## Summary"
+               label: Summary
+               help: One-line summary of the deployment.
+               kind: text
+               required: true
+               verbs: [create, edit]
+
        # Archived records live under each type directory's archived/ subfolder.
 
        browser_host: 127.0.0.1

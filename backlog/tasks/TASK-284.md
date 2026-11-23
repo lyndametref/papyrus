@@ -2,7 +2,7 @@
 id: TASK-284
 title: "Update README, man pages, upgrade notes, and packaging documentation"
 created_date: '2026-11-20T17:44:01Z'
-updated_date: '2026-11-23T06:19:55Z'
+updated_date: '2026-11-23T07:16:14Z'
 labels: []
 references:
   - ADR-036
@@ -15,7 +15,7 @@ references:
   - ADR-042
   - TECH-008
   - ADR-0021
-status: ToDo
+status: Done
 assignee:
   - tech-writer
 milestone: MS-037
@@ -71,3 +71,8 @@ The four documents describe the released behaviour, the README AI notice remains
 - [ ] papyrus check reports no new finding from the edited files.
 ## Comments
 - **task-refiner**: Packaging doc item is coupled to the TASK-288 output-path escalation: until the planner and architect decide between allowing the builds path and staging under the temp directory, describe the single release boundary and mark the RC staging path as pending.
+- **rust-dev**: Docs updated; see files.
+- **rust-dev**: README and config man pages updated for three handlers, three document models, uniform title contract, model-derived verbs, nested fields schema, selectors, diagnostics and seed rules; upgrade notes and packaging updated; check shows no new findings.
+- **rust-dev**: Upgrade notes updated with migration rows, seed rules, fields examples, statuses, group link, cache headers, module consequences and fixed links. Packaging updated for entry point, publish path, out policy, asset guard and inventory. No new check findings.
+- **rust-dev**: Verification: papyrus check reports the same 5 pre-existing findings and none from the edited files; README last non-empty line is the AI notice; cargo fmt and clippy clean. Changes left uncommitted per instruction.
+- **orchestrator**: Acceptance met: README papyrus(1) and papyrus-config(5) sections, upgrade notes and packaging doc updated to the released behaviour (three handlers, three models, title contract, nested fields, selector split, cache headers, builds output policy); AI notice retained; links resolve; docs-only change.
