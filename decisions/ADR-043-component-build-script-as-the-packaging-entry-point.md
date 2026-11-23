@@ -2,7 +2,7 @@
 id: ADR-043
 title: "Component build script as the packaging entry point"
 created_date: '2026-11-22T15:23:49Z'
-updated_date: '2026-11-22T15:24:16Z'
+updated_date: '2026-11-23T06:27:36Z'
 labels: []
 references:
   - ADR-038
@@ -27,6 +27,17 @@ superseded_by: null
 ## Status
 accepted
 ## Decision
+### Amendment (2026-11-23) — release-boundary exceptions and permitted output locations
+
+This note corrects decisions 7 and 21; it does not reopen this record.
+
+- **Decision 21 — MS-035 and MS-036 are excepted; the packaging gate starts at MS-037.** MS-035 and MS-036 are waived internal checkpoints under the decision 23 waiver mechanism: their verification builds are compiled and discarded, no RC version is determined, and no package is published or retained. The waivers are recorded with scope, reason, and timestamp with timezone in the milestone verification records: MS-035 AC-9 and AUD-147 (2026-11-22T20:12:05Z), and MS-036 AC-9 with the user-approved waiver recorded 2026-11-22T20:22:22Z. The sentences in decision 21 that make MS-035 and MS-036 carry the RC gate are read as excepted. From MS-037 onward decision 21 applies unchanged: every verified milestone publishes an RC package under the git-ignored `builds/<version>/`, and the final release publishes the final package through the same script. No other part of decision 21 changes.
+
+- **Decision 7 — permitted output locations.** The deliverable must land in the repository's git-ignored `builds/<version>/` directory. That is the permitted publish location: it is never staged, committed, tagged, pushed, or uploaded, and it may be retained. Scratch staging stays under the project-local `.tmp/` directory. That is the permitted scratch and staging location: it is removed before the work ends and is never a publish location. Both are safe because neither is a tracked repository location; anything else inside the repository remains refused with exit 2.
+
+  The guard implements this rule on the canonicalised path (`realpath -m`): an in-repository `--out` is permitted only when it is strictly below `$ROOT/.tmp/`, or strictly below `$ROOT/builds/` with at least one segment after `builds/` (for example `builds/<version>/` or `builds/<version>/.build/<component>`). `$ROOT`, `$ROOT/builds` without a version segment, and every other in-repository path are refused. Outside the repository, the existing exclusions (the filesystem root, the system directories, `$HOME` and its subtree, the repository root, and any parent of the repository root) remain in force. `scripts/package-out.sh`, `scripts/build-package.sh`, and `scripts/build-deb.sh` must state this rule in their usage text and diagnostics, and `tests/build_package_guard.rs` must exercise both permitted roots and the refusal of every other in-repository path.
+
+- **Not changed:** decisions 1-6, 8-20, 22, 23, the downstream constraints, the context, the consequences, and this record's accepted status.
 ## Supersession and scope
 
 1. This ADR supersedes TASK-235 ruling 1, recorded 2026-11-21 (UTC): "use the existing build-deb script under scripts for verification and the release boundary; do not add a build-package script under scripts." The prohibition is retired. TASK-235 rulings 2 and 3 (no-new-crates gate including dev- and build-dependencies; production LOC as an informational measurement, never a gate) remain in force.
