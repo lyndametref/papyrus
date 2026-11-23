@@ -2,7 +2,7 @@
 id: TASK-287
 title: "Run the quality gate audit and collect release evidence"
 created_date: '2026-11-20T17:44:13Z'
-updated_date: '2026-11-23T06:18:10Z'
+updated_date: '2026-11-23T11:29:26Z'
 labels: []
 references:
   - NFR-007.001
@@ -20,6 +20,7 @@ milestone: MS-037
 dependencies:
   - TASK-285
   - TASK-286
+  - TASK-316
 ordinal: 80
 documentation:
   - tests/no_drift.rs
