@@ -2,7 +2,7 @@
 id: ADR-042
 title: "Document engine CLI surface rulings"
 created_date: '2026-11-22T12:42:43Z'
-updated_date: '2026-11-22T12:43:01Z'
+updated_date: '2026-11-24T19:07:16Z'
 labels: []
 references:
   - ADR-0016
@@ -17,12 +17,12 @@ references:
   - TECH-070
   - MS-034
   - TASK-260
-superseded_by: null
+superseded_by: ADR-045
 ---
 # ADR-042 Document engine CLI surface rulings
 
 ## Status
-accepted
+Superseded by ADR-045
 ## Decision
 These rulings settle the architectural questions raised during MS-034 refinement. They are normative for the descriptor-driven document engine and apply uniformly to every document type. Only the clauses named here change; every other accepted decision remains in force.
 

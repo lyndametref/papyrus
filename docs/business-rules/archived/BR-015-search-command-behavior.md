@@ -5,7 +5,7 @@ created_date: '2026-11-01T20:26:25Z'
 updated_date: '2026-11-16T16:57:06Z'
 labels: []
 references: []
-status: active
+status: archived
 ---
 # BR-015: Papyrus search Command Behavior
 

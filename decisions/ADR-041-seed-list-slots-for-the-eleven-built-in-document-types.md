@@ -2,7 +2,7 @@
 id: ADR-041
 title: "Seed list slots for the eleven built-in document types"
 created_date: '2026-11-22T08:55:18Z'
-updated_date: '2026-11-22T12:02:28Z'
+updated_date: '2026-11-24T19:07:16Z'
 labels: []
 references:
   - RE-010
@@ -13,12 +13,12 @@ references:
   - REQ-007.004
   - TECH-070
   - TECH-077
-superseded_by: null
+superseded_by: ADR-045
 ---
 # ADR-041 Seed list slots for the eleven built-in document types
 
 ## Status
-accepted
+Superseded by ADR-045
 ## Decision
 ### Scope
 

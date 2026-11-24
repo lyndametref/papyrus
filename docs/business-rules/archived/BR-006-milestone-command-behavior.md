@@ -6,7 +6,7 @@ updated_date: '2026-11-16T20:58:34Z'
 labels: []
 references:
   - RE-002
-status: active
+status: archived
 ---
 # BR-006: Papyrus milestone Command Behavior
 

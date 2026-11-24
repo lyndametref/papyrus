@@ -5,7 +5,7 @@ created_date: '2026-11-14T18:39:51Z'
 updated_date: '2026-11-20T21:22:06Z'
 labels: []
 references: []
-status: active
+status: archived
 ---
 # BR-020: Test-Report Document Type Behavior
 

@@ -2,14 +2,15 @@
 id: ADR-0024
 title: "List-Valued Configuration Keys in `papyrus config set`"
 created_date: '2026-11-13T00:00:00Z'
-updated_date: '2026-11-20T20:09:05Z'
+updated_date: '2026-11-24T19:07:16Z'
 labels: []
 references: []
+superseded_by: ADR-045
 ---
 # List-Valued Configuration Keys in `papyrus config set`
 
 ## Status
-accepted
+Superseded by ADR-045
 ## Date
 
 2026-11-13 (status: Proposed, 2026-11-13; status: Accepted, 2026-11-13)

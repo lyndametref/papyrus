@@ -1,30 +1,31 @@
 ---
-id: "BR-009:"
-title: "Papyrus req Command Behavior"
+id: "BR-010:"
+title: "Papyrus nfr Command Behavior"
 created_date: '2026-11-14T18:39:51Z'
-updated_date: '2026-11-20T21:12:51Z'
+updated_date: '2026-11-20T21:13:34Z'
 labels: []
 references: []
-status: active
+status: archived
 ---
-# BR-009: Papyrus req Command Behavior
+# BR-010: Papyrus nfr Command Behavior
 
 ## Description
 
-`papyrus req` is the command family generated from the `GroupedMarkdown` `req` descriptor: `create-group` writes a group record with a plain ID, `create` writes a dotted-ID member only under an existing active group of the same type, the engine-owned group link is immutable and never a field or option, archive and delete cascade to nothing, and lists merge group rows then member rows with no reference list.
+`papyrus nfr` is the command family generated from the `GroupedMarkdown` `nfr` descriptor: `create-group` writes a group record with a plain ID, `create` writes a dotted-ID member only under an existing active group of the same type, the engine-owned group link is immutable and never a field or option, archive and delete cascade to nothing, and lists merge group rows then member rows with no reference list.
 
 ## Rationale
 
-Based on REQ-005.001 — Manage Business Requirements, REQ-007.003 — Dispatch Config-Defined Document Commands, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, and REQ-005.007 — Manage Document Archive State and Deletion, this rule exists because `req` is one of only two `GroupedMarkdown` types, so the generation step must derive the extra `create-group` verb, the required `--group` on create, the plain and dotted ID shapes, the engine-owned group link, the non-cascading archive, and the merged ordering from the descriptor and the seed rather than from a per-type module. A requirement belongs to exactly one group and groups contain business requirements only, so accepting a cross-type or archived group, exposing a second group link, or cascading an archive would silently corrupt the requirement corpus; RE-010 D7 fixes these invariants as accepted and not reopenable.
+Based on REQ-005.002 — Manage Non-Functional Requirements, REQ-007.003 — Dispatch Config-Defined Document Commands, REQ-007.004 — Provide One Schema-Driven Document Content Model with Three Document Models, and REQ-005.007 — Manage Document Archive State and Deletion, this rule exists because `nfr` is one of only two `GroupedMarkdown` types, so the generation step must derive the extra `create-group` verb, the required `--group` on create, the plain and dotted ID shapes, the engine-owned group link, the non-cascading archive, and the merged ordering from the descriptor and the seed rather than from a per-type module. Non-functional requirements are kept in their own groups so they never mix with business requirements, so accepting a cross-type or archived group, exposing a second group link, or cascading an archive would silently corrupt the requirement corpus; RE-010 D7 fixes these invariants as accepted and not reopenable.
 
 ## Applicability
 
-Applies to every invocation of `papyrus req` and to every business-requirement group and member record, in projects where the `req` entry is enabled.
+Applies to every invocation of `papyrus nfr` and to every non-functional-requirement group and member record, in projects where the `nfr` entry is enabled.
 
 ### Type entry
 
-- `req` is the seed `GroupedMarkdown` entry (prefix `REQ`, directory `requirements/business/`); its model, roles, and field sets are seed data and are never declared in configuration.
+- `nfr` is the seed `GroupedMarkdown` entry (prefix `NFR`, directory `requirements/non-functional/`); its model, roles, and field sets are seed data and are never declared in configuration.
 - `group.fields` and `member.fields` are each `story` (`## User Story`) then `description` (`## Description`), and a top-level `fields` on the entry is rejected.
+- The family is addressed by the slug `nfr`: there is no `nfreq` command and no `nfreq` alias.
 - Renaming the entry key renames the command and moves no existing file; prefix, directory, statuses, slots, aliases, and presentation facts are entry data (BR-016).
 - IDs use the entry prefix and `id_padding` and are preserved on archive.
 
@@ -36,9 +37,9 @@ Applies to every invocation of `papyrus req` and to every business-requirement g
 
 ### Groups and members
 
-- `create-group <TITLE>` writes one group record with a plain ID `REQ-<n>` and never writes a member.
-- `create <TITLE> --group <GROUP-ID>` writes one member with the dotted ID `REQ-<n>.<m>`, where `<n>` is the owning group's sequence and `<m>` its position in that group.
-- The named group must already exist, be `active`, and belong to `req`: an unknown group, an archived group, and a group of another document type are each rejected with one validation outcome that writes nothing.
+- `create-group <TITLE>` writes one group record with a plain ID `NFR-<n>` and never writes a member.
+- `create <TITLE> --group <GROUP-ID>` writes one member with the dotted ID `NFR-<n>.<m>`, where `<n>` is the owning group's sequence and `<m>` its position in that group.
+- The named group must already exist, be `active`, and belong to `nfr`: an unknown group, an archived group, and a group of another document type are each rejected with one validation outcome that writes nothing.
 - A member create reuses an existing active group of the same type and never creates a group implicitly.
 - The owning group is the reserved front-matter `group` key, written and maintained only by the engine; it is not a field, no option sets or changes it, and an edit cannot move a member, so membership is immutable after creation.
 

@@ -2,7 +2,7 @@
 id: ADR-036
 title: "Config-declared document field schema and one descriptor model"
 created_date: '2026-11-20T18:28:00Z'
-updated_date: '2026-11-23T07:19:14Z'
+updated_date: '2026-11-24T19:07:16Z'
 labels: []
 references:
   - RE-010
@@ -30,12 +30,12 @@ references:
   - TECH-072
   - TECH-077
   - ADR-042
-superseded_by: null
+superseded_by: ADR-045
 ---
 # ADR-036 Config-declared document field schema and one descriptor model
 
 ## Status
-accepted
+Superseded by ADR-045
 ## Decision
 ### Clarification (2026-11-22) — seed slugs are always effective
 

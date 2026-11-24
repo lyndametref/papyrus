@@ -5,7 +5,7 @@ created_date: '2026-11-15T18:37:54Z'
 updated_date: '2026-11-23T07:27:35Z'
 labels: []
 references: []
-status: active
+status: archived
 ---
 # BR-016: Papyrus Configuration Keys and Precedence
 
