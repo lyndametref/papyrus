@@ -2,6 +2,21 @@ REQUIREMENTS REVIEW — RESIDUAL RISKS
 Session: 2026-11-23
 Scope: business requirements, group by group. Working goal: smaller corpus, no duplication, full coverage.
 
+Closed and removed 2026-11-24 after verification against the current records:
+- R2  "Cross-group changes agreed but not yet written" — all five items (a-e) implemented.
+- R19 "config set cannot add a document type" — REQ-001.002 now states the file-edit rule.
+- R3  "ADR amendments outstanding" — the six ADRs were superseded by ADR-045 and the
+      requirements re-pointed.
+- R23 "ADR amendments still outstanding for this group" — same replacement; see R70-R72.
+- R4  "Glossary terms used as normative but not verified" — GLO-013 to GLO-022 are
+      `verified`.
+- R5a "What triggers the approved transition" — `edit --status approved`, now stated
+      in REQ-005.008.
+- R5b "Additional grouped or HTML types" — capability kept; every SingleHtmlMockup
+      type keeps the three fixed states. See the closed note under R73.
+- R44, R51, R56, R62 — the contradicting business rules were archived on 2026-11-24
+      (BR-001 to BR-020). The traceability debt they created is R74.
+
 ====================================================================
 GROUP REQ-005 — Project Documentation Management  (reviewed, changes applied)
 ====================================================================
@@ -12,33 +27,13 @@ Active atomics: 19,326 -> 7,834 words.
 
 R1. Stale references to archived requirement IDs
     Severity: high (traceability)
-    72 files outside the archived set still cite REQ-005.002/.003/.004/.005/.006/
-    .009/.012/.013/.014. Each archived record carries a "Superseded by" banner, so a
-    reader can follow on, but machine traceability now points at retired records.
-    Affected: business rules BR-009..BR-020, other requirements, specifications.
-    Action: re-point to REQ-005.015 (all SingleMarkdown types) or REQ-005.001
-    (GroupedMarkdown), after all groups are reviewed.
-
-R2. Cross-group changes agreed but not yet written
-    Severity: high (the corpus is currently inconsistent with the agreed target)
-    a) REQ-001.006: init must write only the selected Seed entries; "enabled" is
-       removed; non-interactive runs write every entry. DONE (REQ-001 review).
-    b) REQ-007.002: configuration is the only source of document types; unknown
-       attributes are accepted, ignored, and reported as warnings; key list gains
-       "model" and "field_defaults" and loses "enabled". DONE (REQ-007 review).
-    c) REQ-007.004: the document model becomes configuration data; the "GroupedMarkdown
-       and SingleHtmlMockup are seed-only" restriction is deleted. DONE.
-    d) REQ-007.001: document types are addressed as configured, not as seeded. DONE.
-    e) REQ-001.002: "config set" can no longer add a document type (see R19). DONE.
-
-R3. ADR amendments outstanding
-    Severity: high (requirements now contradict accepted decisions)
-    - ADR-036: decisions 6, 28, 29, 31, 32, 33 and the 2026-11-22 clarification
-      ("seed slugs are always effective").
-    - ADR-041: seed slots become init template content.
-    - ADR-042: ruling 1 ("field_defaults is not a configuration key") reversed.
-    - ADR-0019: fail-closed on unknown keys replaced by warn-and-ignore.
-    - RE-010: D6 (grouped and HTML models seed-only) superseded.
+    64 active files outside the archived set still cite archived requirement IDs
+    (REQ-005.002/.003/.004/.005/.006/.009/.012/.013/.014, and the archived REQ-003 and
+    REQ-002 records). Each archived record carries a "Superseded by" banner, so a
+    reader can follow on, but machine traceability points at retired records.
+    Affected: domain model, specifications, test cases.
+    Action: re-point to REQ-005.015 (all SingleMarkdown types), REQ-005.001
+    (GroupedMarkdown), or REQ-002 (backlog), in a dedicated pass (see R74).
 
 R4. Glossary terms used as normative but not verified
     Severity: medium
@@ -51,11 +46,9 @@ R4. Glossary terms used as normative but not verified
     requirements keep using "Seed".
 
 R5. Open product questions carried inside requirements
-    Severity: medium
-    a) REQ-005.008: what triggers the "approved" transition of a SingleHtmlMockup
-       record — a command option or direct editing of the metadata block?
-    b) REQ-005.008: may a project define additional SingleHtmlMockup types now that
-       the model is configuration data? (Same question applies to GroupedMarkdown.)
+    CLOSED 2026-11-24. (a) The `approved` transition is triggered by
+    `edit --status approved`, now stated in REQ-005.008. (b) Answered "not for now";
+    the answer conflicts with ADR-045 and is carried as R73.
 
 R6. REQ-005.016 encodes per-type facts that must stay in step with implementation
     Severity: low
@@ -86,20 +79,11 @@ models, rejected keys), R14 (restated archive and mockup rules), R15 (open
 questions closed: 3a B, 3b A, 3c B, 3d A), R16 (historical clauses), R18 (model
 and role validation now stated).
 
-R19. "config set" cannot add a document type any more
-    Severity: high (cross-group conflict with REQ-001.002)
-    REQ-007.002 now says adding a document type is a configuration file edit and
-    "config set" changes a declared entry. REQ-001.002 still says "config set
-    document_types.<slug>.<path>" materializes an absent entry. Under a
-    configuration-only model a materialized entry would lack "prefix" and
-    "directory" and could not validate, so REQ-001.002 must adopt the same rule.
-
 R20. "papyrus check" must report files of unconfigured types
     Severity: medium (implementation gap)
-    REQ-007.002 requires a finding for every file that carries managed record front
-    matter but belongs to no configured document type. No check rule exists yet, and
-    the finding needs a stable diagnostic code. It must not fire on prose Markdown
-    (REQ-005.010) or on the former "deprecated/" folders (REQ-005.007).
+    REQ-001.008 requires the finding and BR-021 documents the rule. The check itself
+    is still not implemented: no diagnostic code, no scan. It must not fire on prose
+    Markdown (REQ-005.010) or on the former "deprecated/" folders (REQ-005.007).
 
 R21. Field semantics split across two requirements
     Severity: low
@@ -114,12 +98,6 @@ R22. Two behaviours newly required, not yet implemented
        and the token is an identifier of the type.
     b) Renaming a slug is configuration-only, with no migration; nothing warns the
        user that the former records become unmanaged.
-
-R23. ADR amendments still outstanding for this group
-    Severity: high
-    ADR-0016 (dispatch from the seed), ADR-0019 (fail-closed unknown keys, enabled),
-    ADR-0024 (list-valued keys), ADR-036 decisions 28-34 (seed fill, overlay,
-    validation, seed-only models).
 
 ====================================================================
 GROUP REQ-006 — Search and Local Web Interface
@@ -252,10 +230,10 @@ GROUP REQ-001 — Project Setup and CLI Access
 State after review: 7 active atomics, 1 deprecation. 8,242 -> 5,416 words (-34%).
 Active: .001 .002 .003 .004 .005 .006 .008. Archived: .007.
 
-Resolved by the rewrite: init writes the selected Seed entries (R2a); "config set"
-cannot add a type (R2e, R19); `enabled` and seed-minimal entries removed; the false
-"milestones are never archived" statement fixed in .005; the seed-only identifier
-shape replaced by the configured model; `id_padding` now lives once, in .005.
+Resolved by the rewrite: init writes the selected Seed entries; "config set" cannot
+add a type; `enabled` and seed-minimal entries removed; the false "milestones are
+never archived" statement fixed in .005; the seed-only identifier shape replaced by
+the configured model; `id_padding` now lives once, in .005.
 
 R41. Exit status now depends on finding severity
     Severity: high (behaviour change)
@@ -276,12 +254,6 @@ R43. Unclaimed-record finding can be noisy
     configured type. Removing a document type on purpose therefore produces findings
     for its former records until they are moved or deleted. This is the intended
     reading of decision 3a-B, but it will surprise a user who removes a type.
-
-R44. Business rules still describe the old configuration model
-    Severity: high
-    BR-016 (configuration keys and precedence) still describes `enabled`, seed fill
-    and collection replace; BR-001/BR-004/BR-009..BR-020 still cite requirement IDs
-    that are now archived. The re-pointing pass is still owed.
 
 R45. The init offer is fixed to the Seed
     Severity: low
@@ -332,11 +304,6 @@ R50. Task comments are under-specified
     where comments are stored or how they are displayed. The view requirement lists
     "comments" without defining them.
 
-R51. Business rules still cite the archived task requirements
-    Severity: medium
-    BR-005 and other rules reference REQ-002.003 and REQ-002.004, which are now
-    archived. Part of the deferred re-pointing pass (see R44).
-
 ====================================================================
 GROUP REQ-003 — Milestone and Release Planning
 (merged into REQ-002 Backlog Management; group archived)
@@ -375,12 +342,6 @@ R55. Identifier gap in the REQ-002 numbering
     keep their numbers (identifiers are never reused). The group now reads
     .001, .002, .005, .006; the gap is intentional and should not be filled.
 
-R56. Business rules contradict the new release and milestone behaviour
-    Severity: high
-    BR-006 and BR-007 cite archived REQ-003.001/.002; BR-007 states that archive
-    semantics never apply to a release, which REQ-002.004 now contradicts. BR-006
-    predates milestone acceptance criteria.
-
 R57. UI specifications still describe the pre-merge model
     Severity: medium
     UI-002 cites the archived Backlog atomics and the old milestone shape (no
@@ -416,11 +377,6 @@ R61. "archived" now means two different things
     For decisions it is a status value that moves no file; for documents it is a
     storage location. REQ-007.001 and REQ-004.002 state the distinction, but the CLI
     help, business rules, and UI must not conflate them.
-
-R62. BR-008 contradicts the new decision model
-    Severity: high
-    BR-008 states that `decision archive` is dropped and that decisions use exactly
-    five statuses. Both are now false.
 
 R63. Supersession status mismatch
     Severity: high (correctness)
@@ -492,5 +448,126 @@ R69. Timestamps corrected after the fact
     in five cases `created_date`) values later than the actual creation time. They
     were reset to the file modification time through the CLI editor. Future writes
     should rely on the writer's automatic timestamps.
+
+====================================================================
+ADR REPLACEMENT — 2026-11-24
+====================================================================
+
+ADR-045 "Configuration-Driven Document Engine" was created and accepted. It
+supersedes ADR-0016, ADR-0019, ADR-0024, ADR-036, ADR-041, and ADR-042, which are
+now `Superseded by ADR-045`. Fifteen requirement records were re-pointed: their
+front-matter references and traceability bullets now cite ADR-045, and no active
+requirement cites a superseded ADR.
+
+R70. ADR-036 decision numbers no longer resolve
+    Severity: medium (traceability)
+    Requirements cited ADR-036 decisions by number (7, 9, 21, 26-29...). ADR-045 has
+    14 decisions with different numbering, so the re-pointed citations name ADR-045
+    with a topic instead of a decision number. ADR-045 carries no formal mapping
+    table from the old numbers to the new ones; the mapping is only implied by the
+    prose.
+
+R71. Superseded records store a sentence as their status
+    Severity: medium
+    `decision edit --superseded-by` writes `Superseded by ADR-045` into the
+    `## Status` section instead of the value `superseded` plus the `superseded_by`
+    front-matter key. The six superseded ADRs therefore hold a status outside the
+    vocabulary, which is R63 observed on real data.
+
+R72. Accepted records still cite the superseded ADRs
+    Severity: low
+    ADR-037 and ADR-039 are accepted and frozen; their bodies cite ADR-0016,
+    ADR-0019 and ADR-0036. They remain readable only by following the supersession
+    link. Only a superseding record can correct them.
+
+R73. "No additional grouped or HTML types" — closed by interpretation
+    Severity: closed 2026-11-24
+    The answer "the status for HTML mockup are fixed" keeps the capability of
+    ADR-045 decision 3: any configured type may declare any model, and every
+    SingleHtmlMockup type keeps the three fixed states with no custom statuses,
+    which REQ-007.002 already enforces. No requirement change was needed. If the
+    intent was instead to forbid additional grouped or HTML types, R73 reopens and
+    needs the allow-list described below.
+
+    Original conflict, for reference: a per-slug restriction would need a fixed
+    allow-list (`req`, `nfr`, `ui-mockup`), which contradicts ADR-045 decision 1
+    (no runtime lookup of built-in tables).
+
+R74. Business rules archived, their citations remain
+    Severity: high (traceability)
+    BR-001 to BR-020 were archived on 2026-11-24. 244 active files outside
+    `docs/business-rules/` still cite them: the domain model, the specifications, and
+    most test cases. The rules are retained with their content, so a reader can
+    follow, but no command resolves an archived BR and the references are now dead.
+    Action: re-point or re-validate those citations in the same pass as R1. The next
+    business rule in use is BR-021.
+
+====================================================================
+NON-FUNCTIONAL REQUIREMENTS — REVIEW 2026-11-24
+====================================================================
+
+Scope: all 7 NFR groups, group by group. Working goal: smaller corpus, no
+duplication, stable IDs. Corpus: 25 records / 4,113 words -> 20 records
+(7 groups + 13 atomics) / 1,800 words (-56%). Archived 3, deleted 3, created 1.
+
+Applied:
+- NFR-001 retitled "Offline Operation"; .001 and .002 archived (business scope
+  owned by REQ-001 and REQ-006.002/006.014); .003 rewritten.
+- NFR-002 group absorbs the security-priority statement; .001 archived (merged
+  into the group description); .002 rewritten as Input Sanitization.
+- NFR-003 group and all three atomics rewritten; .003 narrowed to built-in
+  commands (R66 closed) and no longer names Debian.
+- NFR-004 group rewritten; .001 Text-File Storage (format only), .002
+  Project-Directory Boundary, .005 Record-Only Persistence created; .003 and
+  .004 deleted (superseded / functional).
+- NFR-005 group rewritten; .001 updated manually only (change note removed).
+- NFR-006 group and both atomics rewritten; dependency scope extended to
+  bundled third-party assets.
+- NFR-007 retitled "Performance"; .001/.002 rewritten and now share one
+  measurement protocol; .003 deleted as implementation detail.
+- Edited records no longer carry `## Group`, `## Traceability`,
+  `## Open Questions`, or change-note sections.
+- TECH-002 and REQ-006.007 re-pointed from NFR-002.001 to NFR-002.
+
+NR1. Archived and deleted NFR IDs remain cited outside REQ
+    Severity: high (traceability)
+    Active REQ records were corrected on 2026-11-24: NFR-001.002 is dropped where
+    REQ-006.002 is already cited and becomes REQ-006.002 in REQ-006.016; the
+    NFR-004.004 mentions are removed from REQ-001.005, REQ-005.010, and
+    REQ-005.011. Still cited: archived NFR-001.001/.002 by TECH/UI/TC records and
+    ADR-0005/0028/0033/0035; deleted NFR-004.003/.004 and NFR-007.003 by
+    TC-001..005, TECH-054, ADR-0008/0010/0011/0012/0038, and test comments. No
+    command resolves a deleted NFR. Action: the same re-pointing pass for
+    TECH/UI/TC, together with R1/R74.
+
+NR2. Import and asset caching have no requirement record
+    Severity: medium (coverage)
+    NFR-004.004 (one-way import) and NFR-007.003 (asset caching) were deleted.
+    The import is now defined only by ADR-0011, the cache contract only by
+    ADR-0038. If either behaviour must stay normative, it needs a REQ entry. The
+    import command and the cache headers remain implemented and tested.
+
+NR3. NFR-005.001 not brought to the reviewed text
+    Severity: low
+    Recorded as manual; only the change note was removed. It still carries the
+    old title, the duplicated "supported" definition, and the `## Group`
+    section.
+
+NR4. NFR-003.003 still depends on ADR-0021
+    Severity: low
+    The requirement now covers built-in commands only. The strategy for
+    configured document commands remains `proposed` in ADR-0021.
+
+NR5. NFR-007 latency targets remain unverified
+    Severity: medium (verification)
+    NFR-007.001/.002 stay `active`: no run on the reference hardware exists
+    (MS-036 pending). The former 007.003 measurement survives only in ADR-0038
+    and the benchmark harness.
+
+NR6. Browser configuration view has no active REQ owner
+    Severity: low (pre-existing)
+    REQ-006.008 is archived; only the REQ-006 group description mentions the
+    browser configuration view. Archiving NFR-001.002 removes the last
+    "all content" catch-all.
 
 

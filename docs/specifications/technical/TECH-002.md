@@ -2,7 +2,7 @@
 id: TECH-002
 title: "Project Initialization and Configuration Commands"
 created_date: '2026-11-16T17:46:43Z'
-updated_date: '2026-11-18T22:50:56Z'
+updated_date: '2026-11-24T20:25:35Z'
 labels: []
 references:
   - ADR-0001
@@ -18,7 +18,6 @@ references:
   - BR-002
   - BR-003
   - BR-016
-  - NFR-002.001
   - NFR-002.002
   - NFR-004.001
   - NFR-004.002
@@ -47,6 +46,7 @@ references:
   - ADR-034
   - REQ-006.018
   - RE-005
+  - NFR-002
 status: draft
 ---
 # TECH-002 Project Initialization and Configuration Commands
@@ -83,7 +83,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
 - Configuration keys and validation from BR-016, including task statuses uniqueness/default-status membership, default statuses `ToDo, Initiated, Refined, Implemented, Validated, Done`, and ID prefix/padding keys (REQ-001.002, REQ-001.005, REQ-001.007).
 - File-access boundary: init is the sole exception to the project-directory restriction; all other reads/writes stay within the selected project directory, resolved canonically (NFR-004.002).
 - Persistence format: all data saved by Papyrus is UTF-8 text (YAML/Markdown); no binary artifacts (NFR-004.001).
-- Input sanitization by normalization/escaping before use (NFR-002.001, NFR-002.002).
+- Input sanitization by normalization/escaping before use (NFR-002.002).
 - Atomic whole-folder relocation during `config set` for `backlog_directory`, `decision_directory`, `doc_directory`, and any document type's `directory` (REQ-001.002, ADR-0010 decision 8, ADR-0013 stage 5).
 
 ### Out of scope
@@ -175,7 +175,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
 1. All data saved by Papyrus is UTF-8 text (YAML/Markdown); no binary data is written.
 2. Outside `init`, Papyrus reads and writes only within the canonicalized selected project directory.
 3. User-controlled input is sanitized by normalization/escaping before use; values that cannot be normalized into a valid form are rejected with exit code 4.
-4. Security is explicitly considered in implementation and review (NFR-002.001).
+4. Security is explicitly considered in implementation and review (NFR-002).
 
 ## Inputs and outputs
 
@@ -218,7 +218,7 @@ It was revised again (TASK-127) so that OQ-1 is resolved: section 2 item 4 now n
 | Artifact | Reference |
 |---|---|
 | Requirement | REQ-001, REQ-001.001, REQ-001.002, REQ-001.003, REQ-001.004, REQ-001.005, REQ-001.006, REQ-001.007, REQ-007.001, REQ-007.002 |
-| Non-functional | NFR-002.001, NFR-002.002, NFR-004.001, NFR-004.002 |
+| Non-functional | NFR-002, NFR-002.002, NFR-004.001, NFR-004.002 |
 | Business rule | BR-002 (init), BR-003 (config), BR-016 (keys/precedence), BR-001 (command behavior) |
 | ADR | ADR-0001 (Rust), ADR-0003 (Debian Forky only; supersedes ADR-0002), ADR-0010 decision 8 (whole-folder relocation), ADR-0013 stage 5 (relocation implementation), ADR-0019 (fail-closed validation and repair), ADR-0022 (archive location, no restore), ADR-0023 decision 2 (active and archive locations), ADR-0024 (list-valued keys) |
 | Ticket | TASK-2, TASK-85, TASK-111, TASK-112, TASK-122, TASK-127 |
