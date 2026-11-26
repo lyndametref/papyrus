@@ -2,14 +2,14 @@
 id: ADR-0004
 title: "Repository Root Single-Crate Layout for the Papyrus Rust Crate"
 created_date: '2026-11-02T00:00:00Z'
-updated_date: '2026-11-16T21:08:35Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Repository Root Single-Crate Layout for the Papyrus Rust Crate
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-02

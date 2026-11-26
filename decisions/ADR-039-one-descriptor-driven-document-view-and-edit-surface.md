@@ -2,7 +2,7 @@
 id: ADR-039
 title: "One descriptor-driven document view and edit surface"
 created_date: '2026-11-20T19:58:18Z'
-updated_date: '2026-11-22T08:55:32Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - RE-010
@@ -35,7 +35,7 @@ superseded_by: null
 # ADR-039 One descriptor-driven document view and edit surface
 
 ## Status
-accepted
+deprecated
 ## Decision
 ### Supersession and amendments
 

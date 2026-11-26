@@ -2,7 +2,7 @@
 id: ADR-035
 title: "Per-Family Reference Visibility in the Shared Browser List Layout"
 created_date: '2026-11-19T06:40:21Z'
-updated_date: '2026-11-20T20:09:24Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - REQ-006.019
@@ -25,7 +25,7 @@ superseded_by: null
 # ADR-035 Per-Family Reference Visibility in the Shared Browser List Layout
 
 ## Status
-accepted
+deprecated
 ## Decision
 1. Reference visibility in shared browser list views is declared seed data per document type and, for a grouped type, per role. The descriptor's `reference_visibility` resolves to `Visible` or `Hidden` for the record's role; the shared list renders a row's reference list only when that value is `Visible`. It is not a universal list rule and not a content-model rule.
 

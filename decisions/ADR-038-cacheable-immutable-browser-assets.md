@@ -2,7 +2,7 @@
 id: ADR-038
 title: "Cacheable immutable browser assets"
 created_date: '2026-11-20T19:47:59Z'
-updated_date: '2026-11-20T19:48:00Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - RE-010
@@ -24,7 +24,7 @@ superseded_by: null
 # ADR-038 Cacheable immutable browser assets
 
 ## Status
-accepted
+deprecated
 ## Decision
 ## Supersession and amendments
 

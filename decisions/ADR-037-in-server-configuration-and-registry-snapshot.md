@@ -2,7 +2,7 @@
 id: ADR-037
 title: "In-server configuration and registry snapshot"
 created_date: '2026-11-20T19:30:02Z'
-updated_date: '2026-11-20T19:30:02Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - RE-010
@@ -27,7 +27,7 @@ superseded_by: null
 # ADR-037 In-server configuration and registry snapshot
 
 ## Status
-accepted
+deprecated
 ## Decision
 ## Supersession and amendments
 

@@ -2,14 +2,14 @@
 id: ADR-0029
 title: "Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-16T21:08:37Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Read-Only Corpus Diagnostics (`papyrus check`) with Duplicate-ID Repair
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-15

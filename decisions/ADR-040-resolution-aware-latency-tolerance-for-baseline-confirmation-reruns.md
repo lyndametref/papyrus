@@ -2,7 +2,7 @@
 id: ADR-040
 title: "Resolution-aware latency tolerance for baseline confirmation reruns"
 created_date: '2026-11-22T06:18:50Z'
-updated_date: '2026-11-22T06:19:05Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - AUD-137
@@ -16,7 +16,7 @@ superseded_by: null
 # ADR-040 Resolution-aware latency tolerance for baseline confirmation reruns
 
 ## Status
-accepted
+deprecated
 ## Decision
 Confirmation reruns of the recorded baseline are in band when the rerun p95 lies inside the recorded run A to run B p95 interval widened by 10 percent of the nearer bound, or when it lies within an absolute floor of 3 ms of the recorded value.
 

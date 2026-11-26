@@ -2,7 +2,7 @@
 id: ADR-034
 title: "Remove Configuration, Managed Artifacts, and Agent Skills Sections from the Browser"
 created_date: '2026-11-18T20:14:42Z'
-updated_date: '2026-11-20T20:08:57Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - REQ-006.018
@@ -21,7 +21,7 @@ superseded_by: null
 # ADR-034 Remove Configuration, Managed Artifacts, and Agent Skills Sections from the Browser
 
 ## Status
-accepted
+deprecated
 ## Decision
 1. Remove navigation entries and routes for Configuration, Managed artifacts and lifecycles, and Agent skills and workflows from the browser. 2. Remove the browser configuration view; configuration editing remains available only through the CLI using papyrus config. 3. Remove the managed-artifacts-and-lifecycles and agent-skills pages from the browser; their documentation remains available outside the browser. 4. Underlying records and configuration files are not changed by the removal. 5. Other browser pages, navigation, and routes continue to work. 6. Affected building blocks TECH-050, TECH-051, and the config-view portions of TECH-063, TECH-068, TECH-074, and TECH-076 are retired or revised to no longer provide these surfaces.
 

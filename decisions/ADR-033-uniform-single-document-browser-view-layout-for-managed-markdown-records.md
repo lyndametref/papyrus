@@ -2,7 +2,7 @@
 id: ADR-033
 title: "Uniform single-document browser view layout for managed Markdown records"
 created_date: '2026-11-18T08:27:12Z'
-updated_date: '2026-11-20T19:59:46Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - REQ-006.012
@@ -18,7 +18,7 @@ superseded_by: null
 # ADR-033 Uniform single-document browser view layout for managed Markdown records
 
 ## Status
-accepted
+deprecated
 ## Decision
 1. A single shared rendering path produces the detail view for every document record type — `SingleMarkdown`, `GroupedMarkdown`, and `SingleHtmlMockup`; the artifact content comes from the descriptor field map of ADR-039, and no per-type summary card or type-specific metadata block may be introduced.
 

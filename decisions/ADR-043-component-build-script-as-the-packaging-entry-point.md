@@ -2,7 +2,7 @@
 id: ADR-043
 title: "Component build script as the packaging entry point"
 created_date: '2026-11-22T15:23:49Z'
-updated_date: '2026-11-23T06:27:36Z'
+updated_date: '2026-11-26T18:24:53Z'
 labels: []
 references:
   - ADR-038
@@ -25,7 +25,7 @@ superseded_by: null
 # ADR-043 Component build script as the packaging entry point
 
 ## Status
-accepted
+deprecated
 ## Decision
 ### Amendment (2026-11-23) — release-boundary exceptions and permitted output locations
 

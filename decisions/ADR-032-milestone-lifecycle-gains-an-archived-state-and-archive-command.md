@@ -2,7 +2,7 @@
 id: ADR-032
 title: "Milestone lifecycle gains an archived state and archive command"
 created_date: '2026-11-17T18:51:43Z'
-updated_date: '2026-11-17T18:54:26Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references:
   - REQ-003.001
@@ -22,7 +22,7 @@ superseded_by: null
 # ADR-032 Milestone lifecycle gains an archived state and archive command
 
 ## Status
-accepted
+deprecated
 ## Decision
 1. Milestone lifecycle is fixed open to closed to archived. papyrus milestone close id remains the only open to closed transition and writes status and updated_date in place. 2. papyrus milestone archive id is the only transition to archived: it closes an open milestone if needed, then sets status to archived, refreshes updated_date, preserves title, description, labels, references and release assignment, and moves the file to the backlog archive milestones folder using the shared atomic record writer. An already archived milestone is a no-op success. Archive is refused for any status other than open or closed. 3. No restore command exists for milestones; only tasks keep archive and restore because REQ-001.005 requires task IDs to survive that cycle. 4. The milestone descriptor gains the archive verb and an archive location of the backlog archive milestones folder, mirroring the task backlog archive location, and its declared status vocabulary becomes open, closed, archived. ArchivePolicy for milestones is no longer None. 5. The backlog archive milestones folder is now both the lifecycle archive destination and the legacy read and import location: it remains readable by list, view, search and browser resolution and participates in ID allocation as before; the one-way Backlog.md import remains its only other writer. 6. Archived milestones are hidden from active listings because list reads only the active folder, but remain viewable by ID and editable in place as legacy data. 7. Configuration cannot change the milestone lifecycle, verbs, or archive location.
 

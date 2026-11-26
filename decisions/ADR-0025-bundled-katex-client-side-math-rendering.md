@@ -2,14 +2,14 @@
 id: ADR-0025
 title: "Bundled KaTeX Client-Side Math Rendering"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-20T20:09:06Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Bundled KaTeX Client-Side Math Rendering
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-15

@@ -2,7 +2,7 @@
 id: ADR-044
 title: "Non-loopback browser binding is an explicit, unauthenticated risk"
 created_date: '2026-11-23T11:30:42Z'
-updated_date: '2026-11-23T11:30:55Z'
+updated_date: '2026-11-26T18:24:53Z'
 labels: []
 references:
   - REQ-006.002
@@ -14,7 +14,7 @@ superseded_by: null
 # ADR-044 Non-loopback browser binding is an explicit, unauthenticated risk
 
 ## Status
-accepted
+deprecated
 ## Decision
 1. **Trust model.** Papyrus is a single-user, local desktop tool. The browser server's only supported default is loopback (`127.0.0.1`, port `6420`). The server has **no authentication, no session, and no authorization layer by design**: there is no login, no token, no cookie-based identity, no per-user ownership, and no credential storage. This is a deliberate architectural choice for 1.0; it avoids a new dependency, secret provisioning, and credential rotation in a tool with one local operator.
 

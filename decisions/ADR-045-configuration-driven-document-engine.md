@@ -2,7 +2,7 @@
 id: ADR-045
 title: "Configuration-Driven Document Engine"
 created_date: '2026-11-24T19:07:04Z'
-updated_date: '2026-11-24T19:07:08Z'
+updated_date: '2026-11-26T18:24:53Z'
 labels: []
 references:
   - REQ-007.002
@@ -14,7 +14,7 @@ superseded_by: null
 # ADR-045 Configuration-Driven Document Engine
 
 ## Status
-accepted
+deprecated
 ## Decision
 This ADR replaces the six records that governed document-type configuration during the descriptor refactor: ADR-0016 (runtime dispatch), ADR-0019 (fail-closed validation), ADR-0024 (list-valued configuration keys), ADR-036 (config-declared field schema and one descriptor model), ADR-041 (seed list slots), and ADR-042 (CLI surface rulings). Their decisions are rescinded as of this record; where a requirement still cites one of them, it cites this ADR.
 

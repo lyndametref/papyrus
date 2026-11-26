@@ -2,14 +2,14 @@
 id: ADR-0001
 title: "Implementation Language — Rust"
 created_date: '2026-11-01T00:00:00Z'
-updated_date: '2026-11-16T21:08:35Z'
+updated_date: '2026-11-26T18:24:43Z'
 labels: []
 references: []
 ---
 # Implementation Language — Rust
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-01

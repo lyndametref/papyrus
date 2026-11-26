@@ -2,14 +2,14 @@
 id: ADR-0028
 title: "Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-20T20:09:06Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Browser Shell: Shared List Layout, Content-Width Contract, and Collapsible Navigation
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-15

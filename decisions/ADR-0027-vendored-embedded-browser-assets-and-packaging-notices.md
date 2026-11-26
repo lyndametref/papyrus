@@ -2,14 +2,14 @@
 id: ADR-0027
 title: "Vendored Embedded Browser Assets and Packaging Notices"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-20T19:44:49Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Vendored Embedded Browser Assets and Packaging Notices
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-15

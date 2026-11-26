@@ -2,14 +2,14 @@
 id: ADR-0003
 title: "Supported Debian Release Target — Forky Only (amd64 `.deb`)"
 created_date: '2026-11-02T00:00:00Z'
-updated_date: '2026-11-16T21:08:35Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Supported Debian Release Target — Forky Only (amd64 `.deb`)
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-02

@@ -2,14 +2,14 @@
 id: ADR-0026
 title: "Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope"
 created_date: '2026-11-15T00:00:00Z'
-updated_date: '2026-11-20T19:45:29Z'
+updated_date: '2026-11-26T18:24:52Z'
 labels: []
 references: []
 ---
 # Mermaid-Only Offline Diagram Rendering, PlantUML Out of Scope
 
 ## Status
-accepted
+deprecated
 ## Date
 
 2026-11-15; amended 2026-11-16.
