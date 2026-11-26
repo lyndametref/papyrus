@@ -2,12 +2,12 @@
 id: TECH-083
 title: "Record Identifiers"
 created_date: '2026-11-25T20:42:00Z'
-updated_date: '2026-11-26T18:26:36Z'
+updated_date: '2026-11-26T18:36:41Z'
 labels: []
 references:
   - REQ-001.005
   - REQ-007.004
-status: verified
+status: draft
 ---
 # TECH-083 Record Identifiers
 
@@ -38,6 +38,11 @@ Covers record identifier assignment, shape, padding, and the single identifier s
 - Padding is a minimum, never a maximum: when a number's digit count exceeds `id_padding`, the wider number is used, never truncated, and never an error.
 - Existing files are not re-padded, and no migration is performed when `id_padding` changes.
 - Existing identifiers are never truncated or migrated.
+
+## Identifier Allocation
+
+- Allocation is the highest observed number plus one across the type directory and its `archive/` subfolder, with no high-water mark.
+- A deleted number is reusable only when it was the highest observed number at allocation time; lower deleted numbers remain gaps.
 
 ## Single Identifier Space
 

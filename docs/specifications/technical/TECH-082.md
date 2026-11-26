@@ -2,7 +2,7 @@
 id: TECH-082
 title: "CLI Foundation and Context"
 created_date: '2026-11-25T20:41:41Z'
-updated_date: '2026-11-26T18:05:59Z'
+updated_date: '2026-11-26T20:18:43Z'
 labels: []
 references:
   - REQ-001
@@ -10,6 +10,7 @@ references:
   - REQ-001.004
   - NFR-002
   - NFR-002.002
+  - NFR-004.002
 status: verified
 ---
 # TECH-082 CLI Foundation and Context
@@ -56,6 +57,7 @@ Covers the CLI command surface, common options, context selection, and input san
 
 - The project directory is selected from `--dir`, then `PAPYRUS_DIR`, then the current working directory.
 - The configuration file is selected from `--config`, then `PAPYRUS_CONFIG`, then `papyrus.config.yml` in the selected project directory.
+- The selected configuration path must resolve inside the project directory; a `--config` or `PAPYRUS_CONFIG` path outside it is rejected.
 - An explicitly named `--config` or `PAPYRUS_CONFIG` path that does not exist counts as not found.
 - When no source yields an existing configuration file, every command except `papyrus init` fails; the global `--help` and `--version` options are also exempt and must work without a configuration. There is no fallback to built-in defaults and no walk-up or other discovery of a configuration file.
 - That failure is a runtime error whose message names the searched path and states that `papyrus init` creates the configuration.
