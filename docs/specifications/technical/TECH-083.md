@@ -2,7 +2,7 @@
 id: TECH-083
 title: "Record Identifiers"
 created_date: '2026-11-25T20:42:00Z'
-updated_date: '2026-11-26T18:36:41Z'
+updated_date: '2026-11-26T21:42:55Z'
 labels: []
 references:
   - REQ-001.005
@@ -24,11 +24,11 @@ Covers record identifier assignment, shape, padding, and the single identifier s
 ## Identifier Shape
 
 - A document record's identifier shape follows its type's configured document model (REQ-007.004).
-- A `SingleMarkdown` or `SingleHtmlMockup` record has one plain identifier `<PREFIX>-<NUMBER>`.
-- A `GroupedMarkdown` group has a plain identifier `<PREFIX>-<GROUP>`.
-- A member of a `GroupedMarkdown` group has a dotted identifier `<PREFIX>-<GROUP>.<MEMBER>` under the same type prefix.
+- A `simple-record` or `formatted-record` record has one plain identifier `<PREFIX>-<NUMBER>`.
+- A `grouped-record` group has a plain identifier `<PREFIX>-<GROUP>`.
+- A member of a `grouped-record` group has a dotted identifier `<PREFIX>-<GROUP>.<MEMBER>` under the same type prefix.
 - `<PREFIX>` is the type's configured `prefix`.
-- A newly configured `GroupedMarkdown` type produces grouped identifiers, and a newly configured `SingleMarkdown` type produces plain identifiers.
+- A newly configured `grouped-record` type produces grouped identifiers, and a newly configured `simple-record` type produces plain identifiers.
 
 ## Identifier Padding
 

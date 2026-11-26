@@ -2,7 +2,7 @@
 id: TECH-084
 title: "Record Persistence, Layout, and Lifecycle"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-26T20:18:43Z'
+updated_date: '2026-11-26T21:42:55Z'
 labels: []
 references:
   - REQ-005.007
@@ -52,11 +52,11 @@ Covers the storage format, the closed store set, the project-directory boundary,
 
 - `papyrus <slug> archive <ID>` sets the record's status to `archived` and moves the file into the `archive/` subfolder of the type's configured directory.
 - For a record that is not superseded, `archive` is the only operation that writes `archived`.
-- `supersede` on a `SingleHtmlMockup` also archives only the mockup it supersedes (REQ-005.008).
+- `supersede` on a `formatted-record` also archives only the mockup it supersedes (REQ-005.008).
 - The command name is `archive`, the value it writes is `archived`, and the destination is `archive/`.
 - Archiving preserves the record identifier.
 - Archiving discards the previous workflow status; that value is not retained.
-- For a `SingleHtmlMockup` record, the archived state is written to the HTML metadata and the file moves the same way.
+- For a `formatted-record` record, the archived state is written to the HTML metadata and the file moves the same way.
 - Archived records are hidden from lists, search, and the browser, except that a search may explicitly include archived records. The browser shows the shared not-found page for them.
 - No command returns an archived record to a non-archived state, and no restore command exists.
 
@@ -74,12 +74,12 @@ Covers the storage format, the closed store set, the project-directory boundary,
 - Relocation uses the same write-then-remove sequence as the `archive` command and reports the relocation in diagnostics.
 - If relocation fails, the record is returned read-only with a validation outcome, and writes to it are refused until the conflict is resolved.
 
-## GroupedMarkdown Records
+## grouped-record Records
 
 - Archive and delete apply to a single record.
 - Archiving or deleting a group record changes no member's file, status, or identifier.
 
 ## Model Independence
 
-- The rules in this specification are identical for `SingleMarkdown`, `GroupedMarkdown`, and `SingleHtmlMockup`.
+- The rules in this specification are identical for `simple-record`, `grouped-record`, and `formatted-record`.
 - They do not depend on a type's field sequence or role field sets.
