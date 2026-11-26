@@ -2,7 +2,7 @@
 id: TECH-082
 title: "CLI Foundation and Context"
 created_date: '2026-11-25T20:41:41Z'
-updated_date: '2026-11-26T17:08:04Z'
+updated_date: '2026-11-26T18:05:59Z'
 labels: []
 references:
   - REQ-001
@@ -10,16 +10,17 @@ references:
   - REQ-001.004
   - NFR-002
   - NFR-002.002
-status: draft
+status: verified
 ---
 # TECH-082 CLI Foundation and Context
 
 ## Description
-Covers the command surface, common options and outcomes, project and configuration context selection, and sanitization of values supplied through command-line options and standard input. Configuration commands and validation are a separate specification. It does not cover record identity, the document-type configuration schema, or project diagnostics.
+Covers the CLI command surface, common options, context selection, and input sanitization. Configuration and validation are separate specifications.
 
 ## Command Surface
 
-- The help surfaces, per-command help, and the help command are specified separately (REQ-008).
+- The available commands are the built-in commands `init`, `config`, `task`, `milestone`, `release`, `search`, `browser`, `import`, `help`, and `version`, plus one command family for every configured document type and decision type.
+- Help output — `-h`/`--help`, per-command help, and `papyrus help` — is specified in the user-documentation specification (REQ-008).
 - The global options `--json`, `--no-color`, `--version`, `--dir`, and `--config` are accepted with every command that can honour them.
 - A command-line option takes precedence over the corresponding environment variable, configuration value, and default.
 
@@ -68,4 +69,3 @@ Covers the command surface, common options and outcomes, project and configurati
 - A value that cannot be normalized into a valid identifier, name, title, or path is rejected; no invalid value is silently cleaned, truncated, or written.
 - Control characters, path separators, and traversal segments never reach the store.
 - A rejected value produces an error and writes no record.
-- Browser form values follow the same sanitization contract before use.
