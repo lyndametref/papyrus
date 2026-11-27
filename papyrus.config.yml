@@ -42,7 +42,7 @@ document_types:
     statuses: [active, draft, verified, archived]
   tech-spec:
     prefix: TECH
-    directory: specifications/technical
+    directory: specs
     enabled: true
     statuses: [active, draft, verified, archived]
   test-case:
