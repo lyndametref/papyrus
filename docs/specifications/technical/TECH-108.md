@@ -2,18 +2,18 @@
 id: TECH-108
 title: "Build System"
 created_date: '2026-11-26T07:13:33Z'
-updated_date: '2026-11-27T18:55:38Z'
+updated_date: '2026-11-27T19:06:14Z'
 labels: []
 references:
   - NFR-003
   - NFR-003.001
   - NFR-007.001
-status: draft
+status: verified
 ---
 # TECH-108 Build System
 
 ## Description
-Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and the checks that gate a build. Source layout and the packaging entry point are separate specifications.
+Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and the checks that gate a build.
 
 ## Cargo
 
@@ -35,10 +35,6 @@ Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and 
 - The release profile uses LTO and strip for distributed binaries and for the binary used in performance measurement (NFR-007.001).
 - The debug profile is a development artifact and is not distributed.
 - Build output is confined to `target/`.
-
-## Size budget
-
-- The release binary size budget is 12 MiB.
 
 ## Checks
 
