@@ -11,7 +11,7 @@ references:
   - ADR-032
   - BR-006
   - BR-001
-  - GLO-006
+  - GLO-002
   - TECH-009
   - TC-016
   - TC-017
@@ -52,7 +52,7 @@ Outcome: confirm all information for implementing `papyrus milestone archive <id
 - [ ] Update the registry module: add `archived` to milestone states, add the archive verb to milestone verbs, set the milestone template archive policy to the front-matter archived folder, and update comments.
 - [ ] Update the descriptor module so milestone resolves the archive and archived directories to the backlog archive milestones folder, and update the descriptor tests accordingly.
 - [ ] Update help and dispatch tests to list `archive` among milestone verbs.
-- [ ] Traceability is recorded: REQ-003.001, RE-002, BR-006, BR-001, GLO-006, TECH-009, ADR-032, TC-015 through TC-023, MS-025.
+- [ ] Traceability is recorded: REQ-003.001, RE-002, BR-006, BR-001, GLO-002, TECH-009, ADR-032, TC-015 through TC-023, MS-025.
 - [ ] No open material questions remain.
 ## Comments
-- **task-refiner**: Refinement complete. Scope: implement `papyrus milestone archive <id>` as the only transition to `archived` (close first if open, then set archived; no-op if already archived; refuse other statuses with exit 4; unknown ID exit 3; IO or boundary failure exit 1). Assumptions: archive destination is the existing backlog archive milestones folder (created if absent); missing or empty status is read as open; release assignment is preserved and no release file is touched; archived milestones stay viewable and editable in place as legacy data with no restore command. Code locations: milestone module (MilestoneCmd Archive variant and archive function), registry module (states, verbs, archive policy), descriptor module (archive and archived directories), help and dispatch tests. Traceability: REQ-003.001, RE-002, BR-006, BR-001, GLO-006, TECH-009, ADR-032, TC-015 through TC-023, MS-025. No open material questions.
+- **task-refiner**: Refinement complete. Scope: implement `papyrus milestone archive <id>` as the only transition to `archived` (close first if open, then set archived; no-op if already archived; refuse other statuses with exit 4; unknown ID exit 3; IO or boundary failure exit 1). Assumptions: archive destination is the existing backlog archive milestones folder (created if absent); missing or empty status is read as open; release assignment is preserved and no release file is touched; archived milestones stay viewable and editable in place as legacy data with no restore command. Code locations: milestone module (MilestoneCmd Archive variant and archive function), registry module (states, verbs, archive policy), descriptor module (archive and archived directories), help and dispatch tests. Traceability: REQ-003.001, RE-002, BR-006, BR-001, GLO-002, TECH-009, ADR-032, TC-015 through TC-023, MS-025. No open material questions.
