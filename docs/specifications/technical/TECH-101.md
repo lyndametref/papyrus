@@ -2,12 +2,12 @@
 id: TECH-101
 title: "Browser Server, Asset Routing, and Caching"
 created_date: '2026-11-25T20:53:42Z'
-updated_date: '2026-11-27T18:24:40Z'
+updated_date: '2026-11-27T18:38:05Z'
 labels: []
 references:
   - REQ-006.002
   - NFR-001.003
-status: draft
+status: verified
 ---
 # TECH-101 Browser Server, Asset Routing, and Caching
 
@@ -95,5 +95,16 @@ the route that produced it.
 
 - Every response carries `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: no-referrer`.
 - HTML responses are the only responses carrying a CSP. Two policies exist: a strict policy for every HTML response without a rendered diagram, and a diagram policy for an HTML response that renders one.
-- Both policies set `default-src 'none'`, `script-src 'self'`, `img-src 'self'`, `font-src 'self'`, `form-action 'self'`, `base-uri 'none'`, and `frame-ancestors 'none'`. `style-src` is `'self'` in the strict policy and `'self' 'unsafe-inline'` in the diagram policy.
+- The strict policy is:
+
+```
+default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+```
+
+- The diagram policy is:
+
+```
+default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+```
+
 - `script-src` never contains `'unsafe-inline'`, `'unsafe-eval'`, a nonce, or a hash.
