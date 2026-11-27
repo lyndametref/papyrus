@@ -2,7 +2,7 @@
 id: TECH-109
 title: "Project Initialization"
 created_date: '2026-11-26T09:26:53Z'
-updated_date: '2026-11-26T09:26:53Z'
+updated_date: '2026-11-27T18:58:30Z'
 labels: []
 references:
   - REQ-001
@@ -11,100 +11,50 @@ references:
   - REQ-004.001
   - REQ-005.016
   - REQ-007.002
-  - NFR-002.002
   - NFR-004.001
   - NFR-004.002
-status: draft
+status: verified
 ---
 # TECH-109 Project Initialization
 
 ## Description
-Covers `papyrus init`: project creation, the generated configuration, the
-directory layout, the interactive walkthrough, non-interactive behavior, and
-`--force` replacement. The CLI foundation and configuration commands are
-separate specifications.
+Covers the implementation of `papyrus init`: input assembly, Seed expansion, prompt overrides, whole-configuration validation, directory creation, and the configuration write. Terminal key handling is specified separately; Seed content and configuration schema are separate.
 
-## Command
+## Initialization sequence
 
-- `papyrus init <NAME>` initializes the current directory;
-  `papyrus --dir <PATH> init <NAME>` initializes `<PATH>`, creating it if absent
-  (REQ-001.001).
-- `<NAME>` is required and is stored as `project_name` in `papyrus.config.yml`
-  (REQ-001.001).
-- `init` runs without an existing configuration file (REQ-001.001).
-- `init` may create the selected project directory outside an existing project;
-  no other command may (NFR-004.002).
-- All files written by `init` are UTF-8 text (NFR-004.001).
-- An existing `papyrus.config.yml` blocks initialization unless `--force` is
-  given; without `--force` the outcome is a conflict and nothing is written
-  (REQ-001.001).
-- `--force` replaces `papyrus.config.yml` in full with the generated
-  configuration and keeps no value from the previous file. It overwrites no
-  other existing file (REQ-001.001).
-- `init` is allowed in a non-empty directory; no file other than
-  `papyrus.config.yml` is modified (REQ-001.001).
-- User-controlled input, including the project name and paths, is sanitized. A
-  value that cannot be normalized fails with a validation outcome and writes
-  nothing (NFR-002.002).
+1. Resolve the project directory and configuration path with the CLI context rules.
+2. Require `<NAME>`; it becomes `project_name` in the generated configuration.
+3. If `papyrus.config.yml` exists and `--force` is absent, stop with a conflict before creating anything.
+4. Build the selection: an interactive run uses the terminal walkthrough, a non-interactive run includes every Seed entry.
+5. Expand the selected entries from the compiled Seed and apply the prompted or default prefix and directory.
+6. Assemble the configuration document and validate it as a whole; a validation failure writes nothing.
+7. After validation, create the configured directories and write `papyrus.config.yml`; `--force` replaces that file in full and no other file is touched.
 
-## Generated Configuration
+## Seed expansion
 
-- The generated configuration validates before it is written, including
-  `id_padding` from 1 to 6 (REQ-007.002).
-- Every selected Seed entry is written in full; an unselected entry is not
-  written at all (REQ-005.016).
-- There is no `enabled` key; presence in the configuration is the only switch
-  (REQ-005.016).
-- A selected document type is written with its model, field sequence, prefix,
-  directory, status set, reference visibility, slots, and field defaults
-  (REQ-005.016).
-- The decision-type Seed offers `adr` and `bdr`; `init` writes the selected one
-  or both (REQ-004.001).
+- The compiled Seed configuration is the only source of entries; no built-in table is consulted after expansion.
+- A selected document-type entry is copied with its model, field sequence, custom status set, slots, and field defaults.
+- A selected decision-type entry is copied with the shared fixed status vocabulary.
+- The interactive prompts replace the Seed prefix and directory in the written entry; the non-interactive path keeps the Seed values.
+- Backlog families are always included; an unselected document or decision entry is omitted entirely.
 
-## Generated Layout
+## Prompt overrides
 
-- The configured `backlog_directory` is created with `tasks/`, `milestones/`,
-  and `releases/` subfolders.
-- The configured `doc_directory` and the active directory of every selected
-  document type are created.
-- The configured `decision_directory` is created only when at least one
-  decision type is selected; the key is written even when none is.
-- No `archive/` or `deprecated/` folder is pre-created; an archive folder
-  appears when a record is first archived.
-- No backlog archive folder is pre-created.
-- Existing directories are reused; existing files other than
-  `papyrus.config.yml` are never overwritten.
+- Each selected type prompts for prefix and directory; each shared root (`backlog_directory`, `decision_directory`, `doc_directory`) prompts once.
+- Defaults come from the Seed; empty input accepts the default, and invalid input is rejected and re-prompted with the default in the hint.
+- Prompts run line-based under canonical terminal mode after the list phase; typeahead after confirming the list feeds the first prompt.
 
-## Interactive Walkthrough
+## Generated layout
 
-- The walkthrough runs before `papyrus.config.yml` is written, at
-  `papyrus init <NAME>`, also with `--dir` or `PAPYRUS_DIR` (REQ-001.006).
-- It presents the offered artifacts as a checklist rendered with the terminal
-  formatting. The row under the cursor and the selection state of every row are
-  distinguishable, and the display reflects the current state.
-- Selection is cursor-driven. Typed token input, such as space-separated names
-  on one line, is not accepted (REQ-001.006).
-- End of input confirms the current state instead of waiting.
-- The offered artifacts are task, milestone, and release, the decision-type
-  Seed entries `adr` and `bdr`, and the document-type Seed entries.
-- One or both decision types may be selected; each selected type becomes its
-  own command family.
-- Task, milestone, and release are always written, are shown as always
-  included, and are never toggled; their prefixes are still prompted.
-- For every selected decision or document type, the walkthrough prompts the
-  identifier prefix and the storage folder.
-- The shared roots `backlog_directory`, `decision_directory`, and
-  `doc_directory` are prompted once each.
-- Prompts show their default in brackets, and empty input accepts the default.
-- Invalid input is rejected and re-prompted with a hint naming the default.
-- The written configuration matches the state shown when the confirmation was
-  accepted.
-- Each selected document type is written in full; an unselected type is not
-  written at all.
+- The backlog root is created with `tasks/`, `milestones/`, and `releases/`.
+- The document root and the active directory of every selected document type are created.
+- The decision root is created only when at least one decision type is selected; the key is written even when none is.
+- Directories are created with create-or-reuse semantics, so an existing directory is kept.
+- No `archive/` or `deprecated/` folder is created; an archive folder appears on the first archive.
 
-## Non-Interactive Initialization
+## Write behavior
 
-- A run without an interactive terminal skips the walkthrough (REQ-001.006).
-- It writes every Seed entry of both families in full, with the default
-  prefixes and folders (REQ-005.016).
-- It never waits on a prompt.
+- The only file `init` creates or replaces is `papyrus.config.yml`; every other existing file is untouched.
+- The configuration is UTF-8 YAML and is validated before the write.
+- `--force` performs a full replacement and merges no value from the previous file.
+- A failed validation or a prompt conflict leaves the existing configuration unchanged.
