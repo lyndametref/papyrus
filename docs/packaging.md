@@ -65,7 +65,7 @@ Expected:
 
 ## Packaging (three-package workspace)
 
-Per ADR-046, one packaging run produces three `.deb` files at one version, with
+Per ADR-001, one packaging run produces three `.deb` files at one version, with
 scripts under `apps/scripts/`:
 
 - `papyrus-core_<version>_amd64.deb` — library artifact; installs no executable; no Papyrus dependency.

@@ -1,13 +1,13 @@
 ---
-id: ADR-046
+id: ADR-001
 title: "Three-Crate Workspace and Delivered Artifacts"
-created_date: '2026-11-27T19:25:53Z'
-updated_date: '2026-11-27T19:44:00Z'
+created_date: '2026-11-27T21:02:42Z'
+updated_date: '2026-11-27T21:02:42Z'
 labels: []
 references: []
 superseded_by: null
 ---
-# ADR-046 Three-Crate Workspace and Delivered Artifacts
+# ADR-001 Three-Crate Workspace and Delivered Artifacts
 
 ## Status
 proposed
