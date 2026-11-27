@@ -1,8 +1,8 @@
 ---
 id: TECH-084
-title: "Record Persistence, Layout, and Lifecycle"
+title: "Record Persistence and Layout"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-27T14:07:53Z'
+updated_date: '2026-11-27T16:54:39Z'
 labels: []
 references:
   - REQ-005.007
@@ -13,16 +13,16 @@ references:
   - NFR-004.005
 status: verified
 ---
-# TECH-084 Record Persistence, Layout, and Lifecycle
+# TECH-084 Record Persistence and Layout
 
 ## Description
-Covers the storage format, the closed store set, the project-directory boundary, and the on-disk layout and lifecycle of document records: archive, delete, and relocation of misplaced records. Applies to all three document models. Does not cover configuration syntax or validation, command dispatch, field content, or the Seed.
+Covers the storage format, the closed store set, the project-directory boundary, and the on-disk folder layout of the three record categories. Archive, restore, delete, and lifecycle transitions are separate specifications.
 
 ## Storage Format
 
 - Every file Papyrus saves is UTF-8 text and contains no binary data.
 - A `formatted-record` record is HTML.
-- Every other managed document record is Markdown.
+- Every other managed record is Markdown: backlog records, decision records, and the two Markdown document models.
 - The project configuration is YAML.
 
 ## Store Set
@@ -41,44 +41,17 @@ Covers the storage format, the closed store set, the project-directory boundary,
 
 ## Record Layout
 
-- A record file lives in the configured directory of its document type.
-- An archived record file lives in the `archive/` subfolder of that directory.
-- A record is archived exactly when its file is in `archive/`.
-- A Markdown-backed record that is not archived lives in the type directory and carries `status: active` or one of the custom workflow statuses its type declares.
+- A backlog record lives in the backlog folder for its record type, and an archived backlog record lives in that folder's `archive/` subfolder.
+- With exactly one configured decision type, a decision record lives directly in the main decision folder and an archived decision lives in its `archive/` subfolder.
+- With two or more configured decision types, a decision record lives in its type's directory under the main decision folder, and an archived decision lives in that directory's `archive/` subfolder.
+- A document record lives in the configured directory of its document type, and an archived document lives in that directory's `archive/` subfolder.
+- A record is archived exactly when its file is in an `archive/` subfolder.
+- A Markdown-backed record that is not archived carries `status: active` or one of the custom workflow statuses its type declares.
+- An archived record keeps the status it had before archiving; archiving changes no status.
 - A custom workflow status never moves a file and creates no per-status folder.
 - `archive/` is the only recognised archive storage. No other subfolder is read as archived, nor is migrated. No other subfolder is inventoried by any command, including `papyrus check`.
 
-## Archive Lifecycle
+## Document Models
 
-- `papyrus <slug> archive <ID>` writes `archived` as a Markdown-backed record's status and moves the file into the `archive/` subfolder of the type's configured directory.
-- For a Markdown-backed record, `archive` is the only operation that writes `archived`.
-- The command name is `archive`, the value it writes is `archived`, and the destination is `archive/`.
-- Archiving preserves the record identifier.
-- For a Markdown-backed record, archiving discards the previous workflow status; that value is not retained.
-- For a `formatted-record` record, the file moves the same way and no status changes.
-- Archived records are hidden from lists, search, and the browser, except that a search may explicitly include archived records. The browser shows the shared not-found page for them.
-- No command returns an archived record to a non-archived state, and no restore command exists.
-
-## Delete Lifecycle
-
-- `papyrus <slug> delete <ID>` permanently removes a record.
-- A record that is not archived is archived first and then removed.
-- Deletion asks for confirmation, and `--force` skips the prompt.
-- A deleted record leaves no file.
-
-## Misplaced Records
-
-- A Markdown-backed record whose stored status is `archived` while its file is outside `archive/` — after a hand edit or an interrupted write — is relocated into `archive/` before it is returned.
-- Relocation applies on every read, list, view, search, and browser path.
-- Relocation uses the same write-then-remove sequence as the `archive` command and reports the relocation in diagnostics.
-- If relocation fails, the record is returned read-only with a validation outcome, and writes to it are refused until the conflict is resolved.
-
-## grouped-record Records
-
-- Archive and delete apply to a single record.
-- Archiving or deleting a group record changes no member's file, status, or identifier.
-
-## Model Independence
-
-- The rules in this specification are identical for `simple-record`, `grouped-record`, and `formatted-record`.
+- The layout rules are identical for `simple-record`, `grouped-record`, and `formatted-record`.
 - They do not depend on a type's field sequence or role field sets.

@@ -2,7 +2,7 @@
 id: TECH-093
 title: "Unified Search"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-25T20:42:11Z'
+updated_date: '2026-11-26T20:48:00Z'
 labels: []
 references:
   - REQ-009
@@ -13,7 +13,7 @@ status: draft
 
 ## Description
 Covers the single free-text search command over the backlog and document stores:
-its query, record-type filters, result limit, archive handling, and output modes.
+its query, record type filters, result limit, archive handling, and output modes.
 Per-type list and view commands are outside this specification.
 
 ## Command

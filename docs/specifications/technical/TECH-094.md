@@ -2,7 +2,7 @@
 id: TECH-094
 title: "Browser Server, Security, Offline Operation, and Performance"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-25T20:42:11Z'
+updated_date: '2026-11-26T21:42:55Z'
 labels: []
 references:
   - REQ-006
@@ -48,8 +48,8 @@ architecture are outside this specification.
 - The `browser` command and the local browser interface operate without an
   internet connection (NFR-001, NFR-001.003).
 - With external networking disabled and loopback available, the command starts
-  and the interface stays usable for list, view, and edit across artifact
-  families (NFR-001.003).
+  and the interface stays usable for list, view, and edit across record types
+  (NFR-001.003).
 - The interface attempts no outbound network request while that operation is
   exercised (NFR-001.003).
 - Offline operation is a property of the served interface as a whole, not of a
@@ -88,8 +88,8 @@ architecture are outside this specification.
   below 250 ms when 1,000 active records exist across the enabled document types
   (NFR-007.001).
 - The measurement corpus is 1,000 active records across the enabled document
-  types, including a `GroupedMarkdown` group with 200 members and a
-  `SingleHtmlMockup` type with 50 records (NFR-007.001).
+  types, including a `grouped-record` group with 200 members and a
+  `formatted-record` type with 50 records (NFR-007.001).
 - Reference conditions are 4 vCPU, 8 GiB RAM, an SSD, Linux, one server process,
   loopback HTTP, and a release build with LTO and strip (NFR-007.001).
 - The run uses 10 warm-up requests followed by 100 measured sequential requests

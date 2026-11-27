@@ -1,20 +1,21 @@
 ---
 id: TECH-086
-title: "Record Categories, Document Types, and Configuration Validation"
+title: "Record Categories, Record Types, and Configuration Validation"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-27T12:32:35Z'
+updated_date: '2026-11-27T16:54:39Z'
 labels: []
 references:
   - REQ-007
   - REQ-007.001
   - REQ-007.002
   - REQ-005.008
+  - REQ-004.001
 status: verified
 ---
-# TECH-086 Record Categories, Document Types, and Configuration Validation
+# TECH-086 Record Categories, Record Types, and Configuration Validation
 
 ## Description
-Covers the three record categories, their lifecycles, the `document_types` map, its entry keys and defaults, and its validation and diagnostics. Excludes record storage and archive layout, content models, field semantics, the Seed, and command dispatch.
+Covers the three record categories, their statuses and lifecycles, the `document_types` and `decision_types` maps, entry keys and defaults, and validation and diagnostics. Excludes record storage and folder layout, archive and delete mechanics, content models, field semantics, the Seed, and command dispatch.
 
 ## Three Record Categories
 
@@ -25,10 +26,29 @@ Covers the three record categories, their lifecycles, the `document_types` map, 
 
 ## Lifecycles
 
-- **Task.** `statuses` and `default_status` are configurable.
-- **Milestone, release.** Fixed: `open` -> `closed` -> `archived`; `planned` -> `released` -> `archived`.
+- **Task.** `statuses` and `default_status` are configurable. A new task starts at the configured default task status. The final task status is the last entry of the configured list, and a task is unfinished when its status is not that final status.
+- **Milestone, release.** Fixed: `open` -> `closed`, with a new milestone starting `open`; `planned` -> `released`, with a new release starting `planned`. Archived is a file position, not a status value.
 - **Decision.** Fixed statuses: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`. Accepted transitions: `proposed` -> `accepted`, `proposed` -> `rejected`, `accepted` -> `deprecated`, `accepted` -> `superseded`. Archiving moves the file and keeps the status.
 - Configuration cannot add, remove, or rename a category, change a fixed lifecycle, change the document storage state, or change the meaning of `active` or `archived`.
+
+
+## Decision Status Transitions
+
+- The decision status vocabulary is fixed, shared by every decision type, and never declared in configuration: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`.
+- A decision status moves only through the status verbs of its own command family, and no edit option sets it.
+
+| Command | Transition |
+|---|---|
+| `papyrus <slug> accept <ID>` | `proposed` to `accepted` |
+| `papyrus <slug> reject <ID>` | `proposed` to `rejected` |
+| `papyrus <slug> deprecate <ID>` | `accepted` to `deprecated` |
+| `papyrus <slug> supersede <ID> --by <SUCCESSOR-ID>` | `accepted` to `superseded` |
+
+- A verb applied from a status other than its required starting status is rejected with a validation outcome and writes nothing.
+- A decision cannot be accepted or rejected twice, and a rejected decision cannot be accepted or deprecated.
+- A decision is superseded by exactly one successor of the same decision type.
+- `supersede` writes the successor identifier into the front-matter `superseded_by` key and sets the status to `superseded`.
+- A successor of a different type, an unknown successor, or a second supersession is rejected with a validation outcome and writes nothing.
 
 ## Custom Workflow Statuses
 
@@ -39,7 +59,7 @@ Covers the three record categories, their lifecycles, the `document_types` map, 
 ## Status List Invariants
 
 - `active` is always available, describes any non-archived state, and is never declared in `statuses`.
-- `archived` is reserved for the storage state and is never a declared status.
+- `archived` is not a status value and is never a declared status.
 - An empty `statuses` list is valid and leaves `active` as the only workflow status.
 - Custom statuses exist only for front-matter-backed document types.
 - A `formatted-record` type uses fixed HTML-metadata states `draft` and `approved`, declares no custom status, and has no `status` verb; archiving moves the file and changes no state.
@@ -47,15 +67,31 @@ Covers the three record categories, their lifecycles, the `document_types` map, 
 ## The `status` Verb
 
 - `papyrus <document-slug> status <ID> <VALUE>` sets the front-matter status to `<VALUE>`, a declared custom status, changes nothing else, and refreshes `updated_date`.
-- It never archives. The value `archived` is rejected with a validation outcome naming `archive` as the only way to archive, and no file moves.
+- It never archives. The value `archived` is rejected as a status with a validation outcome, and no file moves.
 - An archived record is rejected with a validation outcome naming it as archived; nothing changes and nothing is restored.
-- No create, edit, or field option sets a status.
+- No field option sets a status; a `formatted-record` state is set only by `edit --status approved`.
 
 ## The `document_types` Map
 
 - `document_types` is a map keyed by slug: the slug is the configuration key, the CLI command name, and the type identifier.
 - A document type exists if and only if the configuration declares it. An absent slug is absent from commands, views, and search, and no built-in table is consulted after `init`.
 - A violating configuration blocks every command with a validation outcome, except `config get|set|unset|list`, `init --force`, and `check`.
+
+
+## The `decision_types` Map
+
+- `decision_types` is a map keyed by slug: the slug is the configuration key, the CLI command name, and the type identifier.
+- Each entry declares a `prefix` and a `directory`; presence in the configuration is what makes the type available, and there is no `enabled` key.
+- Every decision type uses the shared fixed status vocabulary; a status list is not part of the entry.
+- A decision type exists if and only if the configuration declares it.
+- `init` writes the selected decision-type Seed entries fully expanded (REQ-004.001).
+
+| Change | Outcome |
+|---|---|
+| Add a type while at least two types are configured | Accepted; the new type receives its own subfolder and no existing record moves |
+| Add the second type to a project with exactly one type | Rejected with a validation outcome; no file moves |
+| Remove a configured type | Rejected with a validation outcome; no file moves |
+| Change the prefix of a type that still has decisions | Rejected with a validation outcome; no file moves |
 
 ## Entry Keys
 

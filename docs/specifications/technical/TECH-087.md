@@ -2,7 +2,7 @@
 id: TECH-087
 title: "Content Models and Field Schema"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-27T14:07:53Z'
+updated_date: '2026-11-27T16:54:39Z'
 labels: []
 references:
   - REQ-005
@@ -94,7 +94,7 @@ A field has no per-field order; sequence position is the only order.
 
 - `group` — owning-group link of a member record.
 - `title` — record title, never a field.
-- `status` — lifecycle state, written only by the status and archive paths.
+- `status` — lifecycle state, written only by the status paths; archiving changes no status.
 - The `formatted-record` metadata keys listed in the formatted-record section.
 - General metadata such as labels and references is carried by the record and is not a field.
 

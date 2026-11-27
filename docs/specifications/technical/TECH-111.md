@@ -2,7 +2,7 @@
 id: TECH-111
 title: "Record Metadata, Front Matter, and Projection"
 created_date: '2026-11-26T18:13:50Z'
-updated_date: '2026-11-27T11:31:27Z'
+updated_date: '2026-11-27T16:54:39Z'
 labels: []
 references:
   - REQ-001.005
@@ -60,7 +60,7 @@ Covers the front-matter contract, general, reserved, and document keys, serializ
 - `updated_date` is set at creation and refreshed by every write, including a browser save.
 - For a decision record, `updated_date` is refreshed only when the status changes.
 - `id`, `created_date`, and `updated_date` have no command option.
-- For a Markdown-backed document record, `status` has no field-derived create or edit option; a new record starts at its type's `default_status`, or at `active` when none is configured, and changes only through the `status` and `archive` verbs.
+- For a Markdown-backed document record, `status` has no field-derived create or edit option; a new record starts at its type's `default_status`, or at `active` when none is configured, and changes only through the `status` verb; archiving changes no status.
 - For a `formatted-record`, `status` has no field-derived create or edit option; `edit --status approved` moves `draft` to `approved`, and archiving changes no status.
 - The status of a task, milestone, release, or decision keeps the behaviour of its own category.
 
@@ -75,9 +75,7 @@ Covers the front-matter contract, general, reserved, and document keys, serializ
 ## CLI and Browser Parity
 
 - The command line in plain text and JSON and the browser single-record view display the same metadata values for the same record.
-- The browser list displays the row metadata defined by the list contract and carries no reference list.
 - All surfaces read the record's stored metadata and project the declared fields of the record's type and role; neither derives a value from the body when the metadata defines it.
 - Neither surface renames a stored value for display.
 - The command line and browser single-record view show at least the identifier, the title, the created and updated dates, the labels, the references, and every declared field of the record's type and role.
-- The browser list shows at least the identifier, the title, the created and updated dates, the labels, and the type's declared slots, and carries no references.
 - A record's `status` is shown as stored, including a custom status declared for its type, and is identical in the command line and the browser.

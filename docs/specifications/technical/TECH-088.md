@@ -2,7 +2,7 @@
 id: TECH-088
 title: Seed
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-27T12:58:24Z'
+updated_date: '2026-11-27T16:18:40Z'
 labels: []
 references:
   - REQ-001.006
@@ -27,11 +27,18 @@ Defines the Seed as a compile-time configuration of the system: one configuratio
 ## Families
 
 - The document-type Seed is the file's `document_types` map and contains the entries of REQ-005.016.
-- The decision-type Seed is the file's `decision_types` map and contains the entries of REQ-004.001.
+- The decision-type Seed is the file's `decision_types` map and contains exactly these two entries:
+
+| Slug | Prefix | Directory |
+|---|---|---|
+| `adr` | `ADR` | `adr` |
+| `bdr` | `BDR` | `bdr` |
+
+- A decision-type entry declares no criticality and no status list; every decision type uses the fixed decision status vocabulary (REQ-004.002).
 - A document-type entry carries its model, field sequence, identifier prefix, directory, custom workflow status set, list slots, and field defaults.
-- A decision-type entry carries its prefix, directory, and the shared status vocabulary.
+- A decision-type entry carries its prefix and directory; the status vocabulary is shared and fixed and is never an entry value.
 - Criticality is not part of the file: it is a requirement attribute of the built-in type, not a configuration key.
-- The entries are not restated here; the file's contents, bounded by REQ-005.016 and REQ-004.001, are the definition.
+- The document-type entries are not restated here; the file's contents, bounded by REQ-005.016, are the definition.
 
 ## Init Lifecycle
 
