@@ -2,87 +2,51 @@
 id: TECH-088
 title: Seed
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-25T20:42:10Z'
+updated_date: '2026-11-27T12:58:24Z'
 labels: []
 references:
+  - REQ-001.006
+  - REQ-004.001
   - REQ-005.016
-status: draft
+status: verified
 ---
 # TECH-088 Seed
 
 ## Description
-Defines the document-type Seed: the built-in document types that `init` offers
-for selection, their models, prefixes, field sequences, reference visibility,
-and workflow statuses, and the init-time lifecycle. The decision-type Seed is a
-separate family and is not specified here.
+Defines the Seed as a compile-time configuration of the system: one configuration file in the source tree, compiled into the binary at build time, supplying both the document-type and the decision-type family. Covers the file's role, validation, and `init` usage. The per-type content is specified by REQ-005.016 and REQ-004.001.
 
-## Definition
+## Seed Source
 
-- The Seed is the built-in list of default record types.
-- It has two families: the document-type Seed, defined here, and the
-  decision-type Seed.
-- This specification is the only definition of the built-in document types; no
-  other requirement, table, or module defines a built-in type, its fields, or
-  its defaults.
+- The Seed is one configuration file kept in the source tree; it is not a table or a built-in list in code.
+- The file is a configuration document in the shape of `papyrus.config.yml`; its `document_types` map is the document-type Seed and its `decision_types` map is the decision-type Seed.
+- Because the file is a valid configuration document, it also serves as the example configuration.
+- The build compiles the file into the binary; no seed file is read at runtime, and no path, environment variable, or project file replaces it.
+- The file is the only Seed source; changing the Seed is a source change that requires a rebuild.
+- The file must pass the configuration validation of REQ-007.002 and REQ-004.001; a Seed that fails validation fails the build.
+
+## Families
+
+- The document-type Seed is the file's `document_types` map and contains the entries of REQ-005.016.
+- The decision-type Seed is the file's `decision_types` map and contains the entries of REQ-004.001.
+- A document-type entry carries its model, field sequence, identifier prefix, directory, custom workflow status set, list slots, and field defaults.
+- A decision-type entry carries its prefix, directory, and the shared status vocabulary.
+- Criticality is not part of the file: it is a requirement attribute of the built-in type, not a configuration key.
+- The entries are not restated here; the file's contents, bounded by REQ-005.016 and REQ-004.001, are the definition.
 
 ## Init Lifecycle
 
 - `init` is the only command that reads the Seed.
 - The walkthrough presents the Seed for selection during `init`.
-- A selected entry is written into `papyrus.config.yml` fully expanded.
-- An unselected entry is not written at all.
-- A run without an interactive terminal writes every entry.
-- After `init` the Seed is irrelevant: no command, view, search, validation, or
-  default resolution reads it.
-- The project configuration is then the only source of document types, and a
-  document type exists if and only if the configuration declares it.
-- There is no `enabled` key: presence in the configuration is the only switch,
-  and removing an entry removes the type.
+- For each selected document or decision type, `init` prompts for the prefix and the storage directory, using the file's values as the defaults.
+- A selected entry is written into the project configuration fully expanded; an unselected entry is not written at all.
+- A run without an interactive terminal writes every entry with the file's prefixes and directories and without prompting.
+- `init` never copies the Seed file as-is; it writes the selected entries into the project configuration.
+- After `init` the Seed is irrelevant: no command, view, search, validation, or default resolution reads it.
+- The project configuration is then the only source of document and decision types, and a type exists if and only if the configuration declares it.
+- There is no `enabled` key: presence in the configuration is the only switch, and removing an entry removes the type.
 
-## Full Expansion
+## Runtime Boundary
 
-A written entry carries: document model, field sequence, identifier prefix,
-directory, custom workflow status set, reference visibility, list slots, and
-field defaults.
-
-The criticality of a built-in type is a requirement attribute, not a
-configuration key.
-
-## Entries
-
-The document-type Seed contains exactly these eleven entries.
-
-| Slug | Model | Criticality | Prefix | Field sequence | References | Statuses |
-|---|---|---|---|---|---|---|
-| `req` | `GroupedMarkdown` | Must have | `REQ` | group and member: `story`, `description` | hidden | none |
-| `nfr` | `GroupedMarkdown` | Must have | `NFR` | group and member: `story`, `description` | hidden | none |
-| `glossary` | `SingleMarkdown` | Must have | `GLO` | `definition` (required) | visible | none |
-| `rule` | `SingleMarkdown` | Must have | `BR` | `description` (required, create and edit), `rationale` (required, create only), `applicability` (required, create only), `requirements` (list, option `requirement`) | visible | none |
-| `ui-spec` | `SingleMarkdown` | Must have | `UI` | `view`, `description` | visible | none |
-| `tech-spec` | `SingleMarkdown` | Must have | `TECH` | `description` | visible | none |
-| `audit` | `SingleMarkdown` | Must have | `AUD` | `audit_type` (front-matter key `type`, option `audit-type`, default `security`), `content` (required) | visible | none |
-| `use-case` | `SingleMarkdown` | Should have | `UC` | `description`, `applicability` | visible | none |
-| `test-case` | `SingleMarkdown` | Should have | `TC` | `description`, `applicability` | visible | none |
-| `test-report` | `SingleMarkdown` | Should have | `TR` | `description`, `applicability` | visible | none |
-| `ui-mockup` | `SingleHtmlMockup` | Must have | `MOCK` | none (`fields: []`) | visible | fixed `pending`, `approved`, `archived` |
-
-## Field Rules
-
-- Every field is a body field under its own heading, except where the table
-  names a front-matter key. `audit_type` is stored at the front-matter key
-  `type`.
-- A field is optional unless the table marks it required.
-- `rule.description` is required on create and on edit.
-- `rule.rationale` and `rule.applicability` are required on create only.
-- `rule.requirements` is a list whose option is `requirement`.
-- `audit.audit_type` has the option `audit-type` and the default `security`.
-- `ui-mockup` declares no fields.
-
-## Statuses and Identifiers
-
-- No entry declares `active` or `archived` in a custom status list: `active`
-  describes any non-archived state and `archived` is the storage state.
-- The `ui-mockup` states are fixed `pending`, `approved`, and `archived` and
-  are not configurable.
-- Every other entry declares no custom workflow status.
-- The prefix of each entry is the identifier prefix of its records.
+- The binary carries the Seed; the project tree does not.
+- No command writes the Seed back, and no command regenerates it from a project configuration.
+- The Seed is fixed for the life of a binary; two projects initialized by the same binary start from the same Seed.

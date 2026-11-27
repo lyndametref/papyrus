@@ -2,7 +2,7 @@
 id: TECH-087
 title: "Content Models and Field Schema"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-26T22:12:37Z'
+updated_date: '2026-11-27T13:01:53Z'
 labels: []
 references:
   - REQ-005
@@ -10,7 +10,7 @@ references:
   - REQ-005.008
   - REQ-005.015
   - REQ-007.004
-status: verified
+status: draft
 ---
 # TECH-087 Content Models and Field Schema
 
@@ -51,7 +51,6 @@ Covers the three document models, the identifier shape and field schema of each 
 - The states are exactly `draft` and `approved`; a new record starts `draft`.
 - `edit --status approved` moves `draft` to `approved`. A backwards or skipping transition is rejected, and `--status` accepts no other value.
 - Archiving is a file move into `archive/`, not a status value: it is allowed from `draft` or `approved` and changes no status.
-- A formatted record cannot be superseded.
 - Papyrus does not version a record.
 
 
@@ -101,7 +100,7 @@ A field has no per-field order; sequence position is the only order.
 
 ## Single Writer
 
-- Content changes are computed by the engine as operations: set a front-matter key, set or clear a body section, set the heading title, or change the model-specific group, metadata, and supersession state.
+- Content changes are computed by the engine as operations: set a front-matter key, set or clear a body section, set the heading title, or change the model-specific group and metadata state.
 - One writer applies those operations atomically.
 - A patch that changes nothing writes no file.
 - No per-type module, table, or code path defines a document type's model, fields, or verbs.
