@@ -2,7 +2,7 @@
 id: TECH-095
 title: "Browser Navigation and Presentation"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-27T16:35:38Z'
+updated_date: '2026-11-27T17:25:34Z'
 labels: []
 references:
   - REQ-006.010
@@ -14,7 +14,7 @@ status: verified
 # TECH-095 Browser Navigation and Presentation
 
 ## Description
-Covers how the browser exposes configured document types: the shared document surface and its routes, the shared list layout, the list status filter, reference links, and view latency. List row content, single-record view content, metadata projection, and the edit form are separate specifications.
+Covers how the browser exposes configured document types: the shared document surface and its routes, the shared list layout, the list status filter, and reference links. List row content, single-record view content, metadata projection, view latency, and the edit form are separate specifications.
 
 ## One surface for every configured type
 
@@ -50,9 +50,3 @@ Covers how the browser exposes configured document types: the shared document su
 - Links are generated locally and require no network access (REQ-006.010).
 - The rule is browser-only; command-line output prints reference values as text (REQ-006.010).
 
-## View latency at 1,000 records
-
-- A document view page is served with a p95 latency below 100 ms when 1,000 active records exist (NFR-007.002).
-- The measurement uses the corpus, hardware, warm-up, measured-request count, reporting, and exclusions of the inventory-latency run, with 100 measured requests per document model to the view route (NFR-007.002).
-- The measured set includes one record with an unresolved reference and one member of the 200-member group (NFR-007.002).
-- The run and the measured figures are recorded with the release (NFR-007.002).

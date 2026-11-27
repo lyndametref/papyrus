@@ -2,7 +2,7 @@
 id: TECH-096
 title: "Browser Editing and Metadata Maintenance"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-25T20:42:11Z'
+updated_date: '2026-11-27T17:25:34Z'
 labels: []
 references:
   - REQ-005.011
@@ -10,15 +10,15 @@ references:
   - REQ-006.014
   - NFR-004.005
   - NFR-007.002
-status: draft
+status: verified
 ---
 # TECH-096 Browser Editing and Metadata Maintenance
 
 ## Description
 Covers the browser edit surface for a document record: the controls it derives
 from the record's declared fields, the write path a save uses, the metadata a
-save maintains, the preservation guarantees of a write, record-only
-persistence, and edit-page latency. It does not cover list or view layout,
+save maintains, the preservation guarantees of a write, and record-only
+persistence. It does not cover list or view layout,
 backlog records, or the Backlog board. The internal version mechanism — version
 tokens, entity tags, and locking — is outside this specification.
 
@@ -54,7 +54,7 @@ tokens, entity tags, and locking — is outside this specification.
   (REQ-006.004, REQ-005.011).
 - A front-matter key on disk that the type does not declare is kept as stored; a
   save never repairs, merges, or removes it (REQ-005.011).
-- A `SingleHtmlMockup` record carries no YAML front matter: its metadata is read
+- A `formatted-record` record carries no YAML front matter: its metadata is read
   from and written to its HTML metadata comment, with the same parity
   (REQ-006.004).
 - A record still carrying a value in a legacy body section moves that value to
@@ -78,8 +78,7 @@ tokens, entity tags, and locking — is outside this specification.
   (REQ-005.011).
 - `id` is generated and stable (REQ-005.011).
 - `id`, `created_date`, and `updated_date` have no form control (REQ-005.011).
-- For a document record, `status` has no edit control; it changes only through
-  the status and archive verbs (REQ-005.011).
+- For a Markdown-backed document record, `status` has no edit control; it changes only through the `status` verb, and archiving changes no status. A `formatted-record` state changes only through `edit --status approved` (REQ-005.011).
 - `labels` and `references` are general repeatable metadata, not fields
   (REQ-005.011).
 - Adding front matter to a record that lacks it leaves the body unchanged
@@ -96,14 +95,3 @@ tokens, entity tags, and locking — is outside this specification.
 - A temporary file used for an atomic write is removed when the write completes
   (NFR-004.005).
 
-## Edit Latency at 1,000 Records
-
-- A document edit page is served with a p95 latency below 100 ms when 1,000
-  active records exist (NFR-007.002).
-- The measurement uses the corpus, hardware, warm-up, measured-request count,
-  reporting, and exclusions of the inventory-latency run, with 100 measured
-  requests per document model to the edit route (NFR-007.002).
-- The measured set includes one record with an unresolved reference and one
-  member of the 200-member group (NFR-007.002).
-- The run and the measured figures are recorded with the release
-  (NFR-007.002).

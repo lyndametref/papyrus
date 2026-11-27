@@ -2,7 +2,7 @@
 id: TECH-110
 title: "Configuration Management"
 created_date: '2026-11-26T17:08:45Z'
-updated_date: '2026-11-26T17:08:45Z'
+updated_date: '2026-11-27T17:14:10Z'
 labels: []
 references:
   - REQ-001.002
@@ -56,9 +56,8 @@ specifications.
 ## Selectors
 
 - A document-type leaf is addressed as `document_types.<slug>.<path>`.
-- A field sequence element is addressed by key, for example
-  `document_types.req.member.fields[story].heading`, or by zero-based index, for
-  example `document_types.req.group.fields[0].required`.
+- A field sequence element is addressed by key, for example `document_types.<slug>.<role>.fields[<key>].heading`, or by zero-based index, for example `document_types.<slug>.<role>.fields[<index>].required`.
+- `<key>` is any key the type declares; no field key is reserved by the selector grammar.
 - The key form and the index form resolve to the same element.
 - A selector that does not resolve to a leaf is rejected with a validation
   outcome. This covers an unknown key, a keyed selector matching no unique
@@ -72,7 +71,7 @@ specifications.
 - A list-valued key accepts a comma-separated value and is written as a YAML
   flow sequence with the same values in the same order.
 - The list-valued keys are the task `statuses`, a document type's `statuses`,
-  `api_aliases`, and `slots`.
+  and `slots`.
 - A comma is always a separator and has no escape form.
 - An empty value for a list-valued key is rejected instead of written.
 - `fields` and the role field sequences are sequences of mappings and are never
@@ -81,8 +80,8 @@ specifications.
 ## Unset Semantics
 
 - `config unset` of a scalar removes the key so that its default applies again.
-- `config unset` of a flat collection — `statuses`, `api_aliases`, or `slots` —
-  removes it so that the collection default applies.
+- `config unset` of a flat collection — `statuses` or `slots` — removes it so
+  that the collection default applies.
 - For a document type, the applied default is the model-level default, never a
   value from a built-in table.
 
@@ -135,9 +134,3 @@ specifications.
   document-type set.
 - A broken configuration is therefore always repairable through Papyrus.
 
-## Input Values
-
-- Every user-supplied configuration value is sanitized before use. A value that
-  cannot be normalized into a valid identifier, name, title, or path is rejected
-  with a validation outcome, and nothing is written (NFR-002.002).
-- A value is never silently cleaned, truncated, or written.

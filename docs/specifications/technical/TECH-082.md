@@ -2,7 +2,7 @@
 id: TECH-082
 title: "CLI Foundation and Context"
 created_date: '2026-11-25T20:41:41Z'
-updated_date: '2026-11-26T20:18:43Z'
+updated_date: '2026-11-27T17:25:34Z'
 labels: []
 references:
   - REQ-001
@@ -16,7 +16,7 @@ status: verified
 # TECH-082 CLI Foundation and Context
 
 ## Description
-Covers the CLI command surface, common options, context selection, and input sanitization. Configuration and validation are separate specifications.
+Covers the CLI command surface, common options, and context selection. Input sanitization, configuration, and validation are separate specifications.
 
 ## Command Surface
 
@@ -65,9 +65,3 @@ Covers the CLI command surface, common options, context selection, and input san
 - `--help` and `--version` print their output and exit 0 without an existing configuration file.
 - Built-in defaults apply only to individual keys absent from a configuration file that was found.
 
-## Input Sanitization
-
-- Every user-supplied value from command-line options and standard input is sanitized before use.
-- A value that cannot be normalized into a valid identifier, name, title, or path is rejected; no invalid value is silently cleaned, truncated, or written.
-- Control characters, path separators, and traversal segments never reach the store.
-- A rejected value produces an error and writes no record.
