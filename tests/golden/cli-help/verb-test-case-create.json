@@ -1,5 +1,0 @@
-{
-  "exit": 0,
-  "stdout": "Create a test-case document.\n\nUsage: papyrus test-case create [OPTIONS] [TITLE]\n\nArguments:\n  [TITLE]  Document title\n\nOptions:\n      --json                           Emit stable, machine-readable JSON.\n      --title <TITLE>                  Document title\n      --description <DESCRIPTION>      Description Use \"-\" to read multiline text from standard input.\n      --dir <path>                     Project directory. Default: the current working directory.\n      --applicability <APPLICABILITY>  Applicability\n      --config <file>                  Configuration file. Default: papyrus.config.yml in the project directory.\n      --label <LABEL>                  Label\n      --no-color                       Disable ANSI color output.\n      --reference <REFERENCE>          Reference\n  -h, --help                           Print help\n",
-  "stderr": ""
-}

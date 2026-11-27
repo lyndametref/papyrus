@@ -1,5 +1,0 @@
-{
-  "exit": 0,
-  "stdout": "Serve the local web interface\n\nUsage: papyrus browser [--host <host>] [--port <port>] [--no-open] [--debug]\n\nOptions:\n      --host <host>    Bind address. Default: 127.0.0.1\n      --json           Emit stable, machine-readable JSON.\n      --dir <path>     Project directory. Default: the current working directory.\n      --port <port>    TCP port. Default: 6420\n      --config <file>  Configuration file. Default: papyrus.config.yml in the project directory.\n      --no-open        Do not open the default browser automatically\n      --debug          Log one line per received request to stderr\n      --no-color       Disable ANSI color output.\n  -h, --help           Print help\n",
-  "stderr": ""
-}

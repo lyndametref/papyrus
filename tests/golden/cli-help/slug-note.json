@@ -1,5 +1,0 @@
-{
-  "exit": 0,
-  "stdout": "Manage note documents.\n\nUsage: papyrus note [OPTIONS] [COMMAND]\n\nCommands:\n  create   Create a note document.\n  list     List note documents.\n  view     View a note document.\n  edit     Edit a note document.\n  archive  Archive a note document.\n  delete   Delete a note document.\n  status   Set the status of a note document.\n  help     Print this message or the help of the given subcommand(s)\n\nOptions:\n      --json           Emit stable, machine-readable JSON.\n      --dir <path>     Project directory. Default: the current working directory.\n      --config <file>  Configuration file. Default: papyrus.config.yml in the project directory.\n      --no-color       Disable ANSI color output.\n  -h, --help           Print help\n",
-  "stderr": ""
-}

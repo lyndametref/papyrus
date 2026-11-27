@@ -1,5 +1,0 @@
-{
-  "exit": 0,
-  "stdout": "Edit a audit document.\n\nUsage: papyrus audit edit [OPTIONS] <ID>\n\nArguments:\n  <ID>  \n\nOptions:\n      --json                     Emit stable, machine-readable JSON.\n      --title <TITLE>            Update the title\n      --audit-type <AUDIT_TYPE>  Audit type\n      --dir <path>               Project directory. Default: the current working directory.\n      --config <file>            Configuration file. Default: papyrus.config.yml in the project directory.\n      --content <CONTENT>        Content Use \"-\" to read multiline text from standard input.\n      --editor                   Open the document body in $VISUAL or $EDITOR\n      --no-color                 Disable ANSI color output.\n      --label <LABEL>            Label\n      --reference <REFERENCE>    Reference\n  -h, --help                     Print help\n",
-  "stderr": ""
-}

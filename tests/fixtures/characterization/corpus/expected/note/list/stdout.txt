@@ -1,3 +1,0 @@
-NOTE-001 Note one | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=note references=NOTE-REF-1 status=active
-NOTE-002 Note two | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active
-NOTE-1000 Note one thousand | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active

@@ -1,2 +1,0 @@
-UC-001 Use case one | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels=behaviour references=UC-REF-1 status=active
-UC-002 Use case two | created_date={{TIMESTAMP}} updated_date={{TIMESTAMP}} labels= references= status=active

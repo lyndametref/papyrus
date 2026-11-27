@@ -1,5 +1,0 @@
-{
-  "exit": 0,
-  "stdout": "Manage nfr documents.\n\nUsage: papyrus nfr [OPTIONS] [COMMAND]\n\nCommands:\n  create        Create a nfr document.\n  create-group  Create a nfr group.\n  list          List nfr documents.\n  view          View a nfr document.\n  edit          Edit a nfr document.\n  archive       Archive a nfr document.\n  delete        Delete a nfr document.\n  status        Set the status of a nfr document.\n  help          Print this message or the help of the given subcommand(s)\n\nOptions:\n      --json           Emit stable, machine-readable JSON.\n      --dir <path>     Project directory. Default: the current working directory.\n      --config <file>  Configuration file. Default: papyrus.config.yml in the project directory.\n      --no-color       Disable ANSI color output.\n  -h, --help           Print help\n",
-  "stderr": ""
-}

@@ -1,4 +1,0 @@
-dangling-milestone: task TASK-002 — milestone TASK-001 does not resolve to a milestone (backlog/tasks/TASK-002.md)
-duplicate-id: task TASK-001 — 2 records share this ID (backlog/tasks/TASK-001-copy.md, backlog/tasks/TASK-001.md)
-repaired: task TASK-001 -> TASK-003 (backlog/tasks/TASK-001.md -> backlog/tasks/TASK-003.md)
-reference: task TASK-002 (backlog/tasks/TASK-002.md) milestone = "TASK-001"
