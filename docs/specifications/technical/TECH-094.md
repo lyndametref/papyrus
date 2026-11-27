@@ -2,11 +2,12 @@
 id: TECH-094
 title: "Browser Server, Offline Operation, and Compatibility"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-27T17:23:19Z'
+updated_date: '2026-11-27T17:45:38Z'
 labels: []
 references:
   - REQ-006
   - REQ-006.002
+  - REQ-006.007
   - NFR-001
   - NFR-001.003
   - NFR-005
@@ -16,7 +17,7 @@ status: verified
 # TECH-094 Browser Server, Offline Operation, and Compatibility
 
 ## Description
-Covers the serving, offline, and compatibility part of the local web interface (REQ-006): bind address and automatic port selection, non-loopback handling, automatic browser opening, offline operation, and the Firefox support floor. Input sanitization and latency are separate specifications; list, view, edit, board, and rendering behavior are separate; content-security policy, cache headers, startup behavior, and internal server architecture are also separate.
+Covers the serving, offline, and compatibility part of the local web interface (REQ-006): bind address and automatic port selection, non-loopback handling, automatic browser opening, console output, offline operation, and the Firefox support floor. Input sanitization and latency are separate specifications; list, view, edit, board, and rendering behavior are separate; content-security policy, cache headers, startup behavior, and internal server architecture are also separate.
 
 ## Command surface and bind defaults
 
@@ -28,6 +29,14 @@ Covers the serving, offline, and compatibility part of the local web interface (
 - A user-specified host that is not a loopback address is accepted and causes a warning (REQ-006.002).
 - The default browser opens automatically on start; automatic opening is suppressed by `--no-open` or by configuration (REQ-006.002).
 - The warning, when raised, does not block startup; the command serves with the requested host (REQ-006.002).
+
+## Console output
+
+- By default the `browser` command outputs only errors to the console (REQ-006.007).
+- Errors are output whether or not `--debug` is set (REQ-006.007).
+- `--debug` is an option of the `browser` command only: it is not a global option and is not accepted by any other command (REQ-006.007).
+- With `--debug`, each received request is logged as one line containing the method, the path, the response status, and the duration (REQ-006.007).
+- Request headers and request bodies are not logged, so record content does not reach the console (REQ-006.007).
 
 ## Offline operation
 
