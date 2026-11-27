@@ -2,7 +2,7 @@
 id: TECH-096
 title: "Browser Editing and Metadata Maintenance"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-27T17:25:34Z'
+updated_date: '2026-11-27T17:46:16Z'
 labels: []
 references:
   - REQ-005.011
@@ -10,7 +10,7 @@ references:
   - REQ-006.014
   - NFR-004.005
   - NFR-007.002
-status: verified
+status: draft
 ---
 # TECH-096 Browser Editing and Metadata Maintenance
 
