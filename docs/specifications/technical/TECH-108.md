@@ -2,20 +2,18 @@
 id: TECH-108
 title: "Build System"
 created_date: '2026-11-26T07:13:33Z'
-updated_date: '2026-11-27T18:46:00Z'
+updated_date: '2026-11-27T18:55:38Z'
 labels: []
 references:
   - NFR-003
   - NFR-003.001
   - NFR-007.001
-status: verified
+status: draft
 ---
 # TECH-108 Build System
 
 ## Description
-Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and
-the checks that gate a build. Source layout and the packaging entry point are
-separate specifications.
+Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and the checks that gate a build. Source layout and the packaging entry point are separate specifications.
 
 ## Cargo
 

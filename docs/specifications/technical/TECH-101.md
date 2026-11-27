@@ -2,19 +2,17 @@
 id: TECH-101
 title: "Browser Server, Asset Routing, and Caching"
 created_date: '2026-11-25T20:53:42Z'
-updated_date: '2026-11-27T18:38:05Z'
+updated_date: '2026-11-27T18:55:38Z'
 labels: []
 references:
   - REQ-006.002
   - NFR-001.003
-status: verified
+status: draft
 ---
 # TECH-101 Browser Server, Asset Routing, and Caching
 
 ## Description
-Covers the embedded HTTP server's transport rules, static asset routing, response cache
-classes, the serving snapshot, and the security header set. Build and packaging mechanics, the per-file asset inventory,
-rendering-library behavior, and record write concurrency are out of scope.
+Covers the embedded HTTP server's transport rules, static asset routing, response cache classes, the serving snapshot, and the security header set. Build and packaging mechanics, the per-file asset inventory, rendering-library behavior, and record write concurrency are out of scope.
 
 ## Transport
 
@@ -56,8 +54,7 @@ rendering-library behavior, and record write concurrency are out of scope.
 
 ## Cache classes
 
-Every response belongs to exactly one class, decided by what the response is and never by
-the route that produced it.
+Every response belongs to exactly one class, decided by what the response is and never by the route that produced it.
 
 | Class | Responses | `Cache-Control` | Validator | `304` |
 |---|---|---|---|---|
