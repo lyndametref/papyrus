@@ -2,12 +2,12 @@
 id: TECH-106
 title: "Distribution Artifact"
 created_date: '2026-11-25T21:03:10Z'
-updated_date: '2026-11-25T21:07:36Z'
+updated_date: '2026-11-27T18:50:24Z'
 labels: []
 references:
   - NFR-003
   - NFR-003.002
-status: draft
+status: verified
 ---
 # TECH-106 Distribution Artifact
 
@@ -26,7 +26,6 @@ Covers the `.deb` artifact, its metadata, payload, versioning, and supported Deb
 
 - `DEBIAN/control` carries the package metadata; `Architecture` is `amd64` and `Version` is the artifact version.
 - The default version is derived from `Cargo.toml`; an explicitly supplied build version overrides it and appears in both the `Version:` field and the file name.
-- An RC and a final package of the same base version are distinguishable by the version string.
 - The package adds no runtime dependency beyond the base system. `stty` comes from Essential `coreutils`, so no new `Depends` entry is required.
 - Installation and removal are non-interactive; the package starts no service, daemon, or network operation.
 
