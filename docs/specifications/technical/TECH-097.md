@@ -2,121 +2,55 @@
 id: TECH-097
 title: "Browser Backlog Board"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-25T20:42:11Z'
+updated_date: '2026-11-27T18:10:35Z'
 labels: []
 references:
   - REQ-006.013
-status: draft
+status: verified
 ---
 # TECH-097 Browser Backlog Board
 
 ## Description
-Covers the browser Backlog view as a per-milestone kanban board: section and
-column structure, card order, milestone and release ordering, lifecycle
-markers, immediate status change, task cleanup, and milestone and release
-cleanup. It does not cover the task record page, other artifact lists, or
-presentation details that the requirement leaves to design.
+Covers the implementation of the browser Backlog board: ordering computation, status-change submission, progressive drag enhancement, cleanup execution, and failure rendering. Routes and server-side rendering are a separate specification. The board's content, ordering rules, markers, and cleanup rules are specified by REQ-006.013; visual layout is specified by the UI specification.
 
-## Board Structure
 
-- Milestones are expandable and collapsible sections (REQ-006.013).
-- Inside an expanded milestone, its tasks appear as a kanban board with one
-  column per task status, laid out horizontally (REQ-006.013).
-- Columns follow the configured task status list exactly and in configured
-  order; a status with no task keeps its column visible (REQ-006.013).
-- Milestones that belong to a release appear under that release; milestones that
-  belong to no release are grouped before the first release (REQ-006.013).
-- Each release boundary is marked by a bold separator naming the release, so the
-  boundary does not depend on colour (REQ-006.013).
-- Tasks that belong to no milestone appear in their own expandable section after
-  all milestone sections (REQ-006.013).
-- Cards are ordered by ascending task identifier within a column (REQ-006.013).
-- Each card links to the task record view (REQ-006.013).
-- Card contents beyond the identifier and title, column widths, separator
-  styling, and control placement are outside this specification (REQ-006.013).
+## Board assembly
 
-## Ordering
+- Status columns are the configured task statuses plus a trailing `Unconfigured status` column for tasks whose stored status is not configured.
+- A task whose milestone is absent or unresolved renders in the expandable `Tasks without a milestone` section after the milestone and release groups.
+- The first milestone that has a non-archived task starts expanded; every other milestone section starts collapsed.
+- A card carries the `POST /records/{id}` form for its status control, and the drag script reuses that form; no drag-specific endpoint or payload exists.
 
-- A milestone is ordered by the lowest ordinal among the non-archived tasks
-  assigned to it, ascending (REQ-006.013).
-- A milestone with no such task comes after every milestone that has one,
-  ordered by milestone identifier ascending (REQ-006.013).
-- Milestones with equal lowest ordinals are ordered by milestone identifier
-  ascending (REQ-006.013).
-- The same milestone rule applies inside a release and in the no-release group
-  (REQ-006.013).
-- A release is ordered by the lowest ordinal among the non-archived tasks in its
-  milestones, ascending (REQ-006.013).
-- A release with no such task comes last, ordered by release identifier
-  ascending (REQ-006.013).
-- Releases with equal lowest ordinals are ordered by release identifier
-  ascending (REQ-006.013).
-- The order is recomputed from current record data on each render, so changing a
-  task ordinal moves its milestone and release on reload (REQ-006.013).
+## Ordering computation
 
-## Lifecycle Markers
+- Each render derives a sort key per milestone and per release from the non-archived tasks: the lowest task ordinal for a milestone, and the lowest ordinal across a release's milestones for a release.
+- A milestone or release with no qualifying task sorts after every one that has a key, by identifier.
+- Equal keys are ordered by identifier.
+- The computation uses the record set of one request; changing an ordinal changes the order on the next render.
 
-- A lifecycle marker is placed immediately before each milestone title and each
-  release title, in addition to the record identifier (REQ-006.013).
-- An open milestone and a planned release carry a ring marker (REQ-006.013).
-- A closed milestone and a released release carry a check marker
-  (REQ-006.013).
-- The marker reflects the stored lifecycle state and changes when that state
-  changes and the view is reloaded (REQ-006.013).
-- Archived milestones and archived releases are not shown and carry no marker
-  (REQ-006.013).
+## Status change
 
-## Task Status Change
+- Without JavaScript, a card offers a `POST /records/{id}` form containing a select over the configured task statuses and a `Change status` submit control.
+- Dragging a card is a progressive enhancement that submits the same change to the same target; there is no separate drag endpoint.
+- The change uses the shared single-record write path and its version token. A conflict or validation failure writes nothing and re-renders the board with an alert carrying `role="alert"` above the groups; the card stays in its stored column.
+- The board holds no staging state; a successful change is read back from the record on the next render.
 
-- A task's status is changed by dragging its card into another status column, or
-  with an equivalent status control on the card that needs no dragging
-  (REQ-006.013).
-- Either action persists the status immediately; the board is not a staging area
-  (REQ-006.013).
-- A change that cannot be persisted leaves the card in its original column and
-  reports the failure (REQ-006.013).
-- A status change alters only the status value and preserves every other task
-  field (REQ-006.013).
+## Cleanup execution
 
-## Task Cleanup
+- `Clean up all` opens a server-rendered confirmation region below the milestone heading; the region is not a dialog, overlay, or script-driven prompt.
+- The confirmation submits, and the cancel control is a plain link that performs no write.
+- On confirmation each affected task is archived individually; the operation is not a transaction, a failure is reported for that task, the remaining tasks are still archived, and failed tasks stay on the board.
+- A column with no affected task still opens the confirmation region but renders no confirm form, only the cancel link.
+- A failed cleanup re-renders with an alert above the release groups that states the archived count out of the total, names the milestone, and lists each failed identifier with its message; successful tasks are absent from the re-read board.
+- The cancel link returns to the board with the milestone expanded and performs no write.
+- A closed milestone's cleanup archives that milestone; a released release's cleanup archives each closed milestone one at a time and never the release itself.
+- Cleanup introduces no new write path, no batch transaction, and no command-line equivalent.
 
-- The final configured task status column of each milestone board offers a
-  "Clean up all" action (REQ-006.013).
-- The final configured status is the last entry of the configured task status
-  list; the action appears only when that status differs from `active`
-  (REQ-006.013).
-- Activating the action shows a warning listing the identifiers of the affected
-  tasks and requires confirmation; on cancel nothing is archived
-  (REQ-006.013).
-- On confirmation each task in that column for the current milestone is archived
-  independently; a failure is reported for that task and does not abort the
-  others, and archived tasks leave the board (REQ-006.013).
-- The action never acts project-wide and has no command-line equivalent
-  (REQ-006.013).
+## Markers
 
-## Milestone and Release Cleanup
+- Lifecycle markers are rendered server-side from the stored status; no script derives or changes them.
 
-- A cleanup control appears immediately after the title of every closed
-  milestone (REQ-006.013).
-- The control appears after the title of every released release that contains at
-  least one closed milestone; a released release with no closed milestone has
-  none (REQ-006.013).
-- Activating it shows a confirmation listing the identifiers of the records that
-  will be archived; cancelling archives nothing (REQ-006.013).
-- For a closed milestone, confirmation archives that milestone
-  (REQ-006.013).
-- For a released release, confirmation archives each closed milestone contained
-  in it, one by one, and leaves the release itself visible and released
-  (REQ-006.013).
-- If archiving one record fails, the failure is reported for that record, the
-  remaining records are still archived, and the failed record stays visible
-  (REQ-006.013).
-- A release cleanup never archives the release itself (REQ-006.013).
-- The cleanup controls have no command-line equivalent and change no lifecycle
-  rule (REQ-006.013).
+## Constraints
 
-## Exclusions
-
-- Archived tasks appear on no board (REQ-006.013).
-- Archived milestones and archived releases are not shown
-  (REQ-006.013).
+- Every board function works without JavaScript; drag is the only enhancement.
+- The board issues no outbound network request.

@@ -2,7 +2,7 @@
 id: TECH-086
 title: "Record Categories, Record Types, and Configuration Validation"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-27T16:54:39Z'
+updated_date: '2026-11-27T18:10:35Z'
 labels: []
 references:
   - REQ-007
@@ -112,7 +112,7 @@ An entry is a mapping that accepts these keys:
 
 Each slot is one extra list column between Status and Created; its key names the record property it renders. Structural keys and reserved record keys cannot be slots, and a slot cannot repeat.
 
-The order in which entries appear in the configuration is the navigation order. The slug is the only `?type=` and API path name; there is no `type_alias` or `api_aliases` key.
+The order in which entries appear in the configuration is the navigation order. The slug is the only type path segment and API path name; there is no `type_alias` or `api_aliases` key.
 
 ## Model Shape
 

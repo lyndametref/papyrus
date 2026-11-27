@@ -2,7 +2,7 @@
 id: TECH-095
 title: "Browser Navigation and Presentation"
 created_date: '2026-11-25T20:42:11Z'
-updated_date: '2026-11-27T18:02:39Z'
+updated_date: '2026-11-27T18:10:35Z'
 labels: []
 references:
   - REQ-006.010
@@ -67,7 +67,7 @@ Covers the implementation of the shared browser surface: the descriptor-driven t
 
 ## Reference links
 
-- Links are resolved and rendered server-side. For a reference value, the renderer looks up the identifier in the enabled type registry and emits `/doc/{id}` only when a record resolves; otherwise it emits the value as text.
+- Links are resolved and rendered server-side. For a reference value, the renderer looks up the identifier in the enabled type registry and emits `/records/{id}` only when a record resolves; otherwise it emits the value as text.
 - The lookup is the same identifier index used by route resolution, so a link and a directly requested URL resolve to the same record.
 - The `href` is built from the resolved identifier and never from the stored value, so stored content cannot inject a scheme or path.
 - One reference renderer serves every reference-bearing property: a task's dependencies and milestone, a release's milestones, a milestone's release and tasks, a record's `references`, a member's owning group, and a mockup's task and specifications.
