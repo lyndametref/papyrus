@@ -35,14 +35,9 @@ document_types:
     directory: requirements/business/
     enabled: true
     statuses: [active, draft, verified, archived]
-  rule:
-    prefix: BR
-    directory: business-rules/
-    enabled: true
-    statuses: [active, draft, verified, archived]
   tech-spec:
     prefix: TECH
-    directory: specs
+    directory: specs/
     enabled: true
     statuses: [active, draft, verified, archived]
   test-case:
@@ -54,11 +49,6 @@ document_types:
     prefix: MOCK
     directory: specifications/ui/mockups/
     enabled: true
-  ui-spec:
-    prefix: UI
-    directory: specifications/ui/
-    enabled: true
-    statuses: [active, draft, verified, archived]
   release-reports:
     prefix: RELR
     directory: release-reports/
