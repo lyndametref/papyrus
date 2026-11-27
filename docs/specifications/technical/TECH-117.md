@@ -21,8 +21,8 @@ Covers the vendored Mermaid asset, its served path, the client initialization an
 
 - Mermaid 11.17.2 is committed pre-built, byte-identical to upstream, and embedded in the binary through the static asset table.
 - `mermaid.min.js` is 3,572,661 B, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`, MIT.
-- It lives under `src/browser/vendor/mermaid/11.17.2/`, which holds the unmodified upstream file, a `LICENSE`, and an `UPSTREAM.md` with package, version, upstream URL, and retrieval date.
-- No Rust crate, Node toolchain, or network access is added; `Cargo.toml` is unchanged and `cargo build` remains the whole build.
+- It lives under `apps/browser/web/vendor/mermaid/11.17.2/`, which holds the unmodified upstream file, a `LICENSE`, and an `UPSTREAM.md` with package, version, upstream URL, and retrieval date.
+- No Rust crate, Node toolchain, or network access is added; the workspace manifests are unchanged and `cargo build` remains the whole build.
 - The file is served from `/assets/mermaid/11.17.2/mermaid.min.js`, matching the embedded path exactly. The unversioned path answers `404` for every method.
 - The path is a literal entry of the static asset table, matched exactly: no prefix matching, path join, version negotiation, redirect, or alias.
 - Vendor responses are immutable (`Cache-Control: public, max-age=31536000, immutable`, no `ETag`); the version segment is the version directory name and the manifest version, never the Papyrus package version.
@@ -65,7 +65,7 @@ mermaid.initialize({
 
 ## Supply chain
 
-- `src/browser/vendor/MANIFEST.md` lists the package, version, licence, upstream URL, byte size, and SHA-256 of `mermaid.min.js`.
+- `apps/browser/web/vendor/MANIFEST.md` lists the package, version, licence, upstream URL, byte size, and SHA-256 of `mermaid.min.js`.
 - A test recomputes the digest of the embedded asset and fails on a mismatch.
 - A licence that cannot be shown compatible with GPL-3.0-or-later distribution blocks shipment.
 - `packaging/deb/usr/share/doc/papyrus/copyright` carries a Mermaid section with name, version, licence identifier, and licence text, in addition to the Papyrus GPL-3.0-or-later statement.

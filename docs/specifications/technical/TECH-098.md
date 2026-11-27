@@ -61,7 +61,7 @@ A field with no math and no diagram produces byte-identical output. Rendering ap
 
 ## Server-side rendering
 
-- HTML is rendered server-side from templates embedded with `include_str!` from `src/browser/templates/*.html`.
+- HTML is rendered server-side from templates embedded with `include_str!` from `apps/browser/src/templates/*.html`.
 - Placeholder syntax is fixed: `{{name}}`. Substitution is a single pass over the template; substituted values are never re-scanned, so a value containing `{{...}}` is emitted literally, and an unknown placeholder is left untouched.
 - There is no template engine and no expression evaluation.
 - Substituted values are escaped at render time. Internal fragments — sidebar, breadcrumb, section, metadata, form — are pre-escaped raw fragments; no other raw insertion exists.

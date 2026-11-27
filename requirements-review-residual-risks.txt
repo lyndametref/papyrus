@@ -16,6 +16,14 @@ Closed and removed 2026-11-24 after verification against the current records:
       type keeps the three fixed states. See the closed note under R73.
 - R44, R51, R56, R62 — the contradicting business rules were archived on 2026-11-24
       (BR-001 to BR-020). The traceability debt they created is R74.
+- R50 "Task comments are under-specified" — comments are removed from tasks; see R79.
+- R64 "Archived decisions stay viewable" — resolved: an archived decision is hidden
+      and unreachable, like an archived document (REQ-004.002, REQ-004.003).
+- R49 "Task references are not validated" — resolved: REQ-001.008 now validates every
+      reference value for backlog records and documents; see R81.
+- R66 "NFR-003.003 contradicts dynamic document commands" — resolved: the NFR now
+      documents the `<slug>` document-type and decision-type families and how a slug
+      is configured.
 
 ====================================================================
 GROUP REQ-005 — Project Documentation Management  (reviewed, changes applied)
@@ -100,13 +108,17 @@ R22. Two behaviours newly required, not yet implemented
        user that the former records become unmanaged.
 
 ====================================================================
-GROUP REQ-006 — Search and Local Web Interface
-(reviewed, changes applied)
+GROUP REQ-006 — Local Web Interface  (split from "Search and Local Web Interface")
+(reviewed, changes applied; search split out on 2026-11-24)
 ====================================================================
 
+Split on 2026-11-24: REQ-006.001 (Search Project Records) was archived and replaced
+by REQ-009.001 in the new group REQ-009 Search. REQ-006 keeps 9 atomics:
+.002 .004 .007 .010 .011 .013 .014 .016 .017.
+
 State after review: 10 active atomics, 9 deprecations. 11,992 -> 5,846 words
-(-51%). Active: .001 .002 .004 .007 .010 .011 .013 .014 .016 .017.
-Archived: .006 .009 .012 .015 .018 .019 .020 .021 .022.
+(-51%). Active: .002 .004 .007 .010 .011 .013 .014 .016 .017.
+Archived: .001 .006 .009 .012 .015 .018 .019 .020 .021 .022.
 Titles changed: .010 "Present Record References as Links"; .013 keeps its title and
 now owns ordering, lifecycle markers, and milestone/release cleanup.
 
@@ -292,18 +304,6 @@ R48. `--documentation` and `--type` must leave the CLI
     and existing task files that carry `documentation:` or `type:` must keep those
     keys as preserved, read-only metadata (REQ-005.011).
 
-R49. Task references are not validated
-    Severity: medium (gap)
-    REQ-002.001 lets a task reference any managed record, but `papyrus check` only
-    validates `milestone` and `release` references (REQ-001.008). A task reference to
-    a record that does not exist is not reported.
-
-R50. Task comments are under-specified
-    Severity: low
-    REQ-002.001 says a comment is appended with an optional author, but nothing states
-    where comments are stored or how they are displayed. The view requirement lists
-    "comments" without defining them.
-
 ====================================================================
 GROUP REQ-003 — Milestone and Release Planning
 (merged into REQ-002 Backlog Management; group archived)
@@ -358,9 +358,10 @@ Active: .001 Manage Decisions, .002 Change Decision Status, .003 Inspect Decisio
 
 R58. Decision status verbs are new
     Severity: high (product change)
-    REQ-004.002 requires `decision accept|reject|deprecate|supersede --by|archive`.
-    The CLI exposes only `edit --status` and `edit --superseded-by`, which must be
-    removed in favour of the verbs.
+    REQ-004.002 requires `decision accept|reject|deprecate|supersede --by` as status
+    verbs and a separate `decision archive` that moves the file without touching the
+    status. The CLI exposes only `edit --status` and `edit --superseded-by`, which
+    must be removed in favour of the verbs.
 
 R59. `decision delete` is new
     Severity: high (product change)
@@ -372,11 +373,13 @@ R60. Content freeze outside `proposed` is new
     `decision edit` currently edits any decision. REQ-004.001 requires editing and
     deleting only while `proposed`, and every other state to reject with no write.
 
-R61. "archived" now means two different things
-    Severity: medium
-    For decisions it is a status value that moves no file; for documents it is a
-    storage location. REQ-007.001 and REQ-004.002 state the distinction, but the CLI
-    help, business rules, and UI must not conflate them.
+R61. Archiving moves files for decisions now
+    Severity: medium (product change)
+    Decisions were archived by status only. REQ-004.002 now moves the file into the
+    decision folder's `archive/` subfolder and keeps the status. The CLI has no
+    `decision archive` verb at all, and an existing decision whose status is the old
+    `archived` value falls outside the five-value vocabulary and needs a migration
+    decision.
 
 R63. Supersession status mismatch
     Severity: high (correctness)
@@ -385,20 +388,13 @@ R63. Supersession status mismatch
     front-matter `superseded_by` key. The implementation must change, or every existing
     decision file carries a value outside the vocabulary.
 
-R64. Archived decisions stay viewable — assumption to confirm
-    Severity: medium
-    REQ-004.003 states that an archived decision remains viewable by identifier (it
-    stays in place and is historical). Documents behave differently: an archived
-    document is unreachable. If decisions should instead be unreachable, that
-    requirement clause must be inverted.
-
 ====================================================================
 SESSION TOTAL
 ====================================================================
 
 Before: 7 groups, 60 records, 51,573 words.
-After:  7 groups, 46 records, 30,809 words (-40%).
-Archived records: 27 in docs/requirements/business/archived/ (24 from this session,
+After:  8 groups, 47 records, 31,168 words (-40%).
+Archived records: 28 in docs/requirements/business/archived/ (25 from this session,
 3 pre-existing).
 
 Capabilities added while shrinking the corpus (all recorded above): release archive
@@ -419,16 +415,10 @@ R65. `papyrus req create-group` writes a defective group record
     With `--title`, `--story`, and `--description`, `req create-group` wrote a file
     whose front matter contained only `status: active`: no `id`, `title`,
     `created_date`, or `updated_date`. The requirement was invisible to `req list`
-    and absent from the browser. It was repaired by writing the front matter through
-    `papyrus req edit REQ-008 --editor`. A regression test is needed for group
-    creation through the option form (the positional form is untested as well).
-
-R66. NFR-003.003 contradicts dynamic document commands
-    Severity: medium
-    It requires "a man page for every command", but document-type commands are
-    generated from configuration and cannot be enumerated statically. REQ-008.001
-    documents the family once and defers per-type options to `--help`. The NFR must
-    say "every built-in command". Not edited in this pass.
+    and absent from the browser. It happened twice: REQ-008 and again REQ-009; both
+    were repaired by writing the front matter through `papyrus req edit --editor`. A
+    regression test is needed for group creation through the option form (the
+    positional form is untested as well).
 
 R67. `papyrus help` currently prints CLI usage, not the manual
     Severity: medium (product change)
@@ -501,6 +491,131 @@ R74. Business rules archived, their citations remain
     follow, but no command resolves an archived BR and the references are now dead.
     Action: re-point or re-validate those citations in the same pass as R1. The next
     business rule in use is BR-021.
+
+R75. `active` and `archived` are now forbidden in a status list
+    Severity: high (product change)
+    REQ-007.002 rejects a `statuses` entry equal to `active` or `archived`, and
+    REQ-007.001 states both are implicit and undeclarable. Consequences:
+    - config validation must reject the two values instead of requiring them;
+    - the `init` template must not write them (REQ-005.016 now shows "none");
+    - every existing configuration that lists `[active, ..., archived]` fails to
+      load, including this project's own `papyrus.config.yml` (several entries);
+    - the browser status filter and the `status` verb keep offering `active` plus
+      the declared values, unchanged.
+    Severity note: "reject with an error" was the project-owner decision, so the
+    failure is intended, not a warning.
+
+R76. ADR-045 decision 7 still states the old default
+    Severity: medium (ADR inconsistency)
+    ADR-045 (accepted) says the model-level default statuses are `[active, archived]`.
+    REQ-007.001 and REQ-007.002 now say a status list contains neither value and
+    defaults to empty. ADR-045 is frozen once accepted: the correction needs either a
+    short amending record that references decision 7, or a direct edit if the
+    immutability rule is waived for a same-day drafting error.
+
+R77. The CLI must render Markdown, not print raw source
+    Severity: high (product change)
+    REQ-005.017 "Record View" now requires field content to be rendered with the
+    console's advanced formatting capabilities (headings, emphasis, lists, tables,
+    code, quotes), with `--no-color` disabling the styling and `--json` unaffected.
+    The CLI prints raw Markdown today, so this needs a renderer, a fallback for
+    terminals without styling, and a test that `--json` stays free of escape codes.
+
+R78. The init checklist is not implemented as specified
+    Severity: high (conformance gap)
+    REQ-001.006 requires the offered artifacts to be presented as a checklist rendered
+    with the terminal formatting, with the cursor row and the selection state of every
+    row clearly distinguishable. The delivered `papyrus init` still asks for typed
+    tokens and prints plain `[x]`/`[ ]` markers, which the requirement forbids. This
+    is the gap already noted in the requirement's traceability, widened by the
+    checklist rule.
+
+R79. Task comments are removed from the product
+    Severity: medium (product change)
+    `papyrus task edit` still accepts `--comment` and `--comment-author`, and a task
+    body keeps comment sections. The requirements no longer define comments, so the
+    options must be removed and existing comment sections must be preserved as
+    unknown body content (the preservation rule of REQ-005.011) rather than dropped.
+
+R80. The archive folder is `archive/`, but ADR-0022 and the code say `archived/`
+    Severity: high (decision and implementation change)
+    Every requirement now names the archive folder `archive/`, for documents and for
+    decisions, and the backlog types already use `backlog/archive/...`. ADR-0022,
+    accepted and frozen, defines `archived/` in decisions 2, 6, and 8, and the code
+    resolves that directory name. A record must amend or supersede ADR-0022, and the
+    implementation must rename the directory. Projects holding an existing
+    `archived/` folder need either a migration rule or a documented manual move;
+    without one, their archived records become unreachable.
+
+R81. Reference validation now spans every record kind
+    Severity: high (behaviour change)
+    REQ-001.008 validates every reference value — backlog relationships, the
+    `references` list of any record, record-identifier list fields, and
+    `superseded_by` — and treats an archived identifier as existing. The current
+    check resolves only `milestone` and `release`, over active folders. The resolver
+    must cover all categories and both folders (active and archive), and must report
+    a reference to an unclaimed file or to a type that is no longer configured.
+
+R82. Search gains `--include-archive`
+    Severity: medium (product change)
+    REQ-009.001 adds `--include-archive` to search archived records, showing their
+    archived state. The search currently excludes archived records and offers no
+    flag. The search index must reach the archive folders of every category, and the
+    flag must combine with `--type` and `--limit`.
+
+R83. Decision types become configuration data
+    Severity: high (product change)
+    REQ-004.001 now defines `decision_types` as a map keyed by slug, each entry with a
+    `prefix` and a `directory`, selectable at init (one or both) and editable
+    afterwards under the layout rule: one type means the main folder with no
+    subfolder, two or more mean one subfolder per type. Implementation impact:
+    - `init` must write the selected decision types;
+    - resolution, the list filter, and identifier allocation must use the configured
+      type, with the type derived from the prefix;
+    - the archive destination depends on the layout;
+    - adding the second type to a single-type project, removing a type, and changing
+      a prefix that still has decisions must be rejected;
+    - `enabled` is no longer a decision-type key (presence is the switch);
+    - existing `decision_types` entries must gain a `directory`.
+
+R84. Decisions are no longer "bespoke"
+    Severity: medium (decision consistency)
+    RE-010 D4 and ADR-045 treat decision records as bespoke and keep document types as
+    the only configuration-driven corpus. REQ-004.001 now makes decision types partly
+    configuration-driven (slug, prefix, directory), while statuses and content stay
+    fixed. A decision record should state whether decision types join the
+    configuration-driven model or remain a separate, deliberately smaller mechanism.
+
+R85. Each decision type becomes its own command family
+    Severity: high (product change)
+    REQ-004.001 requires `papyrus <slug> create|list|view|edit|accept|reject|deprecate|
+    supersede|archive|delete`, with the slug as the command name and no
+    `--decision-type` option. Consequences:
+    - the shared `decision` command family disappears, and `decision` is removed from
+      the reserved built-in names (REQ-007.002);
+    - dispatch is generated per configured decision type, like document types;
+    - the status verbs move onto the type command;
+    - business rules, UI specifications, and user documentation that describe
+      `papyrus decision ...` are stale;
+    - a single configured type still owns the whole main folder, so the command name
+      and the storage layout are independent.
+
+R86. Decision timestamps have their own rule
+    Severity: medium (behaviour change)
+    REQ-004.001 defines two decision dates: the creation date (written once, never
+    changed, shown as the decision's date) and the update date (refreshed only when
+    the status changes). The general rule of REQ-005.011 refreshes `updated_date` on
+    every write, so decisions need an exception in the writer, and the view and list
+    must print both dates. The mapping used is creation date = `created_date` and
+    update date = `updated_date`; if a separate stored `date` field is intended, that
+    must be stated before implementation.
+
+R87. Backlog views must show the attributes they now promise
+    Severity: medium (conformance)
+    REQ-002.002 now requires the milestone view to show acceptance criteria, labels,
+    and references, and the release view to show labels and references. Milestone
+    acceptance criteria do not exist yet (R53), and the CLI view output must be
+    checked against the new list.
 
 ====================================================================
 NON-FUNCTIONAL REQUIREMENTS — REVIEW 2026-11-24

@@ -20,7 +20,7 @@ Covers the user documentation surfaces: the packaged manual pages and their cont
 ## Manual pages
 
 - Papyrus ships the manual pages `papyrus(1)` and `papyrus-config(5)`.
-- The package installs them to the standard manual path, so `man papyrus` and `man papyrus-config` display them after installation.
+- The `papyrus` package installs `papyrus(1)` and `papyrus-config(5)` to the standard manual path; the `papyrus-browser` package installs `papyrus-browser(1)`. `man papyrus`, `man papyrus-config`, and `man papyrus-browser` display them after installation.
 - The pages need no network access.
 - A command added to the CLI is documented in the manual before the release that ships it.
 
@@ -44,7 +44,7 @@ Covers the user documentation surfaces: the packaged manual pages and their cont
 
 - The packaged source is the single source of the manual text.
 - Man page sources are Markdown files under `docs/man/`; the build generates roff from them and installs the roff pages to the standard man paths in the `.deb`.
-- The same source is compiled into the binary at build time, so `papyrus help` prints it without reading a file at runtime.
+- The same source is compiled into the `papyrus` binary at build time, so `papyrus help` prints it without reading a file at runtime.
 - The installed pages and the `papyrus help` output therefore carry the same text.
 
 ## Per-command help

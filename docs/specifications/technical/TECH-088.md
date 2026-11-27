@@ -54,6 +54,6 @@ Defines the Seed as a compile-time configuration of the system: one configuratio
 
 ## Runtime Boundary
 
-- The binary carries the Seed; the project tree does not.
+- The shared core library carries the Seed, statically linked into both front-end binaries; the project tree does not.
 - No command writes the Seed back, and no command regenerates it from a project configuration.
 - The Seed is fixed for the life of a binary; two projects initialized by the same binary start from the same Seed.

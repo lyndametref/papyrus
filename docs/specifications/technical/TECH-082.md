@@ -20,7 +20,7 @@ Covers the CLI command surface, common options, and context selection. Input san
 
 ## Command Surface
 
-- The available commands are the built-in commands `init`, `config`, `task`, `milestone`, `release`, `search`, `browser`, `import`, `help`, and `version`, plus one command family for every configured document type and decision type.
+- The available commands are the built-in commands `init`, `config`, `task`, `milestone`, `release`, `search`, `import`, `help`, and `version`, plus one command family for every configured document type and decision type. The web UI is served by the separate `papyrus-browser` binary.
 - Help output — `-h`/`--help`, per-command help, and `papyrus help` — is specified in the user-documentation specification (REQ-008).
 - The global options `--json`, `--no-color`, `--version`, `--dir`, and `--config` are accepted with every command that can honour them.
 - A command-line option takes precedence over the corresponding environment variable, configuration value, and default.
@@ -35,7 +35,7 @@ Covers the CLI command surface, common options, and context selection. Input san
 
 ## Built-in Names
 
-- The reserved built-in names are `init`, `config`, `task`, `milestone`, `release`, `search`, `browser`, `import`, `help`, and `version`.
+- The reserved built-in names are `init`, `config`, `task`, `milestone`, `release`, `search`, `import`, `help`, and `version`.
 - A configured document-type or decision-type slug that collides with a built-in name is rejected when the configuration loads.
 
 ## Common Options and Outcomes

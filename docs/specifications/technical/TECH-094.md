@@ -21,7 +21,7 @@ Covers the serving, offline, and compatibility part of the local web interface (
 
 ## Command surface and bind defaults
 
-- `papyrus browser` starts the web UI over backlog, decision, and document records (REQ-006.002).
+- `papyrus-browser` starts the web UI over backlog, decision, and document records (REQ-006.002).
 - The default bind address is `127.0.0.1`; there is no default port (REQ-006.002).
 - With no selected port, the command chooses a free port above 1024 and below 9999, retrying with another port when one is taken (REQ-006.002).
 - The chosen address is reported when the browser starts (REQ-006.002).
@@ -32,15 +32,15 @@ Covers the serving, offline, and compatibility part of the local web interface (
 
 ## Console output
 
-- By default the `browser` command outputs only errors to the console (REQ-006.007).
+- By default the `papyrus-browser` binary outputs only errors to the console (REQ-006.007).
 - Errors are output whether or not `--debug` is set (REQ-006.007).
-- `--debug` is an option of the `browser` command only: it is not a global option and is not accepted by any other command (REQ-006.007).
+- `--debug` is an option of the `papyrus-browser` binary only: it is not a global option of `papyrus` and is not accepted by any other command (REQ-006.007).
 - With `--debug`, each received request is logged as one line containing the method, the path, the response status, and the duration (REQ-006.007).
 - Request headers and request bodies are not logged, so record content does not reach the console (REQ-006.007).
 
 ## Offline operation
 
-- The `browser` command and the local browser interface operate without an internet connection (NFR-001, NFR-001.003).
+- The `papyrus-browser` binary and the local browser interface operate without an internet connection (NFR-001, NFR-001.003).
 - With external networking disabled and loopback available, the command starts and the interface stays usable for list, view, and edit across record types (NFR-001.003).
 - The interface attempts no outbound network request while that operation is exercised (NFR-001.003).
 - Offline operation is a property of the served interface as a whole, not of a subset of pages (NFR-001.003).

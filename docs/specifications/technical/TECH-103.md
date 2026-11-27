@@ -112,7 +112,7 @@ Covers the full-screen terminal selector used by the init record-type list: dete
 
 ## Boundaries
 
-- No crate, build, or dev dependency is added; `Cargo.toml`, the `.deb` payload, and its `Depends` set are unchanged.
+- No crate, build, or dev dependency is added by this behaviour; the packaging layout is owned by the distribution specification (TECH-106).
 - No `unsafe` block, FFI declaration, or signal handler is added.
 - No shell interpolation and no user-controlled argument reaches `stty`; only the fixed mode vector, `-g`, and the saved-settings restore are used.
 - External signals, a crash, or an abort can terminate the process without running `Drop`, leaving the terminal in the alternate screen or modified mode until `reset` or `stty sane`; the exposure is bounded to the list phase.

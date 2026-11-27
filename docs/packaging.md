@@ -8,7 +8,9 @@
 - Debian Trixie and any other Debian release are **not claimed or verified** as
   supported. Adding a release to the supported set requires an explicit verification
   pass and a follow-up ADR/requirement update (ADR-0003, NFR-003.002).
-- The package declares `Depends: libc6 (>= 2.34)`; the verified environment is Forky
+- The `papyrus` and `papyrus-browser` packages declare `Depends: libc6 (>= 2.34)` and
+  `Depends: papyrus-core (= <version>)`; the `papyrus-core` package declares only
+  `Depends: libc6 (>= 2.34)`. The verified environment is Forky
   with glibc 2.43.
 
 ## Prerequisites
@@ -25,37 +27,58 @@
 ## Build
 
 ```sh
-cargo build --release
+cd apps
+cargo build --release            # workspace build; both binaries
+# or per crate: cargo build -p papyrus-cli --release / cargo build -p papyrus-browser --release
 ```
 
-The binary is produced at `target/release/papyrus`.
+The binaries are produced at `apps/target/release/papyrus` and `apps/target/release/papyrus-browser`.
 
 Run the test suite:
 
 ```sh
-cargo test
+cd apps && cargo test --workspace
 ```
 
 Lint and format:
 
 ```sh
-cargo clippy --all-targets -- -D warnings
-cargo fmt --check
+cd apps && cargo clippy --workspace --all-targets -- -D warnings
+cd apps && cargo fmt --all --check
 ```
 
 ## Run (uninstalled)
 
 ```sh
-./target/release/papyrus --help
-./target/release/papyrus -h
-./target/release/papyrus --version
+apps/target/release/papyrus --help
+apps/target/release/papyrus -h
+apps/target/release/papyrus --version
+apps/target/release/papyrus-browser --help
+apps/target/release/papyrus-browser --version
 ```
 
 Expected:
 
-- `--help` / `-h`: print help and exit `0`, listing `search` and `browser`.
-- `--version`: print `papyrus <version>` and exit `0`.
+- `--help` / `-h`: print help and exit `0`, listing the built-in commands (`search`, no `browser` subcommand).
+- `--version`: print `papyrus <version>` / `papyrus-browser <version>` and exit `0`.
 - unknown flags/arguments: print usage to stderr and exit `2`.
+
+## Packaging (three-package workspace)
+
+Per ADR-046, one packaging run produces three `.deb` files at one version, with
+scripts under `apps/scripts/`:
+
+- `papyrus-core_<version>_amd64.deb` — library artifact; installs no executable; no Papyrus dependency.
+- `papyrus_<version>_amd64.deb` — installs `/usr/bin/papyrus`; `Depends: papyrus-core (= <version>)`.
+- `papyrus-browser_<version>_amd64.deb` — installs `/usr/bin/papyrus-browser`; `Depends: papyrus-core (= <version>)`.
+
+The run produces three file lists and three smoke tests (one per package, both
+binaries exercised). The front-end packages never depend on each other, and
+neither executable invokes the other; both statically link `papyrus-core`.
+
+> **Historical (Release 1.0).** The sections below through the recorded milestone
+> verifications describe the Release 1.0 single-package procedure. Current
+> packaging follows the three-package workspace section above.
 
 ## Packaging (Release 1.0, 2026-11-23)
 
@@ -125,11 +148,14 @@ Expected metadata: `Package: papyrus`, `Version: <requested version>`, `Architec
 ## Install
 
 ```sh
-sudo dpkg -i builds/<version>/.build/<component>/papyrus_<version>_amd64.deb
+sudo dpkg -i builds/<version>/.build/<component>/papyrus-core_<version>_amd64.deb \
+            builds/<version>/.build/<component>/papyrus_<version>_amd64.deb \
+            builds/<version>/.build/<component>/papyrus-browser_<version>_amd64.deb
 ```
 
 After installation, `papyrus` is available on `PATH` (installed to
-`/usr/bin/papyrus`).
+`/usr/bin/papyrus`). `papyrus-browser` is available at
+`/usr/bin/papyrus-browser`.
 
 ### Isolated install (verification only)
 

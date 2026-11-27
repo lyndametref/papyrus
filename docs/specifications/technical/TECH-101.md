@@ -38,7 +38,7 @@ Covers the embedded HTTP server's transport rules, static asset routing, respons
 
 ## Static asset routing
 
-- One static table is defined in `src/browser/assets.rs`:
+- One static table is defined in `apps/browser/src/assets.rs`:
 
   ```rust
   pub struct Asset { pub path: &'static str, pub mime: &'static str, pub bytes: &'static [u8] }
@@ -48,7 +48,7 @@ Covers the embedded HTTP server's transport rules, static asset routing, respons
 - `lookup` is a linear scan over exact path strings. There is no prefix matching, no directory expansion, no path join, and no percent-decoded filesystem access.
 - A miss returns `404` for every method. A hit with a method other than `GET` or `HEAD` returns `405` with `Allow: GET, HEAD`. `HEAD` sends `Content-Length` and no body.
 - Binary bodies are carried by `Response::bytes(status, content_type, &'static [u8])`. No module serves a file from disk for the browser; every served byte comes from `ASSETS`.
-- Vendored files are served from `/assets/<package>/<asset-version>/<file>`, mirroring `src/browser/vendor/<package>/<asset-version>/`. The version segment is a literal part of the table entry, never a runtime value, and is not the Papyrus package version.
+- Vendored files are served from `/assets/<package>/<asset-version>/<file>`, mirroring `apps/browser/web/vendor/<package>/<asset-version>/`. The version segment is a literal part of the table entry, never a runtime value, and is not the Papyrus package version.
 - Unversioned vendor paths return `404`; they are neither redirected nor aliased. First-party assets keep unversioned paths: `/assets/app.css`, `/assets/app.js`, and `/assets/nav-state.js`.
 - Pages reference only table entries, only from `/assets/`. No CDN, web font, icon font, image, remote `@import`, or remote `url(...)` is referenced.
 

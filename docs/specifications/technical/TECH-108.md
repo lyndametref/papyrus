@@ -18,13 +18,13 @@ Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and 
 ## Cargo
 
 - Cargo is the only build system, dependency manager, and test runner.
-- `Cargo.toml` declares the crate and its direct dependencies; `Cargo.lock` is committed and pins the resolved dependency graph.
-- `cargo build` and `cargo test` run from the repository root; `cargo build --release` writes `target/release/papyrus`.
-- The build uses no Cargo workspace and no code generation before compilation.
+- `apps/Cargo.toml` is a virtual workspace manifest declaring the members `cli`, `browser`, and `libs/core`; each member has its own `Cargo.toml`. `Cargo.lock` and `rust-toolchain.toml` are committed at `apps/` and pin the resolved dependency graph and toolchain.
+- `cargo build`, `cargo test`, `cargo fmt --all`, and `cargo clippy --workspace` run from `apps/`; `cargo build -p papyrus-cli --release` writes `apps/target/release/papyrus` and `cargo build -p papyrus-browser --release` writes `apps/target/release/papyrus-browser`. CI runs every Cargo step with `working-directory: apps` or `--manifest-path apps/Cargo.toml`.
+- The build uses a Cargo workspace (no parent manifest above `apps/Cargo.toml`) and no code generation before compilation.
 
 ## Toolchain
 
-- Rust 1.99.1 via rustup is pinned by `rust-toolchain.toml`.
+- Rust 1.99.1 via rustup is pinned by `apps/rust-toolchain.toml`.
 - The pin is the reproducible baseline; a toolchain change is explicit.
 - Build-time tools are rustc, Cargo, rustfmt, and Clippy. Python 3 and groff are used only for man-page generation and verification.
 - No Node.js or npm step is part of the build.
@@ -34,7 +34,7 @@ Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and 
 
 - The release profile uses LTO and strip for distributed binaries and for the binary used in performance measurement (NFR-007.001).
 - The debug profile is a development artifact and is not distributed.
-- Build output is confined to `target/`.
+- Build output is confined to `apps/target/`, which `.gitignore` excludes.
 
 ## Checks
 
@@ -46,6 +46,6 @@ Covers the Cargo build, pinned toolchain, build profiles, build-time tools, and 
 
 ## Reproducibility
 
-- The committed `Cargo.lock` and `rust-toolchain.toml` define the dependency and toolchain baseline.
+- The committed `apps/Cargo.lock` and `apps/rust-toolchain.toml` define the dependency and toolchain baseline.
 - The packaging build uses the local Cargo cache and performs no network access.
-- The release binary is `target/release/papyrus`; no runtime asset directory or generated file ships beside it.
+- The release binaries are `apps/target/release/papyrus` and `apps/target/release/papyrus-browser`; no runtime asset directory or generated file ships beside either.
