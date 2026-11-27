@@ -2,7 +2,7 @@
 id: TECH-115
 title: "Latency Criteria"
 created_date: '2026-11-27T17:13:35Z'
-updated_date: '2026-11-27T17:51:47Z'
+updated_date: '2026-11-27T19:16:45Z'
 labels: []
 references:
   - NFR-007
@@ -14,6 +14,16 @@ status: verified
 
 ## Description
 Covers the latency targets and the shared measurement method for browser routes at 1,000 active records. Server transport, caching, and page content are separate specifications.
+
+## Latency reduction strategy
+
+- The serving snapshot is built once per configuration generation and reused; a request performs one `stat` fingerprint check and rebuilds only when the configuration changed.
+- Each request may build one record snapshot: it lists each enabled active directory once, maps canonical file stems to paths, and parses a matching record at most once.
+- Full and front-matter-only parses use separate caches; a record already parsed in full is reused for front-matter-only reads within the request.
+- The inventory page parses front matter only, once per listed file, and derives every card count from that single scan.
+- List and board pages build their indexes from the same request snapshot, so a record parsed for a card, title, milestone, or reference is not parsed again.
+- Static assets are served from embedded bytes; each first-party `ETag` is computed once per process, and a conditional request returns `304` without a body.
+- No page, fragment, or record payload is cached across requests; caching is limited to the serving snapshot and the request-scoped record snapshot.
 
 ## Shared measurement method
 
