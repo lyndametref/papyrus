@@ -60,7 +60,7 @@ Covers the three document models, the identifier shape and field schema of each 
 A field declares:
 
 - `key` — stable identifier of the field.
-- `heading` or `frontmatter_key` — one storage location.
+- `heading` — optional body heading. Without one, the field is metadata-only and its field key is its front-matter key.
 - `option` — the CLI option, defaulting to the key in kebab case.
 - `name` and `help` — presentation text.
 - `kind` — `text`, `multiline`, or `list`.
@@ -71,7 +71,7 @@ A field has no per-field order; sequence position is the only order.
 
 ## Storage and Kinds
 
-- A field is stored under exactly one location: a body heading or a front-matter key.
+- A field is stored under exactly one location: a body heading or its key as a front-matter key.
 - A body field occupies one heading section of the record body.
 - A front-matter field occupies one key of the record's YAML front matter.
 - A `multiline` field accepts `-` to read its value from standard input.

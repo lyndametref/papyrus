@@ -2,7 +2,7 @@
 id: TECH-086
 title: "Record Categories, Document Types, and Configuration Validation"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-26T21:45:05Z'
+updated_date: '2026-11-27T12:32:35Z'
 labels: []
 references:
   - REQ-007
@@ -42,7 +42,7 @@ Covers the three record categories, their lifecycles, the `document_types` map, 
 - `archived` is reserved for the storage state and is never a declared status.
 - An empty `statuses` list is valid and leaves `active` as the only workflow status.
 - Custom statuses exist only for front-matter-backed document types.
-- A `formatted-record` type uses fixed HTML-metadata states `pending`, `approved`, and `archived`, declares no custom status, and has no `status` verb.
+- A `formatted-record` type uses fixed HTML-metadata states `draft` and `approved`, declares no custom status, and has no `status` verb; archiving moves the file and changes no state.
 
 ## The `status` Verb
 
@@ -102,7 +102,7 @@ Configuration validation reports every diagnostic in one deterministic pass and 
 
 **Required and duplicated values.** Rejected: a missing `prefix`; a `prefix` repeated across entries; a missing or absolute `directory`; a `directory` outside the project directory; a repeated directory; a repeated slug key.
 
-**Model and field items.** Rejected: a model outside the three; a model shape violation; a field with an unknown `kind` or `verb`, with neither `heading` nor `frontmatter_key`, with a reserved key, or with a duplicate key in its role; an empty `values` restriction, or one that is not `record-ids` on a `list` field; a `field_defaults` key naming no declared field.
+**Model and field items.** Rejected: a model outside the three; a model shape violation; a field with an unknown `kind` or `verb`, with a reserved key, or with a duplicate key in its role; an empty `values` restriction, or one that is not `record-ids` on a `list` field; a `field_defaults` key naming no declared field.
 
 Reserved keys for field keys and front-matter keys: `id`, `title`, `status`, `labels`, `references`, `created_date`, `updated_date`, `group`, `version`, `kind`, `form`, `path`, `metadata`.
 
