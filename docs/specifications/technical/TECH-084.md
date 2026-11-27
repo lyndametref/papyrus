@@ -2,7 +2,7 @@
 id: TECH-084
 title: "Record Persistence, Layout, and Lifecycle"
 created_date: '2026-11-25T20:42:10Z'
-updated_date: '2026-11-27T13:01:53Z'
+updated_date: '2026-11-27T14:07:53Z'
 labels: []
 references:
   - REQ-005.007
@@ -11,7 +11,7 @@ references:
   - NFR-004.001
   - NFR-004.002
   - NFR-004.005
-status: draft
+status: verified
 ---
 # TECH-084 Record Persistence, Layout, and Lifecycle
 
