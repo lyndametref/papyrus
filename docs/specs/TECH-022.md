@@ -2,7 +2,7 @@
 id: TECH-022
 title: "Record Write Concurrency and Conflict Detection"
 created_date: '2026-11-27T20:35:41Z'
-updated_date: '2026-11-27T20:35:41Z'
+updated_date: '2026-11-28T07:50:04Z'
 labels: []
 references:
   - REQ-005.011
@@ -20,7 +20,7 @@ Covers the single record write path shared by the CLI and the browser, the versi
 ## Single write path
 
 - `record::store::write_atomic` is the only writer of a record file. No module calls `fs::write` on a record path; every surface — CLI verbs, browser submission, import — expresses its write through it.
-- Each operation builds one patch: `SetFrontMatter`, `ClearFrontMatter`, `SetSection`, `ClearSection`, `SetHeadingTitle`, and explicit section moves. The writer applies that patch and performs no other transformation.
+- Each operation builds one patch: `SetFrontMatter`, `ClearFrontMatter`, `SetSection`, `ClearSection`, `SetHeadingTitle`, `SetHtmlTitle`, and explicit section moves. The writer applies that patch and performs no other transformation.
 - A patch that changes no byte performs no write, so a no-op does not refresh `updated_date`.
 - One clock read per write supplies the timestamp. `created_date` is set at creation and never changes afterwards; `updated_date` is refreshed by every write, and on a decision record only when the status changes (REQ-005.011).
 - Persistence adds no database, index, cache, lock file, sidecar, or mapping store (NFR-004.005). A record remains a UTF-8 text file (NFR-004.001).
@@ -65,8 +65,8 @@ Covers the single record write path shared by the CLI and the browser, the versi
 - Front-matter keys and body content that the operation does not change are preserved.
 - An undeclared front-matter key already on disk is preserved and is never repaired, merged, or removed.
 - Unknown and editor-added `##` sections are preserved content-identically, in their original order.
-- The body carries no generated title line: identity and title live in the front matter, and a write never inserts one (REQ-005.010).
-- For a `formatted-record`, the HTML body and the metadata-comment keys the operation does not change are preserved; the record has no front matter.
+- The body carries no generated title line: for a Markdown-backed record identity and title live in the front matter, and for a `formatted-record` the title is the HTML `<title>` element; a write never inserts a generated title line (REQ-005.010).
+- For a `formatted-record`, the HTML body and the metadata-comment keys the operation does not change are preserved; a title edit rewrites the HTML `<title>` element, and the record has no front matter.
 - The file ends with a single LF newline.
 - A validation failure writes nothing.
 

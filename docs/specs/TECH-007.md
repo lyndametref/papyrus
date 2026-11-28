@@ -2,7 +2,7 @@
 id: TECH-007
 title: "Content Models and Field Schema"
 created_date: '2026-11-27T20:35:36Z'
-updated_date: '2026-11-28T07:47:44Z'
+updated_date: '2026-11-28T07:51:25Z'
 labels: []
 references:
   - REQ-005
@@ -47,7 +47,8 @@ Covers the three document models, the identifier shape and field schema of each 
 
 - One record per plain identifier, with an HTML body.
 - The type declares no field sequence and the record has no YAML front matter.
-- Metadata lives in an HTML metadata comment and carries exactly these keys: `status`, `references`.
+- Status and references live in an HTML metadata comment; the comment carries exactly these keys: `status`, `references`.
+- The record title is the content of the HTML `<title>` element; it is not a metadata-comment key.
 - Both keys are engine-owned record data; neither is a field, a CLI field option, or a configuration key.
 - The states are exactly `draft` and `approved`; a new record starts `draft`.
 - `edit --status approved` moves `draft` to `approved`. A backwards or skipping transition is rejected, and `--status` accepts no other value.

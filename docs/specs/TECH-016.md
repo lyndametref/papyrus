@@ -2,7 +2,7 @@
 id: TECH-016
 title: "Browser Editing and Metadata Maintenance"
 created_date: '2026-11-27T20:35:39Z'
-updated_date: '2026-11-27T20:35:39Z'
+updated_date: '2026-11-28T07:50:04Z'
 labels: []
 references:
   - REQ-005.011
@@ -30,12 +30,12 @@ Covers the browser edit surface for a document record: the controls it derives f
 ## Save and Write Path
 
 - A save submits the form through the same write path that a command-line edit uses (REQ-005.011).
-- One save produces one patch of operations — set a front-matter key, set or clear a body section, set the heading title, and the model-specific group link, HTML-metadata, and supersession changes — and a single writer applies the patch atomically (REQ-005.011).
+- One save produces one patch of operations — set a front-matter key, set or clear a body section, set the heading title, and the model-specific group link, HTML metadata and title, and supersession changes — and a single writer applies the patch atomically (REQ-005.011).
 - A patch with no change performs no write; a failed validation leaves the store untouched (REQ-005.011).
 - Each submitted value is written to the storage locations its field declares (REQ-006.004).
 - The metadata and content that the save does not change are preserved (REQ-006.004, REQ-005.011).
 - A front-matter key on disk that the type does not declare is kept as stored; a save never repairs, merges, or removes it (REQ-005.011).
-- A `formatted-record` record carries no YAML front matter: its metadata is read from and written to its HTML metadata comment, with the same parity (REQ-006.004).
+- A `formatted-record` record carries no YAML front matter: its status and references are read from and written to its HTML metadata comment, and its title is read from and written to the HTML `<title>` element, with the same parity (REQ-006.004).
 - A record still carrying a value in a legacy body section moves that value to front matter when the record is written, so no value is stored twice (REQ-005.011).
 
 ## Submission and Conflict

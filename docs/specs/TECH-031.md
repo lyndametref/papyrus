@@ -2,7 +2,7 @@
 id: TECH-031
 title: "Record Metadata, Front Matter, and Projection"
 created_date: '2026-11-27T20:35:44Z'
-updated_date: '2026-11-27T20:35:44Z'
+updated_date: '2026-11-28T07:50:04Z'
 labels: []
 references:
   - REQ-001.005
@@ -21,7 +21,7 @@ Covers the front-matter contract, general, reserved, and document keys, serializ
 
 - Every Markdown record that Papyrus manages begins with a YAML front-matter block at byte 0, delimited by `---` lines.
 - Front matter is authoritative for the keys it carries and replaces the equivalent information in the record body for records Papyrus writes.
-- Records of a `formatted-record` type carry no front matter; their metadata is kept in their HTML metadata comment.
+- Records of a `formatted-record` type carry no front matter; their status and references are kept in their HTML metadata comment, and their title is the content of the HTML `<title>` element.
 - Prose Markdown that no document type claims is not managed and is out of scope.
 
 ## General Keys
