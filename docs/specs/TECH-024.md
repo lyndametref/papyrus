@@ -2,7 +2,7 @@
 id: TECH-024
 title: "Man-Page Generation and Installation"
 created_date: '2026-11-27T20:35:42Z'
-updated_date: '2026-11-27T20:35:42Z'
+updated_date: '2026-11-28T08:09:29Z'
 labels: []
 references:
   - REQ-008.001
@@ -24,7 +24,7 @@ Covers man-page generation and installation: the page set, the Markdown sources,
 
 ## Sources
 
-- Man-page sources are Markdown files under `docs/man/`: `docs/man/papyrus.1.md` and `docs/man/papyrus-config.5.md`.
+- Man-page sources are Markdown files under `docs/man/`: `docs/man/papyrus.1.md`, `docs/man/papyrus-config.5.md`, and `docs/man/papyrus-browser.1.md`.
 - `docs/man/` is the only man-page source. No other file is converted into a packaged page.
 - `README.md` carries a pointer to the installed pages and does not repeat their text as a second maintained copy.
 
