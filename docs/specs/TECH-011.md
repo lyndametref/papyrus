@@ -2,7 +2,7 @@
 id: TECH-011
 title: "Record Create and Edit"
 created_date: '2026-11-27T20:35:38Z'
-updated_date: '2026-11-27T20:35:38Z'
+updated_date: '2026-11-28T08:25:50Z'
 labels: []
 references:
   - REQ-002.001
@@ -39,6 +39,7 @@ Covers creating and editing a record across the three record categories: the tit
 - `--editor` opens the record body in the configured editor; an option-only edit updates the metadata without opening the editor.
 - An edit can never clear the title.
 - No edit option sets the status; the status verbs of the category perform status changes.
+- An archived record is not editable: an edit is rejected with a validation outcome and writes nothing.
 - A browser save applies the same create and edit rules.
 
 ## Document fields

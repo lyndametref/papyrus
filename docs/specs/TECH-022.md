@@ -2,7 +2,7 @@
 id: TECH-022
 title: "Record Write Concurrency and Conflict Detection"
 created_date: '2026-11-27T20:35:41Z'
-updated_date: '2026-11-28T07:50:04Z'
+updated_date: '2026-11-28T08:25:50Z'
 labels: []
 references:
   - REQ-005.011
@@ -39,7 +39,7 @@ Covers the single record write path shared by the CLI and the browser, the versi
 
 - A record identifier is resolved by exact, case-sensitive match against the active directory listing of its enabled type. A request value is never concatenated into a path.
 - Every path a read or write touches — record directory, record file, temporary file — passes `Context::ensure_within` against the canonical project directory (NFR-004.002). A symlink escape is rejected before any content is read or written.
-- An identifier that does not resolve — unknown, archived, or of a type that is not configured — produces the shared not-found page and no write.
+- An identifier that is unknown or of a type that is not configured produces the shared not-found page and no write. An archived record resolves for reads; a write to it is rejected with a validation outcome and writes nothing.
 
 ## Atomic write sequence
 

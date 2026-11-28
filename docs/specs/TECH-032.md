@@ -2,7 +2,7 @@
 id: TECH-032
 title: "Record Views"
 created_date: '2026-11-27T20:35:44Z'
-updated_date: '2026-11-27T20:35:44Z'
+updated_date: '2026-11-28T08:25:50Z'
 labels: []
 references:
   - REQ-002.002
@@ -21,7 +21,8 @@ Covers the console single-record view for the three record categories: document 
 - A view renders one record. Plain text is the default output and `--json` carries the values without console formatting.
 - `--no-color` disables the console styling; the content stays readable.
 - References are present on the single-record view of every category.
-- A record that is unknown, archived, or of a type that is not configured is not viewable, and no command returns it.
+- A record that is unknown or of a type that is not configured is not viewable, and no command returns it. An archived record is viewable.
+- An archived record is not editable: an edit is rejected with a validation outcome and writes nothing.
 
 ## Document views
 
@@ -50,4 +51,4 @@ Covers the console single-record view for the three record categories: document 
 
 - A decision view shows the identifier, title, type, status, decision text, context, consequences, creation date, update date, labels, and references.
 - A superseded decision's view names its successor.
-- An archived decision is not viewable.
+- An archived decision is viewable.
