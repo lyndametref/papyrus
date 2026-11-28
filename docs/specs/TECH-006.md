@@ -2,7 +2,7 @@
 id: TECH-006
 title: "Record Categories, Record Types, and Configuration Validation"
 created_date: '2026-11-27T20:35:36Z'
-updated_date: '2026-11-27T20:35:36Z'
+updated_date: '2026-11-28T07:46:59Z'
 labels: []
 references:
   - REQ-007
@@ -124,7 +124,7 @@ The order in which entries appear in the configuration is the navigation order. 
 
 - An omitted `model` is `simple-record`, any configured type may declare any model, and an omitted attribute takes a model-derived default, never a value from a built-in table.
 - Defaults are: no statuses, no `default_status`, a slug-derived `record_name` and plural, and empty summary, slots, and field defaults.
-- A `simple-record` entry that omits `fields` declares one optional `content` field in the body of the record with kind `multiline`; `fields: []` declares no field, and a role block that omits `fields` has an empty sequence.
+- A `simple-record` entry that omits `fields` declares one optional multiline `content` field stored directly in the record body without a heading; `fields: []` declares no field, and a role block that omits `fields` has an empty sequence.
 
 ## Unknown Attributes
 

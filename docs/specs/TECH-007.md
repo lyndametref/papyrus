@@ -2,7 +2,7 @@
 id: TECH-007
 title: "Content Models and Field Schema"
 created_date: '2026-11-27T20:35:36Z'
-updated_date: '2026-11-27T20:35:37Z'
+updated_date: '2026-11-28T07:47:44Z'
 labels: []
 references:
   - REQ-005
@@ -29,6 +29,7 @@ Covers the three document models, the identifier shape and field schema of each 
 
 - One record per plain identifier.
 - The body is Markdown and consists of the type's field sequence, which may be empty.
+- A `simple-record` type that omits `fields` has one optional multiline `content` field stored directly in the body without a heading.
 - A record carries the general front matter; `status` is front-matter data.
 - The type declares one top-level field sequence and no role block.
 
@@ -59,7 +60,7 @@ Covers the three document models, the identifier shape and field schema of each 
 A field declares:
 
 - `key` — stable identifier of the field.
-- `heading` — optional body heading. Without one, the field is metadata-only and its field key is its front-matter key.
+- `heading` — optional body heading. Without one, the field is metadata-only and its field key is its front-matter key, except the default `content` field of a `simple-record` entry that omits `fields`.
 - `option` — the CLI option, defaulting to the key in kebab case.
 - `name` and `help` — presentation text.
 - `kind` — `text`, `multiline`, or `list`.
@@ -70,8 +71,9 @@ A field has no per-field order; sequence position is the only order.
 
 ## Storage and Kinds
 
-- A field is stored under exactly one location: a body heading or its key as a front-matter key.
-- A body field occupies one heading section of the record body.
+- A field is stored under exactly one location: a body heading, its key as a front-matter key, or, for the default `content` field only, the record body directly without a heading.
+- A body field with a heading occupies one heading section of the record body.
+- The default `content` field of a `simple-record` entry that omits `fields` is stored directly in the record body without a heading; it is the only body field without a heading.
 - A front-matter field occupies one key of the record's YAML front matter.
 - A `multiline` field accepts `-` to read its value from standard input.
 - A `list` field holds a list; each command-line occurrence appends one item.
