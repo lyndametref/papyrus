@@ -2,7 +2,7 @@
 id: TECH-023
 title: "Interactive Init Terminal Input"
 created_date: '2026-11-27T20:35:42Z'
-updated_date: '2026-11-27T20:35:42Z'
+updated_date: '2026-11-28T08:03:48Z'
 labels: []
 references:
   - REQ-001.006
@@ -105,10 +105,10 @@ Covers the full-screen terminal selector used by the init record-type list: dete
 
 ## Interrupt
 
-- Ctrl-C arrives as `0x03` and maps to `AppError::Interrupted`, code `130`, message `interrupted`; `main` exits with `err.code()`.
+- Ctrl-C arrives as `0x03` and maps to `AppError::Interrupted`, code `1`, message `interrupted`; `main` exits with `err.code()`.
 - The interrupt is raised before `Config::validate()`, any directory creation, and the configuration write.
 - The guard restores cursor, alternate screen, and terminal mode before the error propagates.
-- The prefix and folder prompts stay canonical; Ctrl-C there keeps the kernel SIGINT disposition and exits 130.
+- The prefix and folder prompts stay canonical; Ctrl-C there keeps the kernel SIGINT disposition and terminates the process by signal (shell status `130` is the signal convention, not an application exit code).
 
 ## Boundaries
 

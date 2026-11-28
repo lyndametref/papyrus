@@ -2,7 +2,7 @@
 id: TECH-002
 title: "CLI Foundation and Context"
 created_date: '2026-11-27T20:35:35Z'
-updated_date: '2026-11-27T20:35:35Z'
+updated_date: '2026-11-28T08:03:48Z'
 labels: []
 references:
   - REQ-001
@@ -52,6 +52,8 @@ Covers the CLI command surface, common options, and context selection. Input san
 | Usage error | 2 |
 | Record not found | 3 |
 | Validation or conflict | 4 |
+
+- The table covers normal process exits; termination by signal is not an application exit code.
 
 ## Project and Configuration Context
 
