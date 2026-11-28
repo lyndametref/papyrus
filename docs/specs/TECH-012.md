@@ -2,7 +2,7 @@
 id: TECH-012
 title: "Record Archive, Restore, Delete, and Lifecycle"
 created_date: '2026-11-27T20:35:38Z'
-updated_date: '2026-11-27T20:35:38Z'
+updated_date: '2026-11-28T07:27:17Z'
 labels: []
 references:
   - REQ-002.001
@@ -20,11 +20,11 @@ Covers the archive, restore, and delete commands and the lifecycle effects they 
 
 ## Archive command
 
-- `papyrus <command> archive <ID>` moves the record's file into the `archive/` subfolder of the folder that holds it and preserves the record identifier.
+- `papyrus <command> archive <ID>` moves the record's file into the `archive/` subfolder of the folder that holds it and preserves the record identifier (for milestones `<backlog_dir>/<milestone_dir>/archive/`; for releases `<backlog_dir>/<release_dir>/archive/`).
 - The file move is the state change; archiving changes no status for any category.
 - Archiving a task preserves its dependencies and references.
 - An archived record is hidden from lists, search, and the browser, except that a search may explicitly include archived records; the browser shows the shared not-found page.
-- Archiving is allowed for any task; for an `open` milestone or a `planned` release, which is closed first; for a `rejected`, `superseded`, or `deprecated` decision; for any non-archived Markdown document; and for a `draft` or `approved` formatted-record.
+- Archiving is allowed for any task, any milestone or release, any `rejected`, `superseded`, or `deprecated` decision, any non-archived Markdown document, and any `draft` or `approved` formatted-record.
 
 - Archiving a decision that is `proposed` or `accepted` is rejected with a validation outcome and writes nothing.
 - No command returns an archived milestone, release, decision, or document to a non-archived state; there is no restore command for them.

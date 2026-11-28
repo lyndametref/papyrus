@@ -2,7 +2,7 @@
 id: TECH-004
 title: "Record Persistence and Layout"
 created_date: '2026-11-27T20:35:35Z'
-updated_date: '2026-11-27T20:35:35Z'
+updated_date: '2026-11-28T07:27:17Z'
 labels: []
 references:
   - REQ-005.007
@@ -41,7 +41,7 @@ Covers the storage format, the closed store set, the project-directory boundary,
 
 ## Record Layout
 
-- A backlog record lives in the backlog folder for its record type, and an archived backlog record lives in that folder's `archive/` subfolder.
+- A backlog record lives in the backlog folder for its record type, and an archived backlog record lives in that folder's `archive/` subfolder (for milestones `<backlog_dir>/<milestone_dir>/archive/`; for releases `<backlog_dir>/<release_dir>/archive/`).
 - With exactly one configured decision type, a decision record lives directly in the main decision folder and an archived decision lives in its `archive/` subfolder.
 - With two or more configured decision types, a decision record lives in its type's directory under the main decision folder, and an archived decision lives in that directory's `archive/` subfolder.
 - A document record lives in the configured directory of its document type, and an archived document lives in that directory's `archive/` subfolder.
