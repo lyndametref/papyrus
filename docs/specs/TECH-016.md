@@ -2,7 +2,7 @@
 id: TECH-016
 title: "Browser Editing and Metadata Maintenance"
 created_date: '2026-11-27T20:35:39Z'
-updated_date: '2026-11-28T07:50:04Z'
+updated_date: '2026-11-28T07:56:54Z'
 labels: []
 references:
   - REQ-005.011
@@ -20,7 +20,7 @@ Covers the browser edit surface for a document record: the controls it derives f
 ## Form Construction
 
 - The form offers the fixed title control and one control per declared field of the record's type and role whose verbs allow edit (REQ-006.004).
-- The form offers the `labels` and `references` controls (REQ-006.004).
+- The form offers the `labels` and `references` controls for a Markdown-backed record; a `formatted-record` form offers the `references` control and no `labels` control (REQ-006.004).
 - `status`, the created date, and the updated date are shown read-only (REQ-006.004).
 - `title` is not a field: it is edited through the fixed title control and not through a field control (REQ-006.004, REQ-005.011).
 - `status` is not editable because it is lifecycle- and configuration-owned (REQ-006.004).
@@ -51,7 +51,7 @@ Covers the browser edit surface for a document record: the controls it derives f
 - `id` is generated and stable (REQ-005.011).
 - `id`, `created_date`, and `updated_date` have no form control (REQ-005.011).
 - For a Markdown-backed document record, `status` has no edit control; it changes only through the `status` verb, and archiving changes no status. A `formatted-record` state changes only through `edit --status approved` (REQ-005.011).
-- `labels` and `references` are general repeatable metadata, not fields (REQ-005.011).
+- `labels` and `references` are general repeatable metadata, not fields, for a Markdown-backed record; a `formatted-record` carries `references` only (REQ-005.008, REQ-006.004).
 - Adding front matter to a record that lacks it leaves the body unchanged (REQ-005.011).
 
 ## Record-Only Persistence
