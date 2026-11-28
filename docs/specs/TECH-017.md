@@ -2,7 +2,7 @@
 id: TECH-017
 title: "Browser Backlog Board"
 created_date: '2026-11-27T20:35:39Z'
-updated_date: '2026-11-27T20:35:39Z'
+updated_date: '2026-11-28T07:59:59Z'
 labels: []
 references:
   - REQ-006.013
@@ -16,7 +16,7 @@ Covers the implementation of the browser Backlog board: ordering computation, st
 
 ## Board assembly
 
-- Status columns are the configured task statuses plus a trailing `Unconfigured status` column for tasks whose stored status is not configured.
+- Status columns are the configured task statuses in configured order; the board adds no other column. A task whose stored status is not configured is not rendered on the board and stays visible in the task list and record view.
 - A task whose milestone is absent or unresolved renders in the expandable `Tasks without a milestone` section after the milestone and release groups.
 - The first milestone that has a non-archived task starts expanded; every other milestone section starts collapsed.
 - A card carries the `POST /records/{id}` form for its status control, and the drag script reuses that form; no drag-specific endpoint or payload exists.
